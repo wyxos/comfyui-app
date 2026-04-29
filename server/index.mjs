@@ -1,0 +1,36 @@
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+
+export { buildCivitaiImagesQueryParams, buildCivitaiModelsQueryParams } from './civitai-query.mjs'
+export { buildCivitaiKeyPreview, serializeCivitaiSettings } from './settings.mjs'
+export { createCompanionServer, configureCompanionServerForTests, startCompanionServer } from './app.mjs'
+export { createDownloadsResponse, serializeDownload } from './downloads/state.mjs'
+export { buildQueueSummaryForPromptIds, extractInputImageNameFromHistory, getQueueSnapshot, normalizeQueueEntries } from './queue-state.mjs'
+export { buildRequestedPromptVariants, normalizeImprovedPromptText } from './ollama.mjs'
+export { buildWorkflow } from './workflow.mjs'
+export { buildControlNetPreviewWorkflow } from './controlnet-preview.mjs'
+export { extractRequestedControlNets } from './controlnet-options.mjs'
+export {
+  classifyLoraCompatibility,
+  fetchCivitaiVersionMetadata,
+  normalizeBaseModelKey,
+  normalizeModelCompatibilityMetadata,
+} from './model-metadata.mjs'
+export {
+  extractRequestedCheckpoints,
+  extractRequestedCheckpointJobs,
+  extractRequestedLoras,
+  normalizeCfg,
+  normalizeDenoise,
+  normalizeDimension,
+  normalizeSeed,
+  sanitizeFilename,
+  sanitizeSubfolder,
+} from './model-paths.mjs'
+export { mergeJobOutputs } from './job-state.mjs'
+export { ensureJobsLoaded, resetJobStoreRuntimeState } from './job-store.mjs'
+
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+  const { startCompanionServer } = await import('./app.mjs')
+  startCompanionServer()
+}

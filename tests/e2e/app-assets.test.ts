@@ -1,0 +1,183 @@
+import { describe, expect, it, vi } from 'vitest'
+import { DEFAULT_BASE_MODELS } from '../../src/views/assets/assetViewTypes'
+import { createMockDownload, createMockModel } from '../fixtures/mockApi'
+import { renderCompanionApp } from './appFlowTestUtils'
+
+function clickHostButton(host: HTMLElement, label: string, index = 0) {
+  const trigger = host.querySelectorAll<HTMLButtonElement>(`button[aria-label="${label}"]`)[index]
+  expect(trigger).toBeDefined()
+  trigger?.click()
+}
+
+function openDownloadsSheet(host: HTMLElement) {
+  clickHostButton(host, 'Open asset downloads')
+}
+
+describe('companion app e2e flows', () => {
+  it('searches assets, opens a preview, hides a model, and queues a download', async () => {
+    const { api, screen, host } = await renderCompanionApp('/assets?q=detail')
+
+    await expect.element(screen.getByText('Mock Detail LoRA')).toBeVisible()
+    const creatorLink = document.querySelector<HTMLAnchorElement>('a[href="/assets?username=atlasmaker"]')
+    expect(creatorLink).not.toBeNull()
+    expect(creatorLink?.target).toBe('_blank')
+    expect(creatorLink?.textContent).toContain('atlasmaker')
+    const initialSearchCall = api.calls.find((call) => call.path === '/api/civitai/models')
+    expect(initialSearchCall?.search.has('sort')).toBe(false)
+
+    await screen.getByRole('button', { name: 'Open Mock Detail LoRA image preview' }).click()
+    const previewDialog = screen.getByRole('dialog', { name: 'Mock Detail LoRA image preview' })
+
+    await expect.element(previewDialog).toBeVisible()
+    await expect.element(previewDialog.getByText('sample prompt', { exact: true })).toBeVisible()
+    await screen.getByRole('button', { name: 'Close image preview' }).click()
+
+    await screen.getByRole('button', { name: 'Download', exact: true }).click()
+
+    openDownloadsSheet(host)
+    await vi.waitFor(() => {
+      expect(host.querySelector('[role="dialog"][aria-label="Asset downloads"]')).not.toBeNull()
+    })
+    expect(api.calls.some((call) => call.method === 'POST' && call.path === '/api/civitai/downloads')).toBe(true)
+
+    clickHostButton(host, 'Pause download')
+
+    await vi.waitFor(() => {
+      expect(
+        api.calls.some(
+          (call) => call.method === 'POST' && call.path === '/api/civitai/downloads/101__201__301/pause',
+        ),
+      ).toBe(true)
+    })
+
+    clickHostButton(host, 'Close asset downloads')
+    clickHostButton(host, 'Blacklist Mock Detail LoRA')
+    await vi.waitFor(() => {
+      expect(host.textContent).toContain('No Civitai models matched "detail".')
+    })
+  })
+
+  it('covers asset filters, empty results, route pagination, metadata, and download panel actions', async () => {
+    const empty = await renderCompanionApp('/assets?q=missing', { models: [] })
+
+    await vi.waitFor(() => {
+      expect(empty.host.textContent).toContain('No Civitai models matched "missing".')
+    })
+
+    const filtered = await renderCompanionApp('/assets?q=detail&types=LORA&nsfw=1&sort=Newest&period=Week&baseModels=all', {
+      civitaiConfigured: true,
+      models: [
+        createMockModel(),
+        createMockModel({ id: 102, name: 'Mock Detail Checkpoint', type: 'Checkpoint' }),
+        createMockModel({
+          id: 103,
+          name: 'Mock Detail No Preview',
+          modelVersions: [
+            {
+              id: 203,
+              name: 'v1',
+              baseModel: 'Pony',
+              files: [
+                {
+                  id: 303,
+                  name: 'noPreview.safetensors',
+                  primary: true,
+                  type: 'Model',
+                  sizeKB: 1024,
+                  downloadUrl: 'https://example.test/noPreview.safetensors',
+                },
+              ],
+              images: [],
+            },
+          ],
+        }),
+      ],
+      downloads: [
+        createMockDownload({
+          id: 'paused-download',
+          state: 'paused',
+          modelName: 'Paused model',
+          progressPercent: 12,
+        }),
+        createMockDownload({
+          id: 'complete-download',
+          state: 'complete',
+          modelName: 'Complete model',
+        }),
+        createMockDownload({
+          id: 'error-download',
+          state: 'error',
+          modelName: 'Errored model',
+          error: 'Download failed.',
+        }),
+      ],
+    })
+
+    await expect.element(filtered.screen.getByText('API key')).toBeVisible()
+    await expect.element(filtered.screen.getByText('Mock Detail LoRA')).toBeVisible()
+    await expect.element(filtered.screen.getByText('Mock Detail No Preview')).toBeVisible()
+    await expect.element(filtered.screen.getByText('2 results')).toBeVisible()
+    await expect.element(filtered.screen.getByText('Page 1')).toBeVisible()
+    expect(filtered.host.textContent).not.toContain('2 results · Page 1')
+    await expect.element(filtered.screen.getByText('No preview available')).toBeVisible()
+    const noPreviewButton = document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Mock Detail No Preview has no preview available"]',
+    )
+    expect(noPreviewButton?.disabled).toBe(true)
+    await expect.element(filtered.screen.getByRole('button', { name: 'Latest', exact: true })).toBeVisible()
+    await expect.element(filtered.screen.getByRole('button', { name: 'Latest LoRA' })).toBeVisible()
+    await expect.element(filtered.screen.getByRole('button', { name: 'Latest checkpoints' })).toBeVisible()
+    await expect.element(filtered.screen.getByRole('button', { name: 'Highest rated checkpoints' })).toBeVisible()
+
+    const searchCall = filtered.api.calls.find((call) => call.path === '/api/civitai/models')
+    expect(searchCall?.search.get('types')).toBe('LORA')
+    expect(searchCall?.search.get('nsfw')).toBe('true')
+    expect(searchCall?.search.get('sort')).toBe('Newest')
+    expect(searchCall?.search.get('period')).toBe('Week')
+    expect(searchCall?.search.get('primaryFileOnly')).toBeNull()
+    expect(searchCall?.search.getAll('baseModels')).toEqual([])
+
+    await filtered.screen.getByRole('button', { name: 'Open Mock Detail LoRA image preview' }).click()
+    await expect.element(filtered.screen.getByText('Negative prompt')).toBeVisible()
+    await expect.element(filtered.screen.getByText('blur', { exact: true }).first()).toBeVisible()
+    await filtered.screen.getByRole('button', { name: 'Close image preview' }).click()
+
+    openDownloadsSheet(filtered.host)
+    await vi.waitFor(() => {
+      expect(filtered.host.textContent).toContain('Paused model')
+      expect(filtered.host.textContent).toContain('Errored model')
+    })
+
+    clickHostButton(filtered.host, 'Resume download')
+    clickHostButton(filtered.host, 'Cancel download')
+    clickHostButton(filtered.host, 'Clear finished downloads')
+    clickHostButton(filtered.host, 'Close asset downloads')
+
+    await vi.waitFor(() => {
+      expect(
+        filtered.api.calls.some(
+          (call) => call.method === 'POST' && call.path === '/api/civitai/downloads/paused-download/resume',
+        ),
+      ).toBe(true)
+      expect(filtered.api.calls.some((call) => call.method === 'POST' && call.path.endsWith('/cancel'))).toBe(true)
+      expect(filtered.api.calls.some((call) => call.method === 'POST' && call.path === '/api/civitai/downloads/clear')).toBe(true)
+    })
+
+    const modelSearchCallsBeforePreset = filtered.api.calls.filter((call) => call.path === '/api/civitai/models').length
+    await filtered.screen.getByRole('button', { name: 'Highest rated checkpoints' }).click()
+    await vi.waitFor(() => {
+      expect(filtered.api.calls.filter((call) => call.path === '/api/civitai/models').length).toBeGreaterThan(
+        modelSearchCallsBeforePreset,
+      )
+    })
+    const modelSearchCallsAfterPreset = filtered.api.calls.filter((call) => call.path === '/api/civitai/models')
+    const presetSearchCall = modelSearchCallsAfterPreset[modelSearchCallsAfterPreset.length - 1]
+    expect(presetSearchCall?.search.get('types')).toBe('Checkpoint')
+    expect(presetSearchCall?.search.get('nsfw')).toBe('true')
+    expect(presetSearchCall?.search.get('sort')).toBe('Highest Rated')
+    expect(presetSearchCall?.search.get('period')).toBe('AllTime')
+    expect(presetSearchCall?.search.get('primaryFileOnly')).toBe('true')
+    expect(presetSearchCall?.search.get('query')).toBeNull()
+    expect(presetSearchCall?.search.getAll('baseModels')).toEqual(DEFAULT_BASE_MODELS)
+  })
+})

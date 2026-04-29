@@ -1,0 +1,341 @@
+import { createHash } from 'node:crypto'
+import { createReadStream } from 'node:fs'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import { configDir } from './config.mjs'
+import { readJsonFileIfExists, resolveModelPath } from './model-paths.mjs'
+import { normalizeOptionalBoolean, safeTrim } from './shared.mjs'
+
+const pendingEnrichment = new Set()
+
+function normalizeInteger(value) {
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+    return value
+  }
+
+  const parsed = Number.parseInt(safeTrim(value), 10)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+function normalizeStringList(value) {
+  const values = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/[\r\n,|]+/g) : []
+  const seen = new Set()
+  const normalized = []
+
+  for (const entry of values) {
+    const text = safeTrim(entry)
+    const key = text.toLowerCase()
+    if (!text || seen.has(key)) {
+      continue
+    }
+
+    seen.add(key)
+    normalized.push(text)
+  }
+
+  return normalized
+}
+
+function normalizeHashes(...values) {
+  const hashes = {}
+
+  for (const value of values) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      continue
+    }
+
+    for (const [algorithm, hash] of Object.entries(value)) {
+      const normalizedAlgorithm = safeTrim(algorithm).toUpperCase()
+      const normalizedHash = safeTrim(hash)
+      if (normalizedAlgorithm && normalizedHash) {
+        hashes[normalizedAlgorithm] = normalizedHash
+      }
+    }
+  }
+
+  return hashes
+}
+
+export function normalizeBaseModelKey(value) {
+  const normalized = safeTrim(value)
+    .toLowerCase()
+    .replace(/\b(stable diffusion|sd)\b/g, 'sd')
+    .replace(/[^a-z0-9]+/g, '')
+
+  if (!normalized) {
+    return ''
+  }
+
+  if (normalized === 'sdxl10' || normalized === 'sdxlbase10') {
+    return 'sdxl'
+  }
+
+  return normalized
+}
+
+function collectFileHashes(payload) {
+  const files = Array.isArray(payload?.files) ? payload.files : []
+  return normalizeHashes(
+    payload?.hashes,
+    payload?.file?.hashes,
+    payload?.modelVersion?.file?.hashes,
+    ...files.map((file) => file?.hashes),
+  )
+}
+
+function normalizeModelType(value, fallback) {
+  const modelType = safeTrim(value || fallback)
+  if (!modelType) {
+    return safeTrim(fallback) || null
+  }
+
+  return modelType.toLowerCase() === 'lora' ? 'LORA' : modelType
+}
+
+export function normalizeModelCompatibilityMetadata(payload, options = {}) {
+  const source = options.source ?? safeTrim(payload?.source) ?? 'unknown'
+  if (!payload || typeof payload !== 'object') {
+    return {
+      modelId: null,
+      versionId: null,
+      modelName: '',
+      versionName: '',
+      modelType: normalizeModelType(null, options.modelType),
+      modelNsfw: null,
+      baseModel: '',
+      baseModelKey: '',
+      trainedWords: [],
+      hashes: {},
+      checkpointNames: [],
+      checkpointHashes: {},
+      source,
+      status: options.status ?? 'missing',
+    }
+  }
+
+  const version = payload.modelVersion && typeof payload.modelVersion === 'object'
+    ? payload.modelVersion
+    : payload.version && typeof payload.version === 'object'
+      ? payload.version
+      : payload
+  const model = payload.model && typeof payload.model === 'object' ? payload.model : payload
+  const baseModel = safeTrim(payload.baseModel ?? version.baseModel ?? payload.metadata?.baseModel)
+  const trainedWords = normalizeStringList([
+    ...normalizeStringList(payload.trainedWords),
+    ...normalizeStringList(version.trainedWords),
+    ...normalizeStringList(payload.triggerWords),
+  ])
+  const hashes = collectFileHashes(payload)
+  const checkpointHashes = normalizeHashes(payload.checkpointHashes, payload.compatibleCheckpointHashes)
+
+  return {
+    modelId: normalizeInteger(payload.modelId ?? model.id ?? version.modelId),
+    versionId: normalizeInteger(payload.versionId ?? payload.modelVersionId ?? version.id),
+    modelName: safeTrim(payload.modelName ?? model.name ?? options.modelName),
+    versionName: safeTrim(payload.versionName ?? version.name),
+    modelType: normalizeModelType(payload.modelType ?? model.type ?? payload.type, options.modelType),
+    modelNsfw: normalizeOptionalBoolean(payload.modelNsfw ?? payload.nsfw ?? model.nsfw ?? payload.modelMetadata?.nsfw),
+    baseModel,
+    baseModelKey: normalizeBaseModelKey(baseModel),
+    trainedWords,
+    hashes,
+    checkpointNames: normalizeStringList(payload.checkpointNames ?? payload.compatibleCheckpoints),
+    checkpointHashes,
+    source,
+    status: options.status ?? 'ready',
+  }
+}
+
+function hasCompatibilityBasis(metadata) {
+  return Boolean(
+    metadata?.baseModelKey ||
+      metadata?.checkpointNames?.length ||
+      Object.keys(metadata?.checkpointHashes ?? {}).length,
+  )
+}
+
+function metadataCachePath(modelType, modelName) {
+  const encodedName = Buffer.from(`${modelType}:${modelName}`).toString('base64url')
+  return join(configDir, 'model-metadata-cache', `${encodedName}.civitai.info`)
+}
+
+function civitaiVersionToSidecar(payload, fallback = {}) {
+  const primaryFile = Array.isArray(payload?.files)
+    ? payload.files.find((file) => file?.primary) ?? payload.files[0]
+    : null
+  const modelNsfw = normalizeOptionalBoolean(payload?.model?.nsfw ?? payload?.modelNsfw ?? payload?.nsfw ?? fallback.modelNsfw)
+  const modelId = payload?.modelId ?? payload?.model?.id ?? fallback.modelId
+  const modelName = payload?.model?.name ?? fallback.modelName
+  const modelType = payload?.model?.type ?? fallback.modelType
+
+  return {
+    source: 'civitai',
+    modelId,
+    modelName,
+    modelType,
+    modelNsfw,
+    model: {
+      id: modelId,
+      name: modelName,
+      type: modelType,
+      nsfw: modelNsfw,
+    },
+    versionId: payload?.id ?? fallback.versionId,
+    versionName: payload?.name ?? fallback.versionName,
+    baseModel: payload?.baseModel ?? fallback.baseModel,
+    trainedWords: payload?.trainedWords ?? fallback.trainedWords ?? [],
+    fileId: primaryFile?.id ?? fallback.fileId,
+    fileName: primaryFile?.name ?? fallback.fileName,
+    hashes: primaryFile?.hashes ?? fallback.hashes ?? {},
+    files: payload?.files ?? [],
+  }
+}
+
+export async function fetchCivitaiVersionMetadata({ versionId, hashes = {}, fetchImpl = fetch } = {}) {
+  if (versionId) {
+    const response = await fetchImpl(`https://civitai.com/api/v1/model-versions/${versionId}`)
+    if (response.ok) {
+      return civitaiVersionToSidecar(await response.json())
+    }
+  }
+
+  for (const hash of Object.values(hashes)) {
+    const normalizedHash = safeTrim(hash)
+    if (!normalizedHash) {
+      continue
+    }
+
+    const response = await fetchImpl(
+      `https://civitai.com/api/v1/model-versions/by-hash/${encodeURIComponent(normalizedHash)}`,
+    )
+    if (response.ok) {
+      return civitaiVersionToSidecar(await response.json(), { hashes })
+    }
+  }
+
+  return null
+}
+
+async function hashFileSha256(filePath) {
+  return new Promise((resolveHash, rejectHash) => {
+    const hash = createHash('sha256')
+    const stream = createReadStream(filePath)
+    stream.on('data', (chunk) => hash.update(chunk))
+    stream.on('error', rejectHash)
+    stream.on('end', () => resolveHash(hash.digest('hex').toUpperCase()))
+  })
+}
+
+async function writeMetadataPayload(modelPath, cachePath, payload) {
+  const sidecarPath = `${modelPath}.civitai.info`
+  try {
+    await writeFile(sidecarPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
+    return sidecarPath
+  } catch {
+    await mkdir(dirname(cachePath), { recursive: true })
+    await writeFile(cachePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
+    return cachePath
+  }
+}
+
+async function enrichModelMetadataInBackground({ metadata, modelPath, cachePath }) {
+  const hashes = { ...(metadata.hashes ?? {}) }
+  if (!Object.keys(hashes).length) {
+    hashes.SHA256 = await hashFileSha256(modelPath)
+  }
+
+  const payload = await fetchCivitaiVersionMetadata({
+    versionId: metadata.versionId,
+    hashes,
+  })
+
+  if (payload) {
+    await writeMetadataPayload(modelPath, cachePath, payload)
+  }
+}
+
+function scheduleModelMetadataEnrichment(options) {
+  const key = `${options.modelType}:${options.modelName}`
+  if (pendingEnrichment.has(key)) {
+    return
+  }
+
+  pendingEnrichment.add(key)
+  void enrichModelMetadataInBackground(options)
+    .catch(() => {})
+    .finally(() => {
+      pendingEnrichment.delete(key)
+    })
+}
+
+export async function getModelCompatibilityMetadata({ rootPath, modelName, modelType, sidecar }) {
+  const modelPath = resolveModelPath(rootPath, modelName)
+  const cachePath = metadataCachePath(modelType, modelName)
+  const cachedPayload = await readJsonFileIfExists(cachePath)
+  const sidecarMetadata = normalizeModelCompatibilityMetadata(sidecar?.payload, {
+    modelName,
+    modelType,
+    source: sidecar ? 'sidecar' : 'unknown',
+    status: sidecar ? 'ready' : 'missing',
+  })
+  const cachedMetadata = normalizeModelCompatibilityMetadata(cachedPayload, {
+    modelName,
+    modelType,
+    source: 'cache',
+    status: cachedPayload ? 'ready' : 'missing',
+  })
+  const metadata = hasCompatibilityBasis(sidecarMetadata)
+    ? sidecarMetadata
+    : hasCompatibilityBasis(cachedMetadata)
+      ? cachedMetadata
+      : sidecar
+        ? sidecarMetadata
+        : cachedPayload
+          ? cachedMetadata
+          : sidecarMetadata
+
+  if (modelPath && !hasCompatibilityBasis(metadata)) {
+    scheduleModelMetadataEnrichment({ rootPath, modelName, modelType, metadata, modelPath, cachePath })
+    return {
+      ...metadata,
+      status: metadata.status === 'missing' ? 'loading' : metadata.status,
+    }
+  }
+
+  return metadata
+}
+
+function hasExplicitMatch(checkpointMetadata, loraMetadata) {
+  const checkpointNameKeys = new Set(
+    [checkpointMetadata?.modelName, checkpointMetadata?.versionName]
+      .filter(Boolean)
+      .map((value) => safeTrim(value).toLowerCase()),
+  )
+  const loraCheckpointNames = loraMetadata?.checkpointNames ?? []
+  if (loraCheckpointNames.some((name) => checkpointNameKeys.has(name.toLowerCase()))) {
+    return true
+  }
+
+  const checkpointHashes = new Set(Object.values(checkpointMetadata?.hashes ?? {}).map((hash) => safeTrim(hash).toLowerCase()))
+  return Object.values(loraMetadata?.checkpointHashes ?? {}).some((hash) =>
+    checkpointHashes.has(safeTrim(hash).toLowerCase()),
+  )
+}
+
+export function classifyLoraCompatibility(checkpointMetadata, loraMetadata) {
+  if (hasExplicitMatch(checkpointMetadata, loraMetadata)) {
+    return 'compatible'
+  }
+
+  const checkpointBaseModel = checkpointMetadata?.baseModelKey ?? ''
+  const loraBaseModel = loraMetadata?.baseModelKey ?? ''
+  if (checkpointBaseModel && loraBaseModel) {
+    return checkpointBaseModel === loraBaseModel ? 'compatible' : 'incompatible'
+  }
+
+  return 'unverified'
+}
+
+export function resetModelMetadataRuntimeState() {
+  pendingEnrichment.clear()
+}

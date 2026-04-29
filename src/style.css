@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+}
+
+:root {
+  --background: #001b2e;
+  --foreground: #f0f7f4;
+  --card: #08253a;
+  --card-foreground: #f0f7f4;
+  --primary: #001b2e;
+  --primary-foreground: #f0f7f4;
+  --secondary: #ffc300;
+  --secondary-foreground: #001b2e;
+  --accent: #0090c1;
+  --accent-foreground: #f0f7f4;
+  --muted: rgba(240, 247, 244, 0.06);
+  --muted-foreground: rgba(240, 247, 244, 0.68);
+  --border: rgba(240, 247, 244, 0.12);
+  --input: rgba(240, 247, 244, 0.16);
+  --ring: #0090c1;
+  --destructive: #dd1c1a;
+  --destructive-foreground: #f0f7f4;
+  --radius: 0.5rem;
+  color-scheme: dark;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top, rgba(0, 144, 193, 0.18), transparent 30%),
+    linear-gradient(180deg, #0a2538 0%, #001b2e 100%);
+  color: var(--foreground);
+  font-family:
+    "Segoe UI Variable",
+    "Segoe UI",
+    Inter,
+    system-ui,
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
