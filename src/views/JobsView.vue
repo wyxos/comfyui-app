@@ -11,7 +11,20 @@ import JobOutputsModal from '../components/JobOutputsModal.vue'
 import UiPaginatedCardGrid from '../components/ui/UiPaginatedCardGrid.vue'
 import UiPreviewCard from '../components/ui/UiPreviewCard.vue'
 import { apiJson } from './home/homeApi'
-import type { JobListResponse, JobResponse, JobState } from './home/homeTypes'
+import {
+  formatCountWithLabel,
+  formatPromptIdShort,
+  getJobEntryAggregateState,
+  getJobEntryElapsedMs,
+  getJobEntryPreviewOutputs,
+  getJobEntryPrimaryLabel,
+  getJobEntryReferenceLabel,
+  getJobEntrySecondaryLabel,
+  getJobEntryStateLabel,
+  getJobEntryTab,
+  groupJobResponses,
+} from './home/homeJobHelpers'
+import type { JobListEntry, JobListResponse, JobOutput, JobResponse, JobState } from './home/homeTypes'
 
 const PAGE_SIZE = 40
 
@@ -37,10 +50,12 @@ const sortedJobs = computed(() => {
   return [...jobs.value].sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
 })
 
-const filteredJobs = computed(() => {
+const jobEntries = computed(() => groupJobResponses(sortedJobs.value))
+
+const filteredJobEntries = computed(() => {
   const search = query.value.trim().toLowerCase()
-  return sortedJobs.value.filter((job) => {
-    if (stateFilter.value !== 'all' && stateGroup(job.state) !== stateFilter.value) {
+  return jobEntries.value.filter((entry) => {
+    if (stateFilter.value !== 'all' && getJobEntryTab(entry) !== stateFilter.value) {
       return false
     }
 
@@ -48,38 +63,28 @@ const filteredJobs = computed(() => {
       return true
     }
 
-    return [
-      job.promptId,
-      job.batchId,
-      job.checkpoint,
-      job.currentNodeLabel,
-      job.error,
-      ...job.promptVariants.map((variant) => variant.promptText),
-      ...job.outputs.map((output) => output.filename),
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-      .includes(search)
+    return getJobEntrySearchText(entry).includes(search)
   })
 })
 
-const pageCount = computed(() => Math.max(1, Math.ceil(filteredJobs.value.length / PAGE_SIZE)))
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredJobEntries.value.length / PAGE_SIZE)))
 const pageStart = computed(() => (currentPage.value - 1) * PAGE_SIZE)
 const pageEnd = computed(() => pageStart.value + PAGE_SIZE)
-const pagedJobs = computed(() => filteredJobs.value.slice(pageStart.value, pageEnd.value))
+const pagedJobEntries = computed(() => filteredJobEntries.value.slice(pageStart.value, pageEnd.value))
 const visibleRangeLabel = computed(() => {
-  if (!filteredJobs.value.length) {
+  if (!filteredJobEntries.value.length) {
     return '0 of 0'
   }
 
-  return `${pageStart.value + 1}-${Math.min(pageEnd.value, filteredJobs.value.length)} of ${filteredJobs.value.length}`
+  return `${pageStart.value + 1}-${Math.min(pageEnd.value, filteredJobEntries.value.length)} of ${
+    filteredJobEntries.value.length
+  }`
 })
 const stateCounts = computed(() => ({
-  all: sortedJobs.value.length,
-  running: sortedJobs.value.filter((job) => stateGroup(job.state) === 'running').length,
-  queued: sortedJobs.value.filter((job) => stateGroup(job.state) === 'queued').length,
-  history: sortedJobs.value.filter((job) => stateGroup(job.state) === 'history').length,
+  all: jobEntries.value.length,
+  running: jobEntries.value.filter((entry) => getJobEntryTab(entry) === 'running').length,
+  queued: jobEntries.value.filter((entry) => getJobEntryTab(entry) === 'queued').length,
+  history: jobEntries.value.filter((entry) => getJobEntryTab(entry) === 'history').length,
 }))
 
 watch([query, stateFilter], () => {
@@ -101,26 +106,6 @@ async function refreshJobs() {
   } finally {
     loading.value = false
   }
-}
-
-function stateGroup(state: JobState): Exclude<JobStateFilter, 'all'> {
-  if (state === 'running' || state === 'cancelling') {
-    return 'running'
-  }
-
-  if (state === 'queued') {
-    return 'queued'
-  }
-
-  return 'history'
-}
-
-function stateLabel(state: JobState) {
-  if (state === 'cancelling') {
-    return 'Cancelling'
-  }
-
-  return state.charAt(0).toUpperCase() + state.slice(1)
 }
 
 function stateToneClass(state: JobState) {
@@ -159,8 +144,65 @@ function formatDuration(elapsedMs: number) {
   return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`
 }
 
-function outputPreview(job: JobResponse) {
-  return job.outputs[0]?.url ?? ''
+function getJobEntrySearchText(entry: JobListEntry) {
+  return [
+    entry.batchId,
+    ...entry.promptIds,
+    getJobEntryPrimaryLabel(entry),
+    getJobEntrySecondaryLabel(entry),
+    getJobEntryReferenceLabel(entry),
+    ...entry.jobs.flatMap((job) => [
+      job.promptId,
+      job.batchId,
+      job.checkpoint,
+      job.currentNodeLabel,
+      job.error,
+      ...job.promptVariants.flatMap((variant) => [variant.label, variant.promptText]),
+      ...job.outputs.flatMap((output) => [
+        output.filename,
+        output.fullPath,
+        output.variantLabel,
+        output.promptText,
+      ]),
+    ]),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+}
+
+function entryTitle(entry: JobListEntry) {
+  return entry.jobs.length > 1 ? getJobEntryPrimaryLabel(entry) : entry.leadJob.promptId
+}
+
+function entrySubtitle(entry: JobListEntry) {
+  return entry.jobs.length > 1 ? getJobEntrySecondaryLabel(entry) : ''
+}
+
+function entryReference(entry: JobListEntry) {
+  return entry.jobs.length > 1 ? getJobEntryReferenceLabel(entry) : ''
+}
+
+function entryAriaLabel(entry: JobListEntry) {
+  return `Open outputs for generation ${entry.batchId ? 'batch' : 'job'} ${
+    entry.batchId ?? entry.leadJob.promptId
+  }`
+}
+
+function outputPreview(entry: JobListEntry) {
+  return getJobEntryPreviewOutputs(entry)[0]?.url ?? ''
+}
+
+function outputPreviewLabel(entry: JobListEntry) {
+  return `${entryTitle(entry)} output preview`
+}
+
+function entryOutputCount(entry: JobListEntry) {
+  return entry.jobs.reduce((total, job) => total + job.outputs.length, 0)
+}
+
+function entryUpdatedAt(entry: JobListEntry) {
+  return Math.max(...entry.jobs.map((job) => job.updatedAt ?? 0), 0)
 }
 
 function stateCount(filter: JobStateFilter) {
@@ -171,12 +213,54 @@ function goToPage(page: number) {
   currentPage.value = Math.max(1, Math.min(page, pageCount.value))
 }
 
-function openJobOutputs(job: JobResponse) {
-  selectedJob.value = job
+function openJobOutputs(entry: JobListEntry) {
+  selectedJob.value = buildJobEntryModalJob(entry)
 }
 
 function closeJobOutputs() {
   selectedJob.value = null
+}
+
+function buildJobEntryModalJob(entry: JobListEntry): JobResponse {
+  if (entry.jobs.length === 1) {
+    return entry.leadJob
+  }
+
+  const outputs = entry.jobs.flatMap((job) => {
+    const checkpointName = formatModalCheckpointName(job.checkpoint)
+    return job.outputs.map((output) => ({
+      ...output,
+      variantLabel: formatModalOutputLabel(checkpointName, output),
+    }))
+  })
+  const errors = entry.jobs.map((job) => job.error?.trim()).filter((value): value is string => Boolean(value))
+
+  return {
+    ...entry.leadJob,
+    promptId: entry.batchId ? `Batch ${formatPromptIdShort(entry.batchId)}` : entry.leadJob.promptId,
+    batchId: entry.batchId,
+    batchIndex: null,
+    state: getJobEntryAggregateState(entry),
+    checkpoint: getJobEntryPrimaryLabel(entry),
+    currentNodeLabel: getJobEntrySecondaryLabel(entry),
+    outputs,
+    error: errors.length ? errors.join(' • ') : null,
+    elapsedMs: getJobEntryElapsedMs(entry),
+    createdAt: Math.min(...entry.jobs.map((job) => job.createdAt)),
+    updatedAt: entryUpdatedAt(entry),
+    queuePosition: null,
+    queueNumber: null,
+    cancelRequested: entry.jobs.some((job) => job.cancelRequested),
+  }
+}
+
+function formatModalCheckpointName(checkpointName: string | null | undefined) {
+  return checkpointName?.replace(/\.(safetensors|ckpt|pt)$/i, '').trim() || 'Workflow'
+}
+
+function formatModalOutputLabel(checkpointName: string, output: JobOutput) {
+  const outputLabel = output.variantLabel?.trim()
+  return outputLabel ? `${checkpointName} · ${outputLabel}` : checkpointName
 }
 
 onMounted(() => {
@@ -263,7 +347,7 @@ onBeforeUnmount(() => {
     </section>
 
     <UiPaginatedCardGrid
-      :items-present="pagedJobs.length > 0"
+      :items-present="pagedJobEntries.length > 0"
       :range-label="visibleRangeLabel"
       :current-page="currentPage"
       :page-count="pageCount"
@@ -273,16 +357,16 @@ onBeforeUnmount(() => {
       @go-to-page="goToPage"
     >
       <UiPreviewCard
-        v-for="job in pagedJobs"
-        :key="job.promptId"
+        v-for="entry in pagedJobEntries"
+        :key="entry.key"
         tag="button"
-        :aria-label="`Open outputs for generation job ${job.promptId}`"
-        :preview-url="outputPreview(job)"
-        :preview-label="`${job.promptId} output preview`"
+        :aria-label="entryAriaLabel(entry)"
+        :preview-url="outputPreview(entry)"
+        :preview-label="outputPreviewLabel(entry)"
         min-height-class="min-h-[13rem]"
         media-class="h-36"
         body-class="p-2"
-        @click="openJobOutputs(job)"
+        @click="openJobOutputs(entry)"
       >
         <template #placeholder>
           <ImageIcon class="h-8 w-8 text-primary-foreground/35" />
@@ -294,30 +378,45 @@ onBeforeUnmount(() => {
         <template #media-overlay>
           <span
             class="absolute right-3 top-3 rounded-sm border px-2 py-1 text-[11px] font-semibold shadow-sm backdrop-blur-sm"
-            :class="stateToneClass(job.state)"
+            :class="stateToneClass(getJobEntryAggregateState(entry))"
           >
-            {{ stateLabel(job.state) }}
+            {{ getJobEntryStateLabel(entry) }}
           </span>
         </template>
 
         <p
-          class="truncate font-mono text-[11px] text-muted-foreground"
-          :title="job.promptId"
+          class="truncate text-[11px]"
+          :class="entry.jobs.length > 1 ? 'font-semibold text-card-foreground' : 'font-mono text-muted-foreground'"
+          :title="entryTitle(entry)"
         >
-          {{ job.promptId }}
+          {{ entryTitle(entry) }}
+        </p>
+        <p
+          v-if="entrySubtitle(entry)"
+          class="mt-1 truncate text-[11px] text-muted-foreground"
+          :title="entrySubtitle(entry)"
+        >
+          {{ entrySubtitle(entry) }}
+        </p>
+        <p
+          v-if="entryReference(entry)"
+          class="mt-1 truncate font-mono text-[11px] text-muted-foreground"
+          :title="entry.batchId ?? undefined"
+        >
+          {{ entryReference(entry) }}
         </p>
         <div class="mt-auto grid grid-cols-3 gap-2 border-t border-border/70 pt-2 text-[11px] text-muted-foreground">
           <span class="truncate">
-            {{ job.outputs.length }} output{{ job.outputs.length === 1 ? '' : 's' }}
+            {{ formatCountWithLabel(entryOutputCount(entry), 'output') }}
           </span>
           <span class="truncate">
-            {{ formatDuration(job.elapsedMs) }}
+            {{ formatDuration(getJobEntryElapsedMs(entry)) }}
           </span>
           <span
             class="truncate text-right"
-            :title="formatDate(job.updatedAt)"
+            :title="formatDate(entryUpdatedAt(entry))"
           >
-            {{ formatDate(job.updatedAt) }}
+            {{ formatDate(entryUpdatedAt(entry)) }}
           </span>
         </div>
       </UiPreviewCard>

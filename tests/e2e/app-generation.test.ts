@@ -274,6 +274,62 @@ describe('companion app e2e flows', () => {
         .toBeVisible()
     })
 
+  it('edits prompt tags on double click and drags them between fields', async () => {
+      const { screen } = await renderCompanionApp('/')
+
+      await screen.getByRole('button', { name: /Prompt text and improver/ }).click()
+      const subjectInput = screen.getByRole('textbox', { name: 'Subject', exact: true })
+      await subjectInput.fill('blue hair')
+      document.querySelector<HTMLInputElement>('input[aria-label="Subject"]')?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+      )
+      const negativeInput = screen.getByRole('textbox', { name: 'Negative prompt', exact: true })
+      await negativeInput.fill('blur')
+      document.querySelector<HTMLInputElement>('input[aria-label="Negative prompt"]')?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+      )
+
+      const getDraggableTag = (text: string) =>
+        Array.from(document.querySelectorAll<HTMLElement>('span[draggable="true"]'))
+          .find((tag) => tag.textContent?.trim() === text)
+
+      getDraggableTag('blue hair')?.dispatchEvent(
+        new MouseEvent('dblclick', { bubbles: true, cancelable: true }),
+      )
+      await vi.waitFor(() => {
+        expect(document.querySelector<HTMLInputElement>('input[aria-label="Edit blue hair tag"]')).not.toBeNull()
+      })
+      const editInput = document.querySelector<HTMLInputElement>('input[aria-label="Edit blue hair tag"]')
+      if (!editInput) {
+        throw new Error('Prompt tag edit input was not rendered.')
+      }
+      editInput.value = 'purple hair'
+      editInput.dispatchEvent(new Event('input', { bubbles: true }))
+      editInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+
+      await vi.waitFor(() => {
+        expect(getDraggableTag('purple hair')).not.toBeUndefined()
+      })
+
+      const purpleHairTag = getDraggableTag('purple hair')
+      const subjectDropTarget = document.querySelector<HTMLElement>('[data-prompt-drop-target="subject"]')
+      const negativeDropTarget = document.querySelector<HTMLElement>('[data-prompt-drop-target="negative"]')
+      expect(purpleHairTag).not.toBeUndefined()
+      expect(subjectDropTarget).not.toBeNull()
+      expect(negativeDropTarget).not.toBeNull()
+      const dataTransfer = new DataTransfer()
+      purpleHairTag?.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer }))
+      negativeDropTarget?.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }))
+      negativeDropTarget?.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }))
+      purpleHairTag?.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer }))
+
+      await vi.waitFor(() => {
+        expect(subjectDropTarget?.textContent).not.toContain('purple hair')
+        expect(negativeDropTarget?.textContent).toContain('purple hair')
+        expect(negativeDropTarget?.textContent).toContain('blur')
+      })
+    })
+
   it('surfaces generation dependency, validation, improver, running, cancel, and failed states', async () => {
       const dependencyFailure = await renderCompanionApp('/', {
         failures: {

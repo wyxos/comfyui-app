@@ -134,6 +134,63 @@ export function getJobEntryTab(entry: JobListEntry): JobListTab {
   return getJobListTabForState(getJobEntryAggregateState(entry))
 }
 
+export function groupJobResponses(jobs: JobResponse[]): JobListEntry[] {
+  const jobsByBatchId = new Map<string, JobResponse[]>()
+  for (const job of jobs) {
+    const batchId = job.batchId?.trim()
+    if (!batchId) {
+      continue
+    }
+
+    const groupedJobs = jobsByBatchId.get(batchId) ?? []
+    groupedJobs.push(job)
+    jobsByBatchId.set(batchId, groupedJobs)
+  }
+
+  const consumedBatchIds = new Set<string>()
+  const entries: JobListEntry[] = []
+
+  for (const job of jobs) {
+    const batchId = job.batchId?.trim()
+    const groupedJobs = batchId ? jobsByBatchId.get(batchId) ?? [] : []
+    if (batchId && groupedJobs.length > 1) {
+      if (consumedBatchIds.has(batchId)) {
+        continue
+      }
+
+      consumedBatchIds.add(batchId)
+      const orderedJobs = [...groupedJobs].sort((leftJob, rightJob) => {
+        const leftIndex = leftJob.batchIndex ?? Number.MAX_SAFE_INTEGER
+        const rightIndex = rightJob.batchIndex ?? Number.MAX_SAFE_INTEGER
+        if (leftIndex !== rightIndex) {
+          return leftIndex - rightIndex
+        }
+
+        return leftJob.createdAt - rightJob.createdAt
+      })
+
+      entries.push({
+        key: `batch:${batchId}`,
+        batchId,
+        promptIds: orderedJobs.map((entry) => entry.promptId),
+        jobs: orderedJobs,
+        leadJob: orderedJobs[0],
+      })
+      continue
+    }
+
+    entries.push({
+      key: `job:${job.promptId}`,
+      batchId: null,
+      promptIds: [job.promptId],
+      jobs: [job],
+      leadJob: job,
+    })
+  }
+
+  return entries
+}
+
 export function isJobEntryActive(entry: JobListEntry, activePromptId = '') {
   return entry.promptIds.includes(activePromptId)
 }

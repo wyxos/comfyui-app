@@ -96,4 +96,104 @@ describe('home prompt tags', () => {
     expect(state.negativePromptTags.value).toEqual([])
     expect(state.negativePromptDraft.value).toBe('')
   })
+
+  it('moves prompt section tags to the negative prompt while preserving weight', () => {
+    const state = createHomeState()
+    const actions = createHomePromptTagActions(state)
+
+    state.promptSections.value.subject = [
+      { text: 'blue hair', strength: '1.2' },
+      { text: 'red eyes', strength: '1' },
+    ]
+    state.negativePromptTags.value = [{ text: 'blur', strength: '1' }]
+
+    expect(actions.movePromptTag(
+      { field: 'section', sectionId: 'subject', index: 0 },
+      { field: 'negative', index: 0 },
+    )).toBe(true)
+
+    expect(state.promptSections.value.subject.map((tag) => tag.text)).toEqual(['red eyes'])
+    expect(state.negativePromptTags.value).toEqual([
+      { text: 'blue hair', strength: '1.2' },
+      { text: 'blur', strength: '1' },
+    ])
+  })
+
+  it('moves negative prompt tags into prompt sections', () => {
+    const state = createHomeState()
+    const actions = createHomePromptTagActions(state)
+
+    state.promptSections.value.details = [{ text: 'looking away', strength: '1' }]
+    state.negativePromptTags.value = [
+      { text: 'bad hands', strength: '1.4' },
+      { text: 'text', strength: '1' },
+    ]
+
+    expect(actions.movePromptTag(
+      { field: 'negative', index: 0 },
+      { field: 'section', sectionId: 'details', index: 1 },
+    )).toBe(true)
+
+    expect(state.negativePromptTags.value.map((tag) => tag.text)).toEqual(['text'])
+    expect(state.promptSections.value.details).toEqual([
+      { text: 'looking away', strength: '1' },
+      { text: 'bad hands', strength: '1.4' },
+    ])
+  })
+
+  it('reorders tags within the same prompt field', () => {
+    const state = createHomeState()
+    const actions = createHomePromptTagActions(state)
+
+    state.promptSections.value.quality = [
+      { text: 'sharp focus', strength: '1' },
+      { text: 'high detail', strength: '1' },
+      { text: 'clean lines', strength: '1' },
+    ]
+
+    expect(actions.movePromptTag(
+      { field: 'section', sectionId: 'quality', index: 2 },
+      { field: 'section', sectionId: 'quality', index: 0 },
+    )).toBe(true)
+
+    expect(state.promptSections.value.quality.map((tag) => tag.text)).toEqual([
+      'clean lines',
+      'sharp focus',
+      'high detail',
+    ])
+  })
+
+  it('renames tags without changing weight', () => {
+    const state = createHomeState()
+    const actions = createHomePromptTagActions(state)
+
+    state.promptSections.value.subject = [{ text: 'blue hair', strength: '1.3' }]
+    state.negativePromptTags.value = [{ text: 'blur', strength: '1.1' }]
+
+    expect(actions.updatePromptSectionTagText('subject', 0, '  purple   hair  ')).toBe(true)
+    expect(actions.updateNegativePromptTagText(0, 'bad anatomy')).toBe(true)
+
+    expect(state.promptSections.value.subject).toEqual([{ text: 'purple hair', strength: '1.3' }])
+    expect(state.negativePromptTags.value).toEqual([{ text: 'bad anatomy', strength: '1.1' }])
+  })
+
+  it('does not move or rename tags into duplicates', () => {
+    const state = createHomeState()
+    const actions = createHomePromptTagActions(state)
+
+    state.promptSections.value.subject = [
+      { text: 'blue hair', strength: '1' },
+      { text: 'red eyes', strength: '1' },
+    ]
+    state.negativePromptTags.value = [{ text: 'blue hair', strength: '1' }]
+
+    expect(actions.movePromptTag(
+      { field: 'section', sectionId: 'subject', index: 0 },
+      { field: 'negative' },
+    )).toBe(false)
+    expect(actions.updatePromptSectionTagText('subject', 1, 'blue hair')).toBe(false)
+
+    expect(state.promptSections.value.subject.map((tag) => tag.text)).toEqual(['blue hair', 'red eyes'])
+    expect(state.negativePromptTags.value.map((tag) => tag.text)).toEqual(['blue hair'])
+  })
 })

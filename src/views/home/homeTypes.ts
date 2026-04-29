@@ -300,6 +300,26 @@ export type PromptTag = {
   strength: string
 }
 export type PromptSectionsState = Record<PromptSectionId, PromptTag[]>
+export type PromptTagLocation =
+  | {
+      field: 'section'
+      sectionId: PromptSectionId
+      index: number
+    }
+  | {
+      field: 'negative'
+      index: number
+    }
+export type PromptTagDropTarget =
+  | {
+      field: 'section'
+      sectionId: PromptSectionId
+      index?: number
+    }
+  | {
+      field: 'negative'
+      index?: number
+    }
 export type PersistedControlNetSelection = Pick<
   ControlNetSelection,
   | 'id'

@@ -1,6 +1,12 @@
 import { PROMPT_SECTION_DEFINITIONS } from './homeConstants'
 import type { HomeState } from './homeState'
-import type { PromptSectionId, PromptSectionsState, PromptTag } from './homeTypes'
+import type {
+  PromptSectionId,
+  PromptSectionsState,
+  PromptTag,
+  PromptTagDropTarget,
+  PromptTagLocation,
+} from './homeTypes'
 import {
   formatPromptWeight,
   formatPromptWeightInput,
@@ -123,6 +129,124 @@ function clearNegativePromptTags() {
   negativePromptDraft.value = ''
 }
 
+function getPromptTagListLocation(location: PromptTagDropTarget) {
+  return location.field === 'section'
+    ? { field: location.field, sectionId: location.sectionId } as const
+    : { field: location.field } as const
+}
+
+function isSamePromptTagList(source: PromptTagLocation, target: PromptTagDropTarget) {
+  if (source.field !== target.field) {
+    return false
+  }
+
+  if (source.field === 'section' && target.field === 'section') {
+    return source.sectionId === target.sectionId
+  }
+
+  return true
+}
+
+function getPromptTagList(location: PromptTagDropTarget) {
+  return location.field === 'section'
+    ? promptSections.value[location.sectionId] ?? []
+    : negativePromptTags.value
+}
+
+function setPromptTagList(location: ReturnType<typeof getPromptTagListLocation>, tags: PromptTag[]) {
+  if (location.field === 'section') {
+    promptSections.value[location.sectionId] = tags
+    return
+  }
+
+  negativePromptTags.value = tags
+}
+
+function clampPromptTagTargetIndex(index: number, length: number) {
+  return Math.min(Math.max(index, 0), length)
+}
+
+function targetHasPromptTagDuplicate(
+  targetTags: PromptTag[],
+  tag: PromptTag,
+  source: PromptTagLocation,
+  target: PromptTagDropTarget,
+) {
+  const key = getPromptTagKey(tag)
+  return targetTags.some((targetTag, targetIndex) => {
+    if (isSamePromptTagList(source, target) && targetIndex === source.index) {
+      return false
+    }
+
+    return getPromptTagKey(targetTag) === key
+  })
+}
+
+function movePromptTag(source: PromptTagLocation, target: PromptTagDropTarget) {
+  const sourceLocation = getPromptTagListLocation(source)
+  const targetLocation = getPromptTagListLocation(target)
+  const sourceTags = getPromptTagList(source)
+  const tag = sourceTags[source.index]
+  if (!tag) {
+    return false
+  }
+
+  const sameList = isSamePromptTagList(source, target)
+  const targetTags = sameList ? sourceTags : getPromptTagList(target)
+  if (targetHasPromptTagDuplicate(targetTags, tag, source, target)) {
+    return false
+  }
+
+  const sourceWithoutTag = sourceTags.filter((_, tagIndex) => tagIndex !== source.index)
+  const rawTargetIndex = target.index ?? targetTags.length
+
+  if (sameList) {
+    const targetIndex = clampPromptTagTargetIndex(
+      rawTargetIndex > source.index ? rawTargetIndex - 1 : rawTargetIndex,
+      sourceWithoutTag.length,
+    )
+    const nextTags = [...sourceWithoutTag]
+    nextTags.splice(targetIndex, 0, tag)
+    setPromptTagList(sourceLocation, nextTags)
+    return true
+  }
+
+  const targetIndex = clampPromptTagTargetIndex(rawTargetIndex, targetTags.length)
+  const nextTargetTags = [...targetTags]
+  nextTargetTags.splice(targetIndex, 0, tag)
+  setPromptTagList(sourceLocation, sourceWithoutTag)
+  setPromptTagList(targetLocation, nextTargetTags)
+  return true
+}
+
+function updatePromptTagText(location: PromptTagLocation, text: string) {
+  const listLocation = getPromptTagListLocation(location)
+  const tags = getPromptTagList(location)
+  const tag = tags[location.index]
+  const nextText = normalizePromptTag(text)
+  if (!tag || !nextText) {
+    return false
+  }
+
+  const nextTag = { ...tag, text: nextText }
+  if (targetHasPromptTagDuplicate(tags, nextTag, location, location)) {
+    return false
+  }
+
+  const nextTags = [...tags]
+  nextTags[location.index] = nextTag
+  setPromptTagList(listLocation, nextTags)
+  return true
+}
+
+function updatePromptSectionTagText(sectionId: PromptSectionId, index: number, text: string) {
+  return updatePromptTagText({ field: 'section', sectionId, index }, text)
+}
+
+function updateNegativePromptTagText(index: number, text: string) {
+  return updatePromptTagText({ field: 'negative', index }, text)
+}
+
 function setPromptSectionTagStrength(sectionId: PromptSectionId, index: number, strength: string) {
   const tag = promptSections.value[sectionId]?.[index]
   if (tag) {
@@ -235,6 +359,8 @@ return {
   hasPromptSectionDrafts,
   addPromptSectionTag,
   removePromptSectionTag,
+  movePromptTag,
+  updatePromptSectionTagText,
   clearPromptSectionTags,
   clearNegativePromptTags,
   setPromptSectionTagStrength,
@@ -243,6 +369,7 @@ return {
   handlePromptSectionTagInput,
   addNegativePromptTag,
   removeNegativePromptTag,
+  updateNegativePromptTagText,
   setNegativePromptTagStrength,
   stepNegativePromptTagStrength,
   handleNegativePromptTagKeydown,

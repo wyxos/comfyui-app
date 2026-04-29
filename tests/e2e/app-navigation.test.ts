@@ -121,6 +121,63 @@ describe('companion app e2e flows', () => {
     await expect.element(screen.getByText('41-45 of 45')).toBeVisible()
   })
 
+  it('groups records from the same submitted generation into one jobs card', async () => {
+    const now = Date.now()
+    const batchJobs = Array.from({ length: 2 }, (_, index) => {
+      const job = createMockJob({ prompt: `batch prompt ${index + 1}` }, 'complete')
+      const outputFilename = `batch-output-${index + 1}.png`
+
+      return {
+        ...job,
+        promptId: `batch-job-${index + 1}`,
+        batchId: 'batch-1',
+        batchIndex: index,
+        checkpoint: `batch-checkpoint-${index + 1}.safetensors`,
+        createdAt: now - 1000 + index,
+        updatedAt: now - 100 + index,
+        outputs: [
+          {
+            ...(job.outputs as Array<Record<string, unknown>>)[0],
+            filename: outputFilename,
+            url: `/api/view?filename=${outputFilename}&subfolder=&type=output`,
+            fullPath: `C:\\mock\\${outputFilename}`,
+          },
+        ],
+      }
+    })
+    const standaloneJob = {
+      ...createMockJob({ prompt: 'standalone prompt' }, 'complete'),
+      promptId: 'standalone-job',
+      batchId: null,
+      batchIndex: null,
+      createdAt: now - 2000,
+      updatedAt: now - 2000,
+    }
+
+    const { screen } = await renderCompanionApp('/jobs', { jobs: [...batchJobs, standaloneJob] })
+
+    await expect.element(screen.getByRole('heading', { name: 'Generation jobs' })).toBeVisible()
+    await expect.element(screen.getByText('1-2 of 2')).toBeVisible()
+    await expect.element(screen.getByRole('button', { name: /All\s+2/ })).toBeVisible()
+    expect(document.querySelector('button[aria-label="Open outputs for generation job batch-job-1"]')).toBeNull()
+    expect(document.querySelector('button[aria-label="Open outputs for generation job batch-job-2"]')).toBeNull()
+
+    const batchCard = document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Open outputs for generation batch batch-1"]',
+    )
+    expect(batchCard).not.toBeNull()
+    expect(batchCard?.textContent).toContain('2 outputs ready')
+    expect(batchCard?.textContent).toContain('Batch batch-1')
+
+    batchCard?.click()
+    await vi.waitFor(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-label="Batch batch-1 outputs preview"]')
+      expect(dialog).not.toBeNull()
+      expect(dialog?.textContent?.replace(/\s+/g, '')).toContain('Outputs2')
+      expect(dialog?.textContent).toContain('batch-output-1.png')
+    })
+  })
+
   it('keeps library pagination usable with the header downloads sheet', async () => {
     const now = Date.now()
     const downloads = Array.from({ length: 46 }, (_, index) => {

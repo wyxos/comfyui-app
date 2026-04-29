@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, ref } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import { Minus, Plus, RefreshCw, Sparkles, Square, X } from 'lucide-vue-next'
 import UiSelect from '../../components/ui/UiSelect.vue'
-import type { PromptSectionId } from './homeTypes'
+import type { PromptSectionId, PromptTagDropTarget, PromptTagLocation } from './homeTypes'
 import { useProvidedHomeView } from './homeViewContext'
 
 const {
@@ -41,6 +42,8 @@ const {
   canImprovePrompt,
   addPromptSectionTag,
   removePromptSectionTag,
+  movePromptTag,
+  updatePromptSectionTagText,
   clearPromptSectionTags,
   clearNegativePromptTags,
   setPromptSectionTagStrength,
@@ -49,6 +52,7 @@ const {
   handlePromptSectionTagInput,
   addNegativePromptTag,
   removeNegativePromptTag,
+  updateNegativePromptTagText,
   setNegativePromptTagStrength,
   stepNegativePromptTagStrength,
   handleNegativePromptTagKeydown,
@@ -70,6 +74,146 @@ const hasNegativePromptTagContent = computed(() =>
 
 function hasPromptSectionContent(sectionId: PromptSectionId) {
   return (promptSections.value[sectionId]?.length ?? 0) > 0 || Boolean(promptSectionDrafts.value[sectionId]?.trim())
+}
+
+const draggedPromptTag = ref<PromptTagLocation | null>(null)
+const editingPromptTag = ref<PromptTagLocation | null>(null)
+const promptTagEditDraft = ref('')
+const promptTagEditInput = ref<HTMLInputElement | null>(null)
+
+function setPromptTagEditInput(element: Element | ComponentPublicInstance | null) {
+  promptTagEditInput.value = element instanceof HTMLInputElement ? element : null
+}
+
+function isSamePromptTagLocation(first: PromptTagLocation | null, second: PromptTagLocation) {
+  if (!first || first.field !== second.field || first.index !== second.index) {
+    return false
+  }
+
+  if (first.field === 'section' && second.field === 'section') {
+    return first.sectionId === second.sectionId
+  }
+
+  return true
+}
+
+function getPromptTagText(location: PromptTagLocation) {
+  return location.field === 'section'
+    ? promptSections.value[location.sectionId]?.[location.index]?.text ?? ''
+    : negativePromptTags.value[location.index]?.text ?? ''
+}
+
+function parsePromptTagDragData(event: DragEvent) {
+  if (draggedPromptTag.value) {
+    return draggedPromptTag.value
+  }
+
+  const rawValue = event.dataTransfer?.getData('application/x-comfyui-prompt-tag')
+  if (!rawValue) {
+    return null
+  }
+
+  try {
+    const parsedValue = JSON.parse(rawValue) as PromptTagLocation
+    if (parsedValue.field === 'negative' && Number.isInteger(parsedValue.index)) {
+      return parsedValue
+    }
+
+    if (
+      parsedValue.field === 'section'
+      && promptSectionDefinitions.some((section) => section.id === parsedValue.sectionId)
+      && Number.isInteger(parsedValue.index)
+    ) {
+      return parsedValue
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+function handlePromptTagDragStart(event: DragEvent, location: PromptTagLocation) {
+  draggedPromptTag.value = location
+  event.dataTransfer?.setData('application/x-comfyui-prompt-tag', JSON.stringify(location))
+  event.dataTransfer?.setData('text/plain', getPromptTagText(location))
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+  }
+}
+
+function handlePromptTagDragOver(event: DragEvent) {
+  if (!draggedPromptTag.value && !event.dataTransfer?.types.includes('application/x-comfyui-prompt-tag')) {
+    return
+  }
+
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+}
+
+function handlePromptTagDrop(event: DragEvent, target: PromptTagDropTarget) {
+  const source = parsePromptTagDragData(event)
+  if (!source) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  movePromptTag(source, target)
+  draggedPromptTag.value = null
+}
+
+function handlePromptTagDragEnd() {
+  draggedPromptTag.value = null
+}
+
+function startPromptTagEdit(location: PromptTagLocation) {
+  promptTagEditDraft.value = getPromptTagText(location)
+  editingPromptTag.value = location
+  void nextTick(() => {
+    promptTagEditInput.value?.focus()
+    promptTagEditInput.value?.select()
+  })
+}
+
+function isEditingPromptTag(location: PromptTagLocation) {
+  return isSamePromptTagLocation(editingPromptTag.value, location)
+}
+
+function commitPromptTagEdit() {
+  const location = editingPromptTag.value
+  if (!location) {
+    return
+  }
+
+  if (location.field === 'section') {
+    updatePromptSectionTagText(location.sectionId, location.index, promptTagEditDraft.value)
+  } else {
+    updateNegativePromptTagText(location.index, promptTagEditDraft.value)
+  }
+
+  editingPromptTag.value = null
+  promptTagEditDraft.value = ''
+}
+
+function cancelPromptTagEdit() {
+  editingPromptTag.value = null
+  promptTagEditDraft.value = ''
+}
+
+function handlePromptTagEditKeydown(event: KeyboardEvent) {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    commitPromptTagEdit()
+    return
+  }
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    cancelPromptTagEdit()
+  }
 }
 </script>
 
@@ -141,13 +285,43 @@ function hasPromptSectionContent(sectionId: PromptSectionId) {
                     </div>
                   </div>
 
-                  <div class="flex min-h-11 flex-wrap items-center gap-2 rounded-md border border-input bg-card px-2 py-2">
+                  <div
+                    class="flex min-h-11 flex-wrap items-center gap-2 rounded-md border border-input bg-card px-2 py-2 transition"
+                    :class="draggedPromptTag ? 'border-accent/60 bg-accent/10' : ''"
+                    :data-prompt-drop-target="section.id"
+                    @dragover="handlePromptTagDragOver"
+                    @drop="handlePromptTagDrop($event, { field: 'section', sectionId: section.id })"
+                  >
                     <div
                       v-for="(tag, index) in promptSections[section.id]"
                       :key="`${section.id}-${tag.text}-${index}`"
-                      class="inline-flex max-w-full items-stretch text-xs font-medium text-card-foreground"
+                      class="inline-flex max-w-full items-stretch text-xs font-medium text-card-foreground transition"
+                      :class="isSamePromptTagLocation(draggedPromptTag, { field: 'section', sectionId: section.id, index }) ? 'opacity-45' : ''"
+                      @dragover.stop="handlePromptTagDragOver"
+                      @drop.stop="handlePromptTagDrop($event, { field: 'section', sectionId: section.id, index })"
                     >
-                      <span class="min-w-0 break-words rounded-l-sm border border-secondary/65 bg-secondary px-2 py-1 font-semibold text-secondary-foreground">{{ tag.text }}</span>
+                      <input
+                        v-if="isEditingPromptTag({ field: 'section', sectionId: section.id, index })"
+                        :ref="setPromptTagEditInput"
+                        v-model="promptTagEditDraft"
+                        class="h-7 min-w-24 max-w-56 rounded-l-sm border border-secondary/65 bg-card px-2 py-1 text-xs font-semibold text-card-foreground outline-none focus:ring-2 focus:ring-ring/25"
+                        :aria-label="`Edit ${tag.text} tag`"
+                        @click.stop
+                        @dblclick.stop
+                        @keydown.stop="handlePromptTagEditKeydown"
+                        @blur="commitPromptTagEdit"
+                      />
+                      <span
+                        v-else
+                        draggable="true"
+                        class="min-w-0 cursor-grab select-none break-words rounded-l-sm border border-secondary/65 bg-secondary px-2 py-1 font-semibold text-secondary-foreground active:cursor-grabbing"
+                        title="Drag to move. Double-click to edit."
+                        @dragstart="handlePromptTagDragStart($event, { field: 'section', sectionId: section.id, index })"
+                        @dragend="handlePromptTagDragEnd"
+                        @dblclick.stop="startPromptTagEdit({ field: 'section', sectionId: section.id, index })"
+                      >
+                        {{ tag.text }}
+                      </span>
                       <span class="flex shrink-0 items-stretch">
                         <button
                           type="button"
@@ -218,13 +392,43 @@ function hasPromptSectionContent(sectionId: PromptSectionId) {
                   Clear
                 </button>
               </div>
-              <div class="flex min-h-11 flex-wrap items-center gap-2 rounded-md border border-input bg-card px-2 py-2">
+              <div
+                class="flex min-h-11 flex-wrap items-center gap-2 rounded-md border border-input bg-card px-2 py-2 transition"
+                :class="draggedPromptTag ? 'border-accent/60 bg-accent/10' : ''"
+                data-prompt-drop-target="negative"
+                @dragover="handlePromptTagDragOver"
+                @drop="handlePromptTagDrop($event, { field: 'negative' })"
+              >
                 <div
                   v-for="(tag, index) in negativePromptTags"
                   :key="`${tag.text}-${index}`"
-                  class="inline-flex max-w-full items-stretch text-xs font-medium text-card-foreground"
+                  class="inline-flex max-w-full items-stretch text-xs font-medium text-card-foreground transition"
+                  :class="isSamePromptTagLocation(draggedPromptTag, { field: 'negative', index }) ? 'opacity-45' : ''"
+                  @dragover.stop="handlePromptTagDragOver"
+                  @drop.stop="handlePromptTagDrop($event, { field: 'negative', index })"
                 >
-                  <span class="min-w-0 break-words rounded-l-sm border border-secondary/65 bg-secondary px-2 py-1 font-semibold text-secondary-foreground">{{ tag.text }}</span>
+                  <input
+                    v-if="isEditingPromptTag({ field: 'negative', index })"
+                    :ref="setPromptTagEditInput"
+                    v-model="promptTagEditDraft"
+                    class="h-7 min-w-24 max-w-56 rounded-l-sm border border-secondary/65 bg-card px-2 py-1 text-xs font-semibold text-card-foreground outline-none focus:ring-2 focus:ring-ring/25"
+                    :aria-label="`Edit ${tag.text} tag`"
+                    @click.stop
+                    @dblclick.stop
+                    @keydown.stop="handlePromptTagEditKeydown"
+                    @blur="commitPromptTagEdit"
+                  />
+                  <span
+                    v-else
+                    draggable="true"
+                    class="min-w-0 cursor-grab select-none break-words rounded-l-sm border border-secondary/65 bg-secondary px-2 py-1 font-semibold text-secondary-foreground active:cursor-grabbing"
+                    title="Drag to move. Double-click to edit."
+                    @dragstart="handlePromptTagDragStart($event, { field: 'negative', index })"
+                    @dragend="handlePromptTagDragEnd"
+                    @dblclick.stop="startPromptTagEdit({ field: 'negative', index })"
+                  >
+                    {{ tag.text }}
+                  </span>
                   <span class="flex shrink-0 items-stretch">
                     <button
                       type="button"
