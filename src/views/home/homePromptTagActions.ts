@@ -61,6 +61,10 @@ function buildPromptSectionsForPersistence() {
 }
 
 function formatCompiledPromptTag(tag: PromptTag) {
+  if (tag.enabled === false) {
+    return ''
+  }
+
   const text = normalizePromptTag(tag.text)
   if (!text) {
     return ''
@@ -247,6 +251,38 @@ function updateNegativePromptTagText(index: number, text: string) {
   return updatePromptTagText({ field: 'negative', index }, text)
 }
 
+function setPromptTagEnabled(location: PromptTagLocation, enabled: boolean) {
+  const listLocation = getPromptTagListLocation(location)
+  const tags = getPromptTagList(location)
+  const tag = tags[location.index]
+  if (!tag) {
+    return false
+  }
+
+  const { enabled: _enabled, ...tagWithoutEnabled } = tag
+  const nextTags = [...tags]
+  nextTags[location.index] = enabled ? tagWithoutEnabled : { ...tagWithoutEnabled, enabled: false }
+  setPromptTagList(listLocation, nextTags)
+  return true
+}
+
+function togglePromptTagEnabled(location: PromptTagLocation) {
+  const tag = getPromptTagList(location)[location.index]
+  if (!tag) {
+    return false
+  }
+
+  return setPromptTagEnabled(location, tag.enabled === false)
+}
+
+function togglePromptSectionTagEnabled(sectionId: PromptSectionId, index: number) {
+  return togglePromptTagEnabled({ field: 'section', sectionId, index })
+}
+
+function toggleNegativePromptTagEnabled(index: number) {
+  return togglePromptTagEnabled({ field: 'negative', index })
+}
+
 function setPromptSectionTagStrength(sectionId: PromptSectionId, index: number, strength: string) {
   const tag = promptSections.value[sectionId]?.[index]
   if (tag) {
@@ -361,6 +397,7 @@ return {
   removePromptSectionTag,
   movePromptTag,
   updatePromptSectionTagText,
+  togglePromptSectionTagEnabled,
   clearPromptSectionTags,
   clearNegativePromptTags,
   setPromptSectionTagStrength,
@@ -370,6 +407,7 @@ return {
   addNegativePromptTag,
   removeNegativePromptTag,
   updateNegativePromptTagText,
+  toggleNegativePromptTagEnabled,
   setNegativePromptTagStrength,
   stepNegativePromptTagStrength,
   handleNegativePromptTagKeydown,

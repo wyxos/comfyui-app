@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createHistoryJob, createImageFile, createJobOutput, renderCompanionApp, uploadFile } from './appFlowTestUtils'
+import {
+  createHistoryJob,
+  createImageFile,
+  createJobOutput,
+  pasteFile,
+  renderCompanionApp,
+  uploadFile,
+} from './appFlowTestUtils'
 
 describe('companion app e2e flows', () => {
   it('loads mocked generation dependencies, improves a prompt, and submits generation', async () => {
@@ -252,6 +259,36 @@ describe('companion app e2e flows', () => {
       )
     })
 
+  it('pastes clipboard images into image dropzones', async () => {
+      const { api, screen } = await renderCompanionApp('/', {
+        uploadInputImageNames: ['pasted-input.png', 'pasted-control.png'],
+      })
+
+      await screen.getByRole('button', { name: /Image.*Input image and denoise/ }).click()
+      const inputImageDropzone = document.querySelector<HTMLElement>('[aria-label="Choose or paste input image"]')
+      expect(inputImageDropzone).not.toBeNull()
+      pasteFile(window, createImageFile('clipboard-input.png'))
+
+      await expect.element(screen.getByText('clipboard-input.png')).toBeVisible()
+      await vi.waitFor(() => {
+        expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(1)
+      })
+
+      await screen.getByRole('button', { name: /ControlNet.*Guided image controls/ }).click()
+      await screen.getByRole('button', { name: 'Add' }).click()
+      const controlNetDropzone = document.querySelector<HTMLElement>(
+        '[aria-label="Choose or paste ControlNet image"]',
+      )
+      expect(controlNetDropzone).not.toBeNull()
+      controlNetDropzone?.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true }))
+      pasteFile(window, createImageFile('clipboard-control.png'))
+
+      await expect.element(screen.getByText('clipboard-control.png')).toBeVisible()
+      await vi.waitFor(() => {
+        expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(2)
+      })
+    })
+
   it('shows checkpoint loading as an inline assets spinner instead of a bottom error', async () => {
       let resolveCheckpoints: (() => void) | null = null
       const checkpointsReady = new Promise<void>((resolve) => {
@@ -272,6 +309,34 @@ describe('companion app e2e flows', () => {
       await expect
         .element(loadingDependencies.screen.getByText('waiIllustriousSDXL_v160.safetensors'))
         .toBeVisible()
+    })
+
+  it('disables prompt tags with one click and omits them from generation', async () => {
+      const { api, screen } = await renderCompanionApp('/')
+
+      await screen.getByRole('button', { name: /Prompt text and improver/ }).click()
+      await screen.getByRole('textbox', { name: 'Subject', exact: true }).fill('blue hair, red eyes')
+
+      await vi.waitFor(() => {
+        expect(document.querySelector('[aria-label="Disable blue hair tag"]')).not.toBeNull()
+        expect(document.querySelector('[aria-label="Disable red eyes tag"]')).not.toBeNull()
+      })
+
+      await screen.getByRole('button', { name: 'Disable blue hair tag' }).click()
+
+      await vi.waitFor(() => {
+        const disabledTag = document.querySelector<HTMLElement>('[aria-label="Enable blue hair tag"]')
+        expect(disabledTag).not.toBeNull()
+        expect(disabledTag?.className).toContain('bg-primary-foreground/14')
+        expect(screen.getByText('red eyes', { exact: true })).toBeTruthy()
+      })
+
+      await screen.getByRole('button', { name: 'Generate' }).click()
+
+      await vi.waitFor(() => {
+        const generateCall = api.calls.find((call) => call.method === 'POST' && call.path === '/api/generate')
+        expect(generateCall?.body).toMatchObject({ prompt: 'red eyes' })
+      })
     })
 
   it('edits prompt tags on double click and drags them between fields', async () => {

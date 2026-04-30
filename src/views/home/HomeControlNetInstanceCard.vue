@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RefreshCw, Ruler, Trash2, Upload, X } from 'lucide-vue-next'
 import UiSelect from '../../components/ui/UiSelect.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
@@ -30,9 +30,11 @@ const {
   handleControlNetDragOver,
   handleControlNetDragLeave,
   handleControlNetImageDrop,
+  handleControlNetImagePaste,
 } = useProvidedHomeView()
 
 const fileInput = ref<HTMLInputElement | null>(null)
+const acceptsClipboardPaste = ref(false)
 const selectedModel = computed({
   get: () => props.controlNet.model,
   set: (value) => setControlNetModel(props.controlNet.id, value),
@@ -60,6 +62,12 @@ function openImagePicker() {
   fileInput.value?.click()
 }
 
+function handleWindowPaste(event: ClipboardEvent) {
+  if (acceptsClipboardPaste.value) {
+    handleControlNetImagePaste(props.controlNet.id, event)
+  }
+}
+
 function handleNumericInput(
   field: 'strength' | 'startPercent' | 'endPercent' | 'previewResolution',
   event: Event,
@@ -69,6 +77,14 @@ function handleNumericInput(
     setControlNetField(props.controlNet.id, field, target.value)
   }
 }
+
+onMounted(() => {
+  window.addEventListener('paste', handleWindowPaste)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('paste', handleWindowPaste)
+})
 </script>
 
 <template>
@@ -208,7 +224,7 @@ function handleNumericInput(
       <div
         role="button"
         tabindex="0"
-        aria-label="Choose ControlNet image"
+        aria-label="Choose or paste ControlNet image"
         class="relative grid min-h-56 place-items-center overflow-hidden rounded-md border bg-background outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25"
         :class="
           controlNet.isDragging
@@ -218,10 +234,15 @@ function handleNumericInput(
         @click="openImagePicker"
         @keydown.enter.prevent="openImagePicker"
         @keydown.space.prevent="openImagePicker"
+        @focus="acceptsClipboardPaste = true"
+        @blur="acceptsClipboardPaste = false"
+        @pointerenter="acceptsClipboardPaste = true"
+        @pointerleave="acceptsClipboardPaste = false"
         @dragenter.prevent="handleControlNetDragEnter(controlNet.id)"
         @dragover.prevent="handleControlNetDragOver(controlNet.id, $event)"
         @dragleave.prevent="handleControlNetDragLeave(controlNet.id, $event)"
         @drop.prevent="handleControlNetImageDrop(controlNet.id, $event)"
+        @paste="handleControlNetImagePaste(controlNet.id, $event)"
       >
         <img
           v-if="controlNet.inputImagePreviewUrl"
@@ -265,7 +286,7 @@ function handleNumericInput(
             <Upload class="h-9 w-9" :stroke-width="1.6" />
           </div>
           <div class="space-y-1">
-            <p class="text-sm font-semibold">Drop control image</p>
+            <p class="text-sm font-semibold">Drop or paste control image</p>
             <p class="text-xs text-muted-foreground">or click to browse from disk</p>
           </div>
         </div>

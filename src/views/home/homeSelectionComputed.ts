@@ -35,6 +35,7 @@ const {
   maintainAspectRatio,
   negativePrompt,
   negativePromptDraft,
+  negativePromptTags,
   ollamaModels,
   prompt,
   promptImprovementError,
@@ -214,12 +215,17 @@ const compiledPrompt = computed(() => buildPromptFromSections(promptSections.val
 const compiledNegativePrompt = computed(() => buildNegativePromptFromTags(true) || negativePrompt.value.trim())
 const hasOriginalPromptText = computed(() => Boolean(compiledPrompt.value))
 const hasImprovedPromptText = computed(() => Boolean(improvedPrompt.value.trim()))
+const hasPromptSectionTags = computed(() =>
+  Object.values(promptSections.value).some((sectionTags) => sectionTags.length > 0),
+)
 const canResetForm = computed(() => {
   return Boolean(
     compiledPrompt.value ||
       improvedPrompt.value ||
       compiledNegativePrompt.value ||
+      hasPromptSectionTags.value ||
       hasPromptSectionDrafts() ||
+      negativePromptTags.value.length ||
       negativePromptDraft.value ||
       !useOriginalPrompt.value ||
       !useImprovedPrompt.value ||

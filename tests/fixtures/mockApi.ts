@@ -103,6 +103,29 @@ export function installMockApi(options: MockApiOptions = {}) {
       })
     }
 
+    if (url.pathname === '/api/jobs/queued/cancel' && method === 'POST') {
+      const cancelledJobs = jobs
+        .filter((job) => job.state === 'queued')
+        .map((job) => ({
+          ...job,
+          state: 'cancelled',
+          cancelRequested: true,
+          currentNodeLabel: 'Cancelled',
+          queuePosition: null,
+          queueNumber: null,
+          updatedAt: Date.now(),
+        }))
+      const cancelledByPromptId = new Map(cancelledJobs.map((job) => [job.promptId, job]))
+      jobs = jobs.map((job) => cancelledByPromptId.get(job.promptId) ?? job)
+
+      return jsonResponse({
+        ok: true,
+        cancelled: cancelledJobs.length,
+        promptIds: cancelledJobs.map((job) => job.promptId),
+        jobs: cancelledJobs,
+      })
+    }
+
     const jobStatusMatch = url.pathname.match(/^\/api\/jobs\/([^/]+)$/)
     if (jobStatusMatch && method === 'GET') {
       const job = jobs.find((item) => item.promptId === decodeURIComponent(jobStatusMatch[1]))

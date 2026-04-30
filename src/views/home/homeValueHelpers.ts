@@ -26,16 +26,22 @@ export function normalizePromptTag(value: unknown) {
   return coerceTrimmedFieldString(value).replace(/\s+/g, ' ')
 }
 
-export function buildPromptTag(text: unknown, strength: unknown = '1'): PromptTag | null {
+export function buildPromptTag(text: unknown, strength: unknown = '1', enabled = true): PromptTag | null {
   const normalizedText = normalizePromptTag(text)
   if (!normalizedText) {
     return null
   }
 
-  return {
+  const tag: PromptTag = {
     text: normalizedText,
     strength: formatPromptWeightInput(strength),
   }
+
+  if (!enabled) {
+    tag.enabled = false
+  }
+
+  return tag
 }
 
 export function getPromptTagKey(tag: Pick<PromptTag, 'text'>) {
@@ -51,7 +57,7 @@ export function normalizePromptTags(values: unknown) {
   const tags: PromptTag[] = []
   for (const value of values) {
     const tag = isRecord(value)
-      ? buildPromptTag(value.text, value.strength)
+      ? buildPromptTag(value.text, value.strength, value.enabled !== false)
       : buildPromptTag(value)
     if (!tag) {
       continue

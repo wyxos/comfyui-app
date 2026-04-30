@@ -139,7 +139,8 @@ runtimeActions = createHomeRuntimeActions(state, selection, preview, status, {
 controlNetActions = createHomeControlNetActions(state, {
   apiJson,
   buildControlNetSelection: loraActions.buildControlNetSelection,
-  isSupportedImageFile: (file) => imageActions.isSupportedImageFile(file),
+  getSupportedImageFileFromTransfer: (dataTransfer) =>
+    imageActions.getSupportedImageFileFromTransfer(dataTransfer),
   loadImageDimensions: (file) => imageActions.loadImageDimensions(file),
   normalizeControlNetResolutionFromOutputSize: aspectActions.normalizeControlNetResolutionFromOutputSize,
   uploadInputImage: (file) => imageActions.uploadInputImage(file),

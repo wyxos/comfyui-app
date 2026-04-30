@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { Minus, Plus, RefreshCw, Sparkles, Square, X } from 'lucide-vue-next'
 import UiSelect from '../../components/ui/UiSelect.vue'
@@ -44,6 +44,7 @@ const {
   removePromptSectionTag,
   movePromptTag,
   updatePromptSectionTagText,
+  togglePromptSectionTagEnabled,
   clearPromptSectionTags,
   clearNegativePromptTags,
   setPromptSectionTagStrength,
@@ -53,6 +54,7 @@ const {
   addNegativePromptTag,
   removeNegativePromptTag,
   updateNegativePromptTagText,
+  toggleNegativePromptTagEnabled,
   setNegativePromptTagStrength,
   stepNegativePromptTagStrength,
   handleNegativePromptTagKeydown,
@@ -80,6 +82,7 @@ const draggedPromptTag = ref<PromptTagLocation | null>(null)
 const editingPromptTag = ref<PromptTagLocation | null>(null)
 const promptTagEditDraft = ref('')
 const promptTagEditInput = ref<HTMLInputElement | null>(null)
+let promptTagClickTimer: number | undefined
 
 function setPromptTagEditInput(element: Element | ComponentPublicInstance | null) {
   promptTagEditInput.value = element instanceof HTMLInputElement ? element : null
@@ -101,6 +104,12 @@ function getPromptTagText(location: PromptTagLocation) {
   return location.field === 'section'
     ? promptSections.value[location.sectionId]?.[location.index]?.text ?? ''
     : negativePromptTags.value[location.index]?.text ?? ''
+}
+
+function isPromptTagDisabled(location: PromptTagLocation) {
+  return location.field === 'section'
+    ? promptSections.value[location.sectionId]?.[location.index]?.enabled === false
+    : negativePromptTags.value[location.index]?.enabled === false
 }
 
 function parsePromptTagDragData(event: DragEvent) {
@@ -170,6 +179,7 @@ function handlePromptTagDragEnd() {
 }
 
 function startPromptTagEdit(location: PromptTagLocation) {
+  clearPromptTagClickTimer()
   promptTagEditDraft.value = getPromptTagText(location)
   editingPromptTag.value = location
   void nextTick(() => {
@@ -215,6 +225,47 @@ function handlePromptTagEditKeydown(event: KeyboardEvent) {
     cancelPromptTagEdit()
   }
 }
+
+function clearPromptTagClickTimer() {
+  window.clearTimeout(promptTagClickTimer)
+  promptTagClickTimer = undefined
+}
+
+function togglePromptTagEnabledAt(location: PromptTagLocation) {
+  if (location.field === 'section') {
+    togglePromptSectionTagEnabled(location.sectionId, location.index)
+    return
+  }
+
+  toggleNegativePromptTagEnabled(location.index)
+}
+
+function handlePromptTagClick(location: PromptTagLocation) {
+  if (isEditingPromptTag(location)) {
+    return
+  }
+
+  clearPromptTagClickTimer()
+  promptTagClickTimer = window.setTimeout(() => {
+    togglePromptTagEnabledAt(location)
+    promptTagClickTimer = undefined
+  }, 180)
+}
+
+function handlePromptTagToggleKeydown(event: KeyboardEvent, location: PromptTagLocation) {
+  if (event.key !== 'Enter' && event.key !== ' ') {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  clearPromptTagClickTimer()
+  togglePromptTagEnabledAt(location)
+}
+
+onBeforeUnmount(() => {
+  clearPromptTagClickTimer()
+})
 </script>
 
 <template>
@@ -314,10 +365,21 @@ function handlePromptTagEditKeydown(event: KeyboardEvent) {
                       <span
                         v-else
                         draggable="true"
-                        class="min-w-0 cursor-grab select-none break-words rounded-l-sm border border-secondary/65 bg-secondary px-2 py-1 font-semibold text-secondary-foreground active:cursor-grabbing"
-                        title="Drag to move. Double-click to edit."
+                        role="button"
+                        tabindex="0"
+                        class="min-w-0 cursor-grab select-none break-words rounded-l-sm border px-2 py-1 font-semibold transition active:cursor-grabbing"
+                        :class="
+                          isPromptTagDisabled({ field: 'section', sectionId: section.id, index })
+                            ? 'border-primary-foreground/20 bg-primary-foreground/14 text-primary-foreground/45 line-through'
+                            : 'border-secondary/65 bg-secondary text-secondary-foreground'
+                        "
+                        :aria-pressed="!isPromptTagDisabled({ field: 'section', sectionId: section.id, index })"
+                        :aria-label="`${isPromptTagDisabled({ field: 'section', sectionId: section.id, index }) ? 'Enable' : 'Disable'} ${tag.text} tag`"
+                        :title="isPromptTagDisabled({ field: 'section', sectionId: section.id, index }) ? 'Click to include. Drag to move. Double-click to edit.' : 'Click to skip. Drag to move. Double-click to edit.'"
+                        @click.stop="handlePromptTagClick({ field: 'section', sectionId: section.id, index })"
                         @dragstart="handlePromptTagDragStart($event, { field: 'section', sectionId: section.id, index })"
                         @dragend="handlePromptTagDragEnd"
+                        @keydown="handlePromptTagToggleKeydown($event, { field: 'section', sectionId: section.id, index })"
                         @dblclick.stop="startPromptTagEdit({ field: 'section', sectionId: section.id, index })"
                       >
                         {{ tag.text }}
@@ -421,10 +483,21 @@ function handlePromptTagEditKeydown(event: KeyboardEvent) {
                   <span
                     v-else
                     draggable="true"
-                    class="min-w-0 cursor-grab select-none break-words rounded-l-sm border border-secondary/65 bg-secondary px-2 py-1 font-semibold text-secondary-foreground active:cursor-grabbing"
-                    title="Drag to move. Double-click to edit."
+                    role="button"
+                    tabindex="0"
+                    class="min-w-0 cursor-grab select-none break-words rounded-l-sm border px-2 py-1 font-semibold transition active:cursor-grabbing"
+                    :class="
+                      isPromptTagDisabled({ field: 'negative', index })
+                        ? 'border-primary-foreground/20 bg-primary-foreground/14 text-primary-foreground/45 line-through'
+                        : 'border-secondary/65 bg-secondary text-secondary-foreground'
+                    "
+                    :aria-pressed="!isPromptTagDisabled({ field: 'negative', index })"
+                    :aria-label="`${isPromptTagDisabled({ field: 'negative', index }) ? 'Enable' : 'Disable'} ${tag.text} tag`"
+                    :title="isPromptTagDisabled({ field: 'negative', index }) ? 'Click to include. Drag to move. Double-click to edit.' : 'Click to skip. Drag to move. Double-click to edit.'"
+                    @click.stop="handlePromptTagClick({ field: 'negative', index })"
                     @dragstart="handlePromptTagDragStart($event, { field: 'negative', index })"
                     @dragend="handlePromptTagDragEnd"
+                    @keydown="handlePromptTagToggleKeydown($event, { field: 'negative', index })"
                     @dblclick.stop="startPromptTagEdit({ field: 'negative', index })"
                   >
                     {{ tag.text }}

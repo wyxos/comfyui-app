@@ -112,6 +112,8 @@ const submissionError = ref('')
 const isSubmittingGenerate = ref(false)
 const isImprovingPrompt = ref(false)
 const isCancellingJob = ref(false)
+const isCancellingQueuedJobs = ref(false)
+const queueActionError = ref('')
 const copiedOutputPath = ref(false)
 const openingOutputFolder = ref(false)
 const isPreviewModalOpen = ref(false)
@@ -209,6 +211,8 @@ return {
   isSubmittingGenerate,
   isImprovingPrompt,
   isCancellingJob,
+  isCancellingQueuedJobs,
+  queueActionError,
   copiedOutputPath,
   openingOutputFolder,
   isPreviewModalOpen,

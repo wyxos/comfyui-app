@@ -251,4 +251,43 @@ describe('companion server API routes', () => {
       const promptText = workflowNodes.map((node) => node.inputs?.text).filter(Boolean).join('\n')
       expect(promptText).toContain('portrait, (detail boost:1.2)')
     })
+
+  it('cancels only app-known queued jobs from the ComfyUI queue', async () => {
+      const server = await setupHarness()
+
+      await server.json('POST', '/api/generate', {
+        prompt: 'running portrait',
+        checkpoint: 'waiIllustriousSDXL_v160.safetensors',
+      })
+      await server.json('POST', '/api/generate', {
+        prompt: 'queued portrait',
+        checkpoint: 'waiIllustriousSDXL_v160.safetensors',
+      })
+
+      server.upstream.queue = {
+        queue_running: [[1, 'prompt-1']],
+        queue_pending: [[2, 'prompt-2'], [3, 'external-job']],
+      }
+
+      await expect(server.json('POST', '/api/jobs/queued/cancel')).resolves.toMatchObject({
+        payload: expect.objectContaining({
+          ok: true,
+          cancelled: 1,
+          promptIds: ['prompt-2'],
+          jobs: [
+            expect.objectContaining({
+              promptId: 'prompt-2',
+              state: 'cancelled',
+              cancelRequested: true,
+              currentNodeLabel: 'Cancelled',
+            }),
+          ],
+        }),
+      })
+
+      expect(server.calls.some((call) => call.method === 'POST' && call.url.pathname === '/interrupt')).toBe(false)
+      expect(
+        server.calls.find((call) => call.method === 'POST' && call.url.pathname === '/queue')?.body,
+      ).toEqual({ delete: ['prompt-2'] })
+    })
 })

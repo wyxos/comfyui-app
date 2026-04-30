@@ -177,6 +177,38 @@ describe('home prompt tags', () => {
     expect(state.negativePromptTags.value).toEqual([{ text: 'bad anatomy', strength: '1.1' }])
   })
 
+  it('toggles prompt tags out of compiled prompts without deleting them', () => {
+    const state = createHomeState()
+    const actions = createHomePromptTagActions(state)
+
+    state.promptSections.value.subject = [
+      { text: 'blue hair', strength: '1' },
+      { text: 'red eyes', strength: '1.2' },
+    ]
+    state.negativePromptTags.value = [
+      { text: 'blur', strength: '1' },
+      { text: 'text', strength: '1' },
+    ]
+
+    expect(actions.togglePromptSectionTagEnabled('subject', 0)).toBe(true)
+    expect(actions.toggleNegativePromptTagEnabled(0)).toBe(true)
+
+    expect(state.promptSections.value.subject[0]).toEqual({ text: 'blue hair', strength: '1', enabled: false })
+    expect(state.negativePromptTags.value[0]).toEqual({ text: 'blur', strength: '1', enabled: false })
+    expect(actions.buildPromptFromSections(state.promptSections.value)).toBe('(red eyes:1.2)')
+    expect(actions.buildNegativePromptFromTags()).toBe('text')
+    expect(actions.buildPromptSectionsForPersistence().subject[0]).toEqual({
+      text: 'blue hair',
+      strength: '1',
+      enabled: false,
+    })
+
+    expect(actions.togglePromptSectionTagEnabled('subject', 0)).toBe(true)
+
+    expect(state.promptSections.value.subject[0]).toEqual({ text: 'blue hair', strength: '1' })
+    expect(actions.buildPromptFromSections(state.promptSections.value)).toBe('blue hair, (red eyes:1.2)')
+  })
+
   it('does not move or rename tags into duplicates', () => {
     const state = createHomeState()
     const actions = createHomePromptTagActions(state)

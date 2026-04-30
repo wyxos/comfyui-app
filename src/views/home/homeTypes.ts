@@ -285,6 +285,14 @@ export type JobListResponse = {
   message?: string
 }
 
+export type CancelQueuedJobsResponse = {
+  ok: boolean
+  cancelled?: number
+  promptIds?: string[]
+  jobs?: JobResponse[]
+  message?: string
+}
+
 export type JobListTab = 'running' | 'queued' | 'history'
 export type FormTab = 'assets' | 'prompt' | 'config' | 'image' | 'controlnet' | 'ipadapter'
 export type PromptField = 'prompt' | 'negativePrompt'
@@ -298,6 +306,7 @@ export type PromptSectionDefinition = {
 export type PromptTag = {
   text: string
   strength: string
+  enabled?: boolean
 }
 export type PromptSectionsState = Record<PromptSectionId, PromptTag[]>
 export type PromptTagLocation =

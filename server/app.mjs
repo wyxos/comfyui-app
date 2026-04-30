@@ -26,7 +26,15 @@ import {
   handlePutCivitaiSettings,
 } from './handlers/settings.mjs'
 import { handleControlNetPreview, handleGenerate, handleImprovePrompt, handleModelPreview } from './handlers/generate.mjs'
-import { handleCancelJob, handleInputImageUpload, handleJobStatus, handleJobsList, handleOpenParentFolder, handleViewProxy } from './handlers/jobs-files.mjs'
+import {
+  handleCancelJob,
+  handleCancelQueuedJobs,
+  handleInputImageUpload,
+  handleJobStatus,
+  handleJobsList,
+  handleOpenParentFolder,
+  handleViewProxy,
+} from './handlers/jobs-files.mjs'
 import { resetDownloadsRuntimeState } from './downloads/state.mjs'
 import { resetDownloadQueueRuntimeState } from './downloads/queue.mjs'
 import { resetComfyModelDirsFromEnv } from './model-paths.mjs'
@@ -161,6 +169,10 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
 
   if (url.pathname === '/api/jobs' && request.method === 'GET') {
     return handleJobsList(response)
+  }
+
+  if (url.pathname === '/api/jobs/queued/cancel' && request.method === 'POST') {
+    return handleCancelQueuedJobs(response)
   }
 
   if (url.pathname.startsWith('/api/jobs/') && url.pathname.endsWith('/cancel') && request.method === 'POST') {

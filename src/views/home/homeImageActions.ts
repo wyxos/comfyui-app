@@ -208,6 +208,16 @@ function isSupportedImageFile(file: File) {
   return file.type.startsWith('image/') || /\.(png|jpe?g|webp|avif)$/i.test(file.name)
 }
 
+function getSupportedImageFileFromTransfer(dataTransfer: DataTransfer | null | undefined) {
+  const transferredFiles = Array.from(dataTransfer?.files ?? [])
+  const itemFiles = Array.from(dataTransfer?.items ?? [])
+    .filter((item) => item.kind === 'file')
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => Boolean(file))
+
+  return [...transferredFiles, ...itemFiles].find((file) => isSupportedImageFile(file)) ?? null
+}
+
 function handleImageDragEnter() {
   imageDragDepth += 1
   isDraggingImage.value = true
@@ -241,15 +251,28 @@ function handleImageDrop(event: DragEvent) {
   imageDragDepth = 0
   isDraggingImage.value = false
 
-  const droppedFile = Array.from(event.dataTransfer?.files ?? []).find((file) =>
-    isSupportedImageFile(file),
-  )
+  const droppedFile = getSupportedImageFileFromTransfer(event.dataTransfer)
 
   if (!droppedFile) {
     return
   }
 
   void setSelectedImage(droppedFile)
+
+  if (inputImageField.value) {
+    inputImageField.value.value = ''
+  }
+}
+
+function handleImagePaste(event: ClipboardEvent) {
+  const pastedFile = getSupportedImageFileFromTransfer(event.clipboardData)
+  if (!pastedFile) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  void setSelectedImage(pastedFile)
 
   if (inputImageField.value) {
     inputImageField.value.value = ''
@@ -269,9 +292,11 @@ return {
   applyControlNetOutputResolution,
   openImagePicker,
   isSupportedImageFile,
+  getSupportedImageFileFromTransfer,
   handleImageDragEnter,
   handleImageDragOver,
   handleImageDragLeave,
   handleImageDrop,
+  handleImagePaste,
 }
 }

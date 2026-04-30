@@ -5,7 +5,7 @@ import { createClientId, normalizeControlNetNumericField } from './homeValueHelp
 type HomeControlNetActionDeps = {
   apiJson: <T>(path: string, init?: RequestInit & { timeoutMs?: number }) => Promise<T>
   buildControlNetSelection: () => ControlNetSelection
-  isSupportedImageFile: (file: File) => boolean
+  getSupportedImageFileFromTransfer: (dataTransfer: DataTransfer | null | undefined) => File | null
   loadImageDimensions: (file: File) => Promise<{ width: number; height: number }>
   normalizeControlNetResolutionFromOutputSize: () => number
   uploadInputImage: (file: File) => Promise<string>
@@ -21,7 +21,7 @@ const {
 const {
   apiJson,
   buildControlNetSelection,
-  isSupportedImageFile,
+  getSupportedImageFileFromTransfer,
   loadImageDimensions,
   normalizeControlNetResolutionFromOutputSize,
   uploadInputImage,
@@ -296,12 +296,21 @@ function handleControlNetImageDrop(id: string, event: DragEvent) {
     controlNet.isDragging = false
   }
 
-  const droppedFile = Array.from(event.dataTransfer?.files ?? []).find((file) =>
-    isSupportedImageFile(file),
-  )
+  const droppedFile = getSupportedImageFileFromTransfer(event.dataTransfer)
   if (droppedFile) {
     void setControlNetImage(id, droppedFile)
   }
+}
+
+function handleControlNetImagePaste(id: string, event: ClipboardEvent) {
+  const pastedFile = getSupportedImageFileFromTransfer(event.clipboardData)
+  if (!pastedFile) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  void setControlNetImage(id, pastedFile)
 }
 
 return {
@@ -324,5 +333,6 @@ return {
   handleControlNetDragOver,
   handleControlNetDragLeave,
   handleControlNetImageDrop,
+  handleControlNetImagePaste,
 }
 }

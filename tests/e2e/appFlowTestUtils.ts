@@ -51,6 +51,19 @@ export function uploadFile(input: HTMLInputElement, file: File) {
   input.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
+export function pasteFile(target: EventTarget, file: File) {
+  const dataTransfer = new DataTransfer()
+  dataTransfer.items.add(file)
+  const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent
+
+  Object.defineProperty(event, 'clipboardData', {
+    configurable: true,
+    value: dataTransfer,
+  })
+
+  target.dispatchEvent(event)
+}
+
 export function createJobOutput(filename: string, index: number) {
   return {
     filename,

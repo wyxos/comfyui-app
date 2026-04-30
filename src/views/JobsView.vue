@@ -5,6 +5,7 @@ import {
   LoaderCircle,
   RefreshCw,
   Search,
+  XCircle,
 } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import JobOutputsModal from '../components/JobOutputsModal.vue'
@@ -24,7 +25,14 @@ import {
   getJobEntryTab,
   groupJobResponses,
 } from './home/homeJobHelpers'
-import type { JobListEntry, JobListResponse, JobOutput, JobResponse, JobState } from './home/homeTypes'
+import type {
+  CancelQueuedJobsResponse,
+  JobListEntry,
+  JobListResponse,
+  JobOutput,
+  JobResponse,
+  JobState,
+} from './home/homeTypes'
 
 const PAGE_SIZE = 40
 
@@ -39,6 +47,7 @@ type JobStateFilter = (typeof stateFilters)[number]['value']
 
 const jobs = ref<JobResponse[]>([])
 const loading = ref(false)
+const cancellingQueued = ref(false)
 const error = ref('')
 const query = ref('')
 const stateFilter = ref<JobStateFilter>('all')
@@ -105,6 +114,24 @@ async function refreshJobs() {
     error.value = caughtError instanceof Error ? caughtError.message : 'Could not load generation jobs.'
   } finally {
     loading.value = false
+  }
+}
+
+async function cancelQueuedJobs() {
+  if (cancellingQueued.value || stateCounts.value.queued === 0) {
+    return
+  }
+
+  cancellingQueued.value = true
+  error.value = ''
+
+  try {
+    await apiJson<CancelQueuedJobsResponse>('/api/jobs/queued/cancel', { method: 'POST' })
+    await refreshJobs()
+  } catch (caughtError) {
+    error.value = caughtError instanceof Error ? caughtError.message : 'Could not cancel queued generation jobs.'
+  } finally {
+    cancellingQueued.value = false
   }
 }
 
@@ -286,22 +313,42 @@ onBeforeUnmount(() => {
           </p>
         </div>
 
-        <button
-          class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold text-card-foreground transition hover:border-secondary/60 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
-          type="button"
-          :disabled="loading"
-          @click="refreshJobs"
-        >
-          <LoaderCircle
-            v-if="loading"
-            class="h-4 w-4 animate-spin"
-          />
-          <RefreshCw
-            v-else
-            class="h-4 w-4"
-          />
-          Refresh
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            v-if="stateCounts.queued > 0"
+            class="inline-flex h-9 items-center gap-2 rounded-md border border-destructive/45 bg-destructive/10 px-3 text-xs font-semibold text-destructive transition hover:bg-destructive/16 focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
+            type="button"
+            :disabled="loading || cancellingQueued"
+            @click="cancelQueuedJobs"
+          >
+            <LoaderCircle
+              v-if="cancellingQueued"
+              class="h-4 w-4 animate-spin"
+            />
+            <XCircle
+              v-else
+              class="h-4 w-4"
+            />
+            Cancel queued ({{ stateCounts.queued }})
+          </button>
+
+          <button
+            class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold text-card-foreground transition hover:border-secondary/60 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
+            type="button"
+            :disabled="loading"
+            @click="refreshJobs"
+          >
+            <LoaderCircle
+              v-if="loading"
+              class="h-4 w-4 animate-spin"
+            />
+            <RefreshCw
+              v-else
+              class="h-4 w-4"
+            />
+            Refresh
+          </button>
+        </div>
       </div>
 
       <div class="mt-3 flex flex-wrap items-center gap-2">

@@ -5,7 +5,7 @@ import type { HomePreviewComputed } from './homePreviewComputed'
 import type { HomeSelectionComputed } from './homeSelectionComputed'
 import type { HomeState } from './homeState'
 import type { HomeStatusComputed } from './homeStatusComputed'
-import type { JobListEntry, JobListResponse, JobListTab, JobResponse } from './homeTypes'
+import type { CancelQueuedJobsResponse, JobListEntry, JobListResponse, JobListTab, JobResponse } from './homeTypes'
 
 type HomeJobPollingDeps = {
   apiJson: <T>(path: string, init?: RequestInit & { timeoutMs?: number }) => Promise<T>
@@ -35,6 +35,7 @@ const {
   detailLine,
   errorMessage,
   isSubmittingGenerate,
+  isCancellingQueuedJobs,
   jobListTab,
   jobState,
   jobsList,
@@ -46,6 +47,7 @@ const {
   progressMax,
   progressPercent,
   progressValue,
+  queueActionError,
   queueSummary,
   statusLine,
   submissionError,
@@ -218,6 +220,26 @@ async function refreshJobs() {
   }
 }
 
+async function cancelQueuedJobs() {
+  if (isCancellingQueuedJobs.value) {
+    return
+  }
+
+  isCancellingQueuedJobs.value = true
+  queueActionError.value = ''
+
+  try {
+    await apiJson<CancelQueuedJobsResponse>('/api/jobs/queued/cancel', {
+      method: 'POST',
+    })
+    await refreshJobs()
+  } catch (error) {
+    queueActionError.value = error instanceof Error ? error.message : 'Could not cancel queued workflows.'
+  } finally {
+    isCancellingQueuedJobs.value = false
+  }
+}
+
 async function pollJobs() {
   try {
     await refreshJobs()
@@ -277,6 +299,7 @@ return {
   startPolling,
   selectJob,
   selectJobEntry,
+  cancelQueuedJobs,
 }
 }
 

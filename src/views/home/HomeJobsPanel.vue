@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import {
+  AlertCircle,
   Check,
   Copy,
   FolderOpen,
+  LoaderCircle,
+  XCircle,
 } from 'lucide-vue-next'
+import { computed } from 'vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
 import { useProvidedHomeView } from './homeViewContext'
 
@@ -18,8 +22,10 @@ const {
   latestOutput,
   queuePanelNotice,
   jobListTabs,
+  queueActionError,
   visibleJobEntries,
   visibleJobsEmptyState,
+  isCancellingQueuedJobs,
   isJobEntryActive,
   getJobEntryPrimaryLabel,
   getJobEntryVariantSummary,
@@ -32,9 +38,12 @@ const {
   getJobEntryPreviewOutputKey,
   formatElapsed,
   copyOutputPath,
+  cancelQueuedJobs,
   openOutputParentFolder,
   selectJobEntry,
 } = useProvidedHomeView()
+
+const queuedJobCount = computed(() => jobListTabs.value.find((tab) => tab.value === 'queued')?.count ?? 0)
 </script>
 
 <template>
@@ -52,27 +61,59 @@ const {
                   {{ queuePanelNotice }}
                 </p>
 
-                <div class="grid grid-cols-3 gap-2 rounded-md border border-primary-foreground/12 bg-primary-foreground/6 p-1">
-                  <button
-                    v-for="tab in jobListTabs"
-                    :key="tab.value"
-                    type="button"
-                    class="inline-flex items-center justify-between gap-2 rounded-sm px-3 py-2 text-xs font-semibold transition"
-                    :class="
-                      jobListTab === tab.value
-                        ? 'bg-secondary text-secondary-foreground shadow-sm'
-                        : 'text-primary-foreground/70 hover:bg-primary-foreground/8 hover:text-accent'
-                    "
-                    @click="jobListTab = tab.value"
-                  >
-                    <span>{{ tab.label }}</span>
-                    <span
-                      class="rounded-sm border border-primary-foreground/14 bg-background px-1.5 py-0.5 text-[10px] leading-none text-primary-foreground"
+                <div class="flex items-stretch gap-2">
+                  <div class="grid min-w-0 flex-1 grid-cols-3 gap-2 rounded-md border border-primary-foreground/12 bg-primary-foreground/6 p-1">
+                    <button
+                      v-for="tab in jobListTabs"
+                      :key="tab.value"
+                      type="button"
+                      class="inline-flex items-center justify-between gap-2 rounded-sm px-3 py-2 text-xs font-semibold transition"
+                      :class="
+                        jobListTab === tab.value
+                          ? 'bg-secondary text-secondary-foreground shadow-sm'
+                          : 'text-primary-foreground/70 hover:bg-primary-foreground/8 hover:text-accent'
+                      "
+                      @click="jobListTab = tab.value"
                     >
-                      {{ tab.count }}
-                    </span>
-                  </button>
+                      <span>{{ tab.label }}</span>
+                      <span
+                        class="rounded-sm border border-primary-foreground/14 bg-background px-1.5 py-0.5 text-[10px] leading-none text-primary-foreground"
+                      >
+                        {{ tab.count }}
+                      </span>
+                    </button>
+                  </div>
+
+                  <UiTooltip
+                    v-if="queuedJobCount > 0"
+                    content="Cancel all queued jobs"
+                  >
+                    <button
+                      type="button"
+                      class="inline-flex h-full w-11 shrink-0 items-center justify-center rounded-md border border-destructive/45 bg-destructive/10 text-destructive transition hover:bg-destructive/16 disabled:cursor-wait disabled:opacity-60"
+                      aria-label="Cancel all queued jobs"
+                      :disabled="isCancellingQueuedJobs"
+                      @click="cancelQueuedJobs"
+                    >
+                      <LoaderCircle
+                        v-if="isCancellingQueuedJobs"
+                        class="h-4 w-4 animate-spin"
+                      />
+                      <XCircle
+                        v-else
+                        class="h-4 w-4"
+                      />
+                    </button>
+                  </UiTooltip>
                 </div>
+
+                <p
+                  v-if="queueActionError"
+                  class="inline-flex items-center gap-2 rounded-sm border border-destructive/45 bg-destructive/16 px-3 py-2 text-xs font-semibold text-destructive"
+                >
+                  <AlertCircle class="h-4 w-4" />
+                  {{ queueActionError }}
+                </p>
 
                 <div
                   v-if="visibleJobEntries.length"

@@ -178,6 +178,40 @@ describe('companion app e2e flows', () => {
     })
   })
 
+  it('cancels and clears all queued jobs from the jobs view', async () => {
+    const now = Date.now()
+    const queuedJobs = ['queued-job-1', 'queued-job-2'].map((promptId, index) => ({
+      ...createMockJob({ prompt: `queued prompt ${index + 1}` }, 'queued'),
+      promptId,
+      batchId: null,
+      batchIndex: null,
+      createdAt: now - 1000 + index,
+      updatedAt: now - 100 + index,
+      queuePosition: index + 1,
+      queueNumber: index + 10,
+    }))
+    const runningJob = {
+      ...createMockJob({ prompt: 'running prompt' }, 'running'),
+      promptId: 'running-job-1',
+      createdAt: now - 2000,
+      updatedAt: now - 200,
+    }
+
+    const { api, screen } = await renderCompanionApp('/jobs', { jobs: [...queuedJobs, runningJob] })
+
+    await expect.element(screen.getByRole('heading', { name: 'Generation jobs' })).toBeVisible()
+    await expect.element(screen.getByText('1 running, 2 queued, 0 history')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'Cancel queued (2)' }).click()
+
+    await vi.waitFor(() => {
+      expect(api.calls.some((call) => call.method === 'POST' && call.path === '/api/jobs/queued/cancel')).toBe(true)
+      expect(api.jobs.filter((job) => job.state === 'queued')).toHaveLength(0)
+      expect(api.jobs.filter((job) => job.state === 'cancelled')).toHaveLength(2)
+    })
+    await expect.element(screen.getByText('1 running, 0 queued, 2 history')).toBeVisible()
+  })
+
   it('keeps library pagination usable with the header downloads sheet', async () => {
     const now = Date.now()
     const downloads = Array.from({ length: 46 }, (_, index) => {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted } from 'vue'
 import {
   Ruler,
   Upload,
@@ -31,9 +32,24 @@ const {
   handleImageDragOver,
   handleImageDragLeave,
   handleImageDrop,
+  handleImagePaste,
 } = useProvidedHomeView()
 
 void inputImageField
+
+function handleWindowImagePaste(event: ClipboardEvent) {
+  if (formTab.value === 'image') {
+    handleImagePaste(event)
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('paste', handleWindowImagePaste)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('paste', handleWindowImagePaste)
+})
 </script>
 
 <template>
@@ -84,6 +100,7 @@ void inputImageField
                 <div
                   role="button"
                   tabindex="0"
+                  aria-label="Choose or paste input image"
                   class="relative aspect-square w-full overflow-hidden rounded-md border bg-card outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25"
                   :class="
                     isDraggingImage
@@ -97,6 +114,7 @@ void inputImageField
                   @dragover.prevent="handleImageDragOver"
                   @dragleave.prevent="handleImageDragLeave"
                   @drop.prevent="handleImageDrop"
+                  @paste="handleImagePaste"
                 >
                   <img
                     v-if="hasInputImage"
@@ -150,7 +168,7 @@ void inputImageField
                       <Upload class="h-12 w-12" :stroke-width="1.6" />
                     </div>
                     <div class="space-y-2">
-                      <p class="text-base font-semibold">Drop image here</p>
+                      <p class="text-base font-semibold">Drop or paste image here</p>
                       <p class="text-xs text-primary-foreground/60">
                         {{ dropzoneResolutionHint }}
                       </p>
@@ -166,7 +184,7 @@ void inputImageField
                       {{ selectedInputImageName }}
                     </p>
                     <p class="mt-1 text-xs text-primary-foreground/70">
-                      Drop a new image or click to replace
+                      Drop or paste a new image, or click to replace
                     </p>
                   </div>
                 </div>

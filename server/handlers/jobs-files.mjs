@@ -171,6 +171,54 @@ export async function handleCancelJob(promptId, response) {
   }
 }
 
+export async function handleCancelQueuedJobs(response) {
+  ensureJobsLoaded()
+
+  try {
+    const queueSnapshot = getQueueSnapshot(await comfyFetchJson('/queue'))
+    const queuedEntries = queueSnapshot.pending.filter((entry) => jobs.has(entry.promptId))
+    const promptIds = queuedEntries.map((entry) => entry.promptId)
+
+    if (promptIds.length) {
+      await comfyPost('/queue', { delete: promptIds })
+    }
+
+    const queueEntryByPromptId = new Map(queuedEntries.map((entry) => [entry.promptId, entry]))
+    const cancelledJobs = promptIds
+      .map((promptId) => jobs.get(promptId))
+      .filter(Boolean)
+
+    for (const job of cancelledJobs) {
+      const queueEntry = queueEntryByPromptId.get(job.promptId) ?? null
+      markJob(job, {
+        state: 'cancelled',
+        cancelRequestedAt: Date.now(),
+        error: null,
+        queuePosition: null,
+        queueNumber: queueEntry?.queueNumber ?? null,
+        currentNodeLabel: 'Cancelled',
+        progressValue: null,
+        progressMax: null,
+      })
+    }
+
+    return sendJson(response, 200, {
+      ok: true,
+      cancelled: cancelledJobs.length,
+      promptIds,
+      jobs: await Promise.all(cancelledJobs.map((job) => serializeJob(job))),
+    })
+  } catch (error) {
+    return sendError(
+      response,
+      502,
+      'comfyui-cancel-queued-failed',
+      'Could not cancel queued workflows in ComfyUI.',
+      error.payload ?? error.message,
+    )
+  }
+}
+
 export async function handleOpenParentFolder(request, response) {
   let body
   try {
