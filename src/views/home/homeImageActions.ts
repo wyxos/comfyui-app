@@ -218,6 +218,52 @@ function getSupportedImageFileFromTransfer(dataTransfer: DataTransfer | null | u
   return [...transferredFiles, ...itemFiles].find((file) => isSupportedImageFile(file)) ?? null
 }
 
+function getClipboardImageExtension(type: string) {
+  if (type === 'image/jpeg') {
+    return 'jpg'
+  }
+
+  if (type === 'image/webp') {
+    return 'webp'
+  }
+
+  if (type === 'image/avif') {
+    return 'avif'
+  }
+
+  return 'png'
+}
+
+async function getSupportedImageFileFromClipboard() {
+  if (!navigator.clipboard?.read) {
+    throw new Error('Clipboard image paste is not available here. Press Ctrl+V over the drop zone instead.')
+  }
+
+  const clipboardItems = await navigator.clipboard.read()
+  for (const item of clipboardItems) {
+    const imageType = item.types.find((type) => type.startsWith('image/'))
+    if (!imageType) {
+      continue
+    }
+
+    const blob = await item.getType(imageType)
+    const fileName =
+      blob instanceof File && blob.name
+        ? blob.name
+        : `clipboard-image.${getClipboardImageExtension(blob.type || imageType)}`
+    const file = new File([blob], fileName, {
+      type: blob.type || imageType,
+      lastModified: Date.now(),
+    })
+
+    if (isSupportedImageFile(file)) {
+      return file
+    }
+  }
+
+  throw new Error('The clipboard does not contain a supported image.')
+}
+
 function handleImageDragEnter() {
   imageDragDepth += 1
   isDraggingImage.value = true
@@ -279,6 +325,22 @@ function handleImagePaste(event: ClipboardEvent) {
   }
 }
 
+async function pasteImageFromClipboard() {
+  inputImageUploadError.value = ''
+
+  try {
+    const pastedFile = await getSupportedImageFileFromClipboard()
+    await setSelectedImage(pastedFile)
+
+    if (inputImageField.value) {
+      inputImageField.value.value = ''
+    }
+  } catch (error) {
+    inputImageUploadError.value =
+      error instanceof Error ? error.message : 'Could not paste an image from the clipboard.'
+  }
+}
+
 return {
   handleImageSelection,
   clearSelectedImage,
@@ -293,10 +355,12 @@ return {
   openImagePicker,
   isSupportedImageFile,
   getSupportedImageFileFromTransfer,
+  getSupportedImageFileFromClipboard,
   handleImageDragEnter,
   handleImageDragOver,
   handleImageDragLeave,
   handleImageDrop,
   handleImagePaste,
+  pasteImageFromClipboard,
 }
 }

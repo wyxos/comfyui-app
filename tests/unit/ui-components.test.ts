@@ -122,6 +122,7 @@ describe('UiPaginatedCardGrid', () => {
     expect(wrapper.text()).toContain('24 shown')
     expect(wrapper.text()).toContain('Page 1')
     expect(wrapper.find('article').text()).toBe('Model card')
+    expect((wrapper.get('input[aria-label="Page number"]').element as HTMLInputElement).value).toBe('1')
 
     const buttons = wrapper.findAll('button')
     expect(buttons[0].attributes('disabled')).toBeDefined()
@@ -129,6 +130,33 @@ describe('UiPaginatedCardGrid', () => {
 
     await buttons[1].trigger('click')
     expect(wrapper.emitted('go-to-page')).toEqual([[2]])
+  })
+
+  it('supports direct page entry and mouse side-button pagination', async () => {
+    const wrapper = mount(UiPaginatedCardGrid, {
+      props: {
+        itemsPresent: true,
+        rangeLabel: '81-120 of 160',
+        currentPage: 3,
+        pageCount: 5,
+        canGoPrevious: true,
+        canGoNext: true,
+      },
+      slots: {
+        default: '<article>Model card</article>',
+      },
+    })
+
+    const content = wrapper.get('section')
+    await content.trigger('mousedown', { button: 4 })
+    await content.trigger('mousedown', { button: 3 })
+
+    const pageInput = wrapper.get('input[aria-label="Page number"]')
+    ;(pageInput.element as HTMLInputElement).value = '5'
+    await pageInput.trigger('input')
+    await pageInput.trigger('keydown', { key: 'Enter' })
+
+    expect(wrapper.emitted('go-to-page')).toEqual([[4], [2], [5]])
   })
 })
 

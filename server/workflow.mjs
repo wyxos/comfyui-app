@@ -1,7 +1,12 @@
 import { animaAssets, samplerProfiles } from './config.mjs'
 import { safeTrim } from './shared.mjs'
 import { normalizeCfg, normalizeDenoise, normalizeDimension, normalizeSeed } from './model-paths.mjs'
-import { applyControlNetSourcesToConditioning, createControlNetSourceNodes } from './controlnet-workflow.mjs'
+import {
+  applyAnimaLLLiteSourcesToModel,
+  applyControlNetSourcesToConditioning,
+  createAnimaLLLiteSourceNodes,
+  createControlNetSourceNodes,
+} from './controlnet-workflow.mjs'
 export function detectCheckpointFamily(checkpointName) {
   return checkpointName.toLowerCase().includes('anima') ? 'anima' : 'sdxl'
 }
@@ -364,7 +369,7 @@ export function buildAnimaWorkflow({
     nodeLabels[emptyLatentNodeId] = 'Preparing latent'
     latentSourceNodeId = emptyLatentNodeId
   }
-  const controlNetSources = createControlNetSourceNodes({
+  const controlNetSources = createAnimaLLLiteSourceNodes({
     prompt,
     nodeLabels,
     nextNodeId,
@@ -372,19 +377,17 @@ export function buildAnimaWorkflow({
     width,
     height,
   })
+  activeModelRef = applyAnimaLLLiteSourcesToModel({
+    prompt,
+    nodeLabels,
+    nextNodeId,
+    modelRef: activeModelRef,
+    controlNetSources,
+  })
   for (const variant of promptVariants) {
     const samplerNodeId = nextNodeId()
     const vaeDecodeNodeId = nextNodeId()
     const saveImageNodeId = nextNodeId()
-    const conditioningRefs = applyControlNetSourcesToConditioning({
-      prompt,
-      nodeLabels,
-      nextNodeId,
-      positiveRef: [positiveNodeIds[variant.id], 0],
-      negativeRef: [negativeNodeId, 0],
-      controlNetSources,
-      variantLabel: buildPromptVariantLabel(variant).toLowerCase(),
-    })
 
     prompt[samplerNodeId] = {
       class_type: 'KSampler',
@@ -396,8 +399,8 @@ export function buildAnimaWorkflow({
         scheduler: samplerProfile.scheduler,
         denoise: usingImageInput ? denoise : samplerProfile.txt2imgDenoise,
         model: activeModelRef,
-        positive: conditioningRefs.positiveRef,
-        negative: conditioningRefs.negativeRef,
+        positive: [positiveNodeIds[variant.id], 0],
+        negative: [negativeNodeId, 0],
         latent_image: [latentSourceNodeId, 0],
       },
     }

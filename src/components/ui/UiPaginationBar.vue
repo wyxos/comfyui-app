@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { computed, ref, watch } from 'vue'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     rangeLabel: string
     currentPage: number
@@ -25,6 +26,43 @@ withDefaults(
 const emit = defineEmits<{
   'go-to-page': [page: number]
 }>()
+
+const pageDraft = ref(String(props.currentPage))
+const maxPageInput = computed(() => Math.max(
+  1,
+  props.pageCount,
+  props.currentPage,
+  props.canGoNext ? props.currentPage + 1 : 1,
+))
+
+watch(
+  () => props.currentPage,
+  (page) => {
+    pageDraft.value = String(page)
+  },
+)
+
+function clampPage(page: number) {
+  return Math.min(Math.max(page, 1), maxPageInput.value)
+}
+
+function goToPage(page: number) {
+  const nextPage = clampPage(page)
+  pageDraft.value = String(nextPage)
+  if (nextPage !== props.currentPage) {
+    emit('go-to-page', nextPage)
+  }
+}
+
+function submitPageDraft() {
+  const page = Number.parseInt(pageDraft.value, 10)
+  if (Number.isNaN(page)) {
+    pageDraft.value = String(props.currentPage)
+    return
+  }
+
+  goToPage(page)
+}
 </script>
 
 <template>
@@ -36,19 +74,34 @@ const emit = defineEmits<{
         type="button"
         :disabled="!(canGoPrevious ?? currentPage > 1)"
         :aria-label="previousLabel"
-        @click="emit('go-to-page', currentPage - 1)"
+        @click="goToPage(currentPage - 1)"
       >
         <ChevronLeft class="h-4 w-4" />
       </button>
-      <span class="min-w-20 text-center font-semibold text-card-foreground">
+      <span class="sr-only">
         {{ pageText ?? `Page ${currentPage} / ${pageCount}` }}
       </span>
+      <label class="flex h-8 items-center gap-1 rounded-sm border border-border bg-background/45 px-2 font-semibold text-card-foreground">
+        <span>Page</span>
+        <input
+          v-model="pageDraft"
+          class="h-6 w-12 rounded-sm border border-border bg-card px-1 text-center text-card-foreground outline-none transition focus:border-secondary"
+          type="number"
+          inputmode="numeric"
+          min="1"
+          :max="maxPageInput"
+          aria-label="Page number"
+          @change="submitPageDraft"
+          @keydown.enter.prevent="submitPageDraft"
+        >
+        <span class="text-muted-foreground">/ {{ maxPageInput }}</span>
+      </label>
       <button
         class="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-border text-muted-foreground transition hover:border-secondary/60 hover:text-secondary disabled:cursor-not-allowed disabled:opacity-50"
         type="button"
         :disabled="!(canGoNext ?? currentPage < pageCount)"
         :aria-label="nextLabel"
-        @click="emit('go-to-page', currentPage + 1)"
+        @click="goToPage(currentPage + 1)"
       >
         <ChevronRight class="h-4 w-4" />
       </button>

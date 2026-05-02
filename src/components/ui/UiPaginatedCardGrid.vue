@@ -5,7 +5,7 @@ defineOptions({
   inheritAttrs: false,
 })
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     itemsPresent: boolean
     rangeLabel: string
@@ -36,12 +36,49 @@ withDefaults(
 const emit = defineEmits<{
   'go-to-page': [page: number]
 }>()
+
+function canGoPreviousPage() {
+  return props.canGoPrevious ?? props.currentPage > 1
+}
+
+function canGoNextPage() {
+  return props.canGoNext ?? props.currentPage < props.pageCount
+}
+
+function isMousePaginationButton(event: MouseEvent) {
+  return event.button === 3 || event.button === 4
+}
+
+function preventMousePaginationDefault(event: MouseEvent) {
+  if (!isMousePaginationButton(event)) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function handleMousePagination(event: MouseEvent) {
+  if (!isMousePaginationButton(event)) {
+    return
+  }
+
+  preventMousePaginationDefault(event)
+  if (event.button === 3 && canGoPreviousPage()) {
+    emit('go-to-page', props.currentPage - 1)
+  } else if (event.button === 4 && canGoNextPage()) {
+    emit('go-to-page', props.currentPage + 1)
+  }
+}
 </script>
 
 <template>
   <section
     v-bind="$attrs"
     :class="contentClass"
+    @mousedown.capture="handleMousePagination"
+    @mouseup.capture="preventMousePaginationDefault"
+    @auxclick.capture="preventMousePaginationDefault"
   >
     <div
       v-if="itemsPresent"

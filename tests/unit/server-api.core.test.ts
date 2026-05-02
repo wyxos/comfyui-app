@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { useServerHarness } from './serverApiTestUtils'
 
@@ -202,6 +203,59 @@ describe('companion server API routes', () => {
         name: 'waiIllustriousSDXL_v160.safetensors',
         modelNsfw: true,
         compatibility: expect.objectContaining({ modelNsfw: true }),
+      })
+    })
+
+  it('uses completed-download compatibility while sidecar metadata is still missing', async () => {
+      const server = await setupHarness({
+        upstream: {
+          loraInfo: {
+            LoraLoader: {
+              input: {
+                required: {
+                  lora_name: [['Dark_aura.safetensors']],
+                  strength_model: ['FLOAT', { default: 0.65 }],
+                },
+              },
+            },
+          },
+        },
+      })
+
+      await writeFile(join(server.loraDir, 'Dark_aura.safetensors'), 'lora', 'utf8')
+      await server.writeDownloads([
+        downloadItem('Dark_aura', 'complete', {
+          modelId: 433097,
+          modelName: 'Dark Aura for Pony',
+          modelType: 'LORA',
+          versionId: 1109669,
+          versionName: 'Illustrious',
+          baseModel: 'Illustrious',
+          trainedWords: ['dark aura'],
+          hashes: {
+            SHA256: '96D811C4383E4FE1D8BCA611C1C2D6D3763EF4674E37679B16EF7090B87FF616',
+          },
+          fileName: 'Dark_aura.safetensors',
+          targetPath: join(server.loraDir, 'Dark_aura.safetensors'),
+        }),
+      ])
+
+      const loras = await server.request('/api/loras')
+      expect(loras.payload.loras[0]).toMatchObject({
+        name: 'Dark_aura.safetensors',
+        compatibility: expect.objectContaining({
+          modelId: 433097,
+          versionId: 1109669,
+          modelName: 'Dark Aura for Pony',
+          versionName: 'Illustrious',
+          baseModel: 'Illustrious',
+          baseModelKey: 'illustrious',
+          trainedWords: ['dark aura'],
+          hashes: {
+            SHA256: '96D811C4383E4FE1D8BCA611C1C2D6D3763EF4674E37679B16EF7090B87FF616',
+          },
+          status: 'ready',
+        }),
       })
     })
 })

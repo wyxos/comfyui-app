@@ -2,6 +2,7 @@ import type { HomeSelectionComputed } from './homeSelectionComputed'
 import type { HomeState } from './homeState'
 import type {
   CheckpointSelection,
+  ControlNetLineartPolarity,
   ControlNetSelection,
   LoraSelection,
   PersistedControlNetSelection,
@@ -69,6 +70,10 @@ function buildCheckpointSelection(
   }
 }
 
+function normalizeControlNetLineartPolarity(value: unknown): ControlNetLineartPolarity {
+  return coerceTrimmedFieldString(value) === 'black-lines' ? 'black-lines' : 'white-lines'
+}
+
 function buildControlNetSelection(
   entry: Partial<PersistedControlNetSelection> = {},
 ): ControlNetSelection {
@@ -80,6 +85,7 @@ function buildControlNetSelection(
     enabled: entry.enabled !== false,
     model: resolveAvailableControlNetModel(entry.model),
     preprocessor: coerceTrimmedFieldString(entry.preprocessor) || 'lineart',
+    lineartPolarity: normalizeControlNetLineartPolarity(entry.lineartPolarity),
     previewResolution: formatControlNetNumber(
       coerceFieldString(entry.previewResolution),
       defaultPreviewResolution,

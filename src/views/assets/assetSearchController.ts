@@ -445,14 +445,22 @@ export function createAssetSearchController(state: AssetSearchState) {
       return
     }
 
-    if (page > state.currentPage.value) {
-      if (!state.nextCursor.value && state.totalPages.value > 0 && page > state.totalPages.value) {
-        return
-      }
+    if (state.totalPages.value > 0 && page > state.totalPages.value) {
+      return
+    }
 
-      cursorHistory[state.currentPage.value - 1] = state.currentCursor.value
+    if (page > state.currentPage.value) {
+      if (state.currentCursor.value) {
+        cursorHistory[state.currentPage.value - 1] = state.currentCursor.value
+      }
       scrollAssetsResultsToTop()
-      void replaceSearchUrl(state.activeQuery.value || state.query.value, page, state.includeNsfw.value, state.nextCursor.value, 'push')
+      void replaceSearchUrl(
+        state.activeQuery.value || state.query.value,
+        page,
+        state.includeNsfw.value,
+        page === state.currentPage.value + 1 ? state.nextCursor.value : '',
+        'push',
+      )
       return
     }
 
@@ -466,7 +474,7 @@ export function createAssetSearchController(state: AssetSearchState) {
     scrollAssetsResultsToTop()
     void replaceSearchUrl(
       state.activeQuery.value || state.query.value,
-      previousCursor === undefined ? 1 : page,
+      page,
       state.includeNsfw.value,
       previousCursor ?? '',
       'push',

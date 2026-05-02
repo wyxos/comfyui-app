@@ -169,6 +169,7 @@ describe('server helper exports', () => {
             model: 'mistoLine_rank256.safetensors',
             inputImageName: 'control.png',
             preprocessor: 'lineart',
+            lineartPolarity: 'black-lines',
             previewResolution: '640',
             strength: '1.25',
             startPercent: '-1',
@@ -183,6 +184,7 @@ describe('server helper exports', () => {
         model: 'mistoLine_rank256.safetensors',
         inputImageName: 'control.png',
         preprocessor: 'lineart',
+        lineartPolarity: 'black-lines',
         previewResolution: 640,
         strength: 1.25,
         startPercent: 0,
@@ -204,6 +206,17 @@ describe('server helper exports', () => {
     expect(nodes.some((node) => node.class_type === 'LoadImage')).toBe(true)
     expect(nodes.some((node) => node.class_type === 'CannyEdgePreprocessor')).toBe(true)
     expect(nodes.some((node) => node.class_type === 'SaveImage')).toBe(true)
+
+    const invertedLineartWorkflow = buildControlNetPreviewWorkflow({
+      inputImageName: 'source.png',
+      preprocessor: 'lineart',
+      lineartPolarity: 'black-lines',
+      resolution: 768,
+    })
+    const invertedNodes = Object.values(invertedLineartWorkflow.prompt) as any[]
+    expect(invertedLineartWorkflow.lineartPolarity).toBe('black-lines')
+    expect(invertedNodes.some((node) => node.class_type === 'LineArtPreprocessor')).toBe(true)
+    expect(invertedNodes.some((node) => node.class_type === 'ImageInvert')).toBe(true)
   })
 
   it('normalizes Civitai metadata and classifies LoRA compatibility', () => {
@@ -230,6 +243,46 @@ describe('server helper exports', () => {
     expect(classifyLoraCompatibility(checkpoint, compatibleLora)).toBe('compatible')
     expect(classifyLoraCompatibility(checkpoint, incompatibleLora)).toBe('incompatible')
     expect(classifyLoraCompatibility(checkpoint, unverifiedLora)).toBe('unverified')
+  })
+
+  it('normalizes Civitai model payloads with nested versions', () => {
+    const darkAura = normalizeModelCompatibilityMetadata(
+      {
+        id: 433097,
+        name: 'Dark Aura for Pony',
+        type: 'LORA',
+        modelVersions: [
+          {
+            id: 1109669,
+            name: 'Illustrious',
+            baseModel: 'Illustrious',
+            trainedWords: ['dark aura'],
+            files: [
+              {
+                hashes: {
+                  SHA256: '96D811C4383E4FE1D8BCA611C1C2D6D3763EF4674E37679B16EF7090B87FF616',
+                },
+              },
+            ],
+          },
+        ],
+      },
+      { modelType: 'LORA', source: 'sidecar' },
+    )
+
+    expect(darkAura).toMatchObject({
+      modelId: 433097,
+      versionId: 1109669,
+      modelName: 'Dark Aura for Pony',
+      versionName: 'Illustrious',
+      modelType: 'LORA',
+      baseModel: 'Illustrious',
+      baseModelKey: 'illustrious',
+      trainedWords: ['dark aura'],
+      hashes: {
+        SHA256: '96D811C4383E4FE1D8BCA611C1C2D6D3763EF4674E37679B16EF7090B87FF616',
+      },
+    })
   })
 
   it('fetches Civitai metadata by version id and file hash', async () => {
@@ -298,6 +351,7 @@ describe('server helper exports', () => {
           model: 'mistoLine_rank256.safetensors',
           inputImageName: 'control.png',
           preprocessor: 'lineart',
+          lineartPolarity: 'black-lines',
           previewResolution: 768,
           strength: 0.8,
           startPercent: 0.1,
@@ -314,11 +368,13 @@ describe('server helper exports', () => {
     expect(Object.values(sdxl.prompt).some((node: any) => node.class_type === 'ControlNetApplyAdvanced')).toBe(true)
     const sdxlPromptEntries = Object.entries(sdxl.prompt) as [string, any][]
     const lineArtNode = sdxlPromptEntries.find(([, node]) => node.class_type === 'LineArtPreprocessor')
+    const invertNode = sdxlPromptEntries.find(([, node]) => node.class_type === 'ImageInvert')
     const scaledControlImage = sdxlPromptEntries.find(([, node]) => {
-      return node.class_type === 'ImageScale' && node.inputs?.image?.[0] === lineArtNode?.[0]
+      return node.class_type === 'ImageScale' && node.inputs?.image?.[0] === invertNode?.[0]
     })
     const controlNetApplyNode = sdxlPromptEntries.find(([, node]) => node.class_type === 'ControlNetApplyAdvanced')
     expect(lineArtNode?.[1].inputs).toMatchObject({ resolution: 768 })
+    expect(invertNode?.[1].inputs.image).toEqual([lineArtNode?.[0], 0])
     expect(controlNetApplyNode?.[1].inputs.image).toEqual([scaledControlImage?.[0], 0])
     expect(sdxl.outputNodeOrder).toHaveLength(1)
 
@@ -338,6 +394,48 @@ describe('server helper exports', () => {
     expect(anima.family).toBe('anima')
     expect(Object.values(anima.prompt).some((node: any) => node.class_type === 'CLIPLoader')).toBe(true)
     expect(Object.values(anima.prompt).some((node: any) => node.class_type === 'LoadImage')).toBe(true)
+  })
+
+  it('routes Anima control images through the LLLite model patch node', () => {
+    const promptVariants = buildRequestedPromptVariants('a portrait', '')
+    const anima = buildWorkflow({
+      promptVariants,
+      negativePrompt: '',
+      checkpoint: 'animaPencilXL.safetensors',
+      loras: [],
+      width: 1024,
+      height: 1024,
+      cfg: 4,
+      denoise: 0.75,
+      seed: 1,
+      inputImageName: '',
+      controlNets: [
+        {
+          model: 'anima-lllite-lineart-1.safetensors',
+          inputImageName: 'control.png',
+          preprocessor: 'lineart',
+          lineartPolarity: 'black-lines',
+          previewResolution: 768,
+          strength: 0.8,
+          startPercent: 0.1,
+          endPercent: 0.9,
+        },
+      ],
+    })
+
+    const entries = Object.entries(anima.prompt) as [string, any][]
+    const llliteNode = entries.find(([, node]) => node.class_type === 'AnimaLLLiteApply')
+    const samplerNode = entries.find(([, node]) => node.class_type === 'KSampler')
+
+    expect(llliteNode?.[1].inputs).toMatchObject({
+      lllite_name: 'anima-lllite-lineart-1.safetensors',
+      strength: 0.8,
+      start_percent: 0.1,
+      end_percent: 0.9,
+    })
+    expect(samplerNode?.[1].inputs.model).toEqual([llliteNode?.[0], 0])
+    expect(entries.some(([, node]) => node.class_type === 'ControlNetLoader')).toBe(false)
+    expect(entries.some(([, node]) => node.class_type === 'ControlNetApplyAdvanced')).toBe(false)
   })
 
   it('serializes downloads without abort controllers and summarizes counts', () => {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from 'vue'
 import {
+  ClipboardPaste,
   Ruler,
   Upload,
   X,
@@ -33,6 +34,7 @@ const {
   handleImageDragLeave,
   handleImageDrop,
   handleImagePaste,
+  pasteImageFromClipboard,
 } = useProvidedHomeView()
 
 void inputImageField
@@ -130,35 +132,47 @@ onBeforeUnmount(() => {
                     Ignored
                   </div>
 
-                  <UiTooltip
-                    v-if="selectedImageDimensions"
-                    class="absolute top-3 right-14 z-10"
-                    :content="sourceImageDimensionLabel"
-                  >
-                    <button
-                      type="button"
-                      aria-label="Use source image resolution"
-                      class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary-foreground/12 bg-primary text-primary-foreground shadow-sm transition hover:border-secondary hover:text-secondary focus:border-accent focus:ring-2 focus:ring-ring/25"
-                      @click.stop="applySourceImageResolution"
-                    >
-                      <Ruler class="h-4 w-4" />
-                    </button>
-                  </UiTooltip>
-
-                  <UiTooltip
+                  <div
                     v-if="hasInputImage"
-                    class="absolute top-3 right-3 z-10"
-                    content="Clear image"
+                    class="absolute right-3 top-3 z-10 flex items-center gap-2"
                   >
-                    <button
-                      type="button"
-                      aria-label="Clear image"
-                      class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-destructive/25 bg-destructive text-destructive-foreground shadow-sm transition hover:bg-destructive/92 focus:border-accent focus:ring-2 focus:ring-ring/25"
-                      @click.stop="clearSelectedImage"
+                    <UiTooltip content="Paste image from clipboard">
+                      <button
+                        type="button"
+                        aria-label="Paste input image from clipboard"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary-foreground/12 bg-primary text-primary-foreground shadow-sm transition hover:border-secondary hover:text-secondary focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
+                        :disabled="isUploadingInputImage"
+                        @click.stop="pasteImageFromClipboard"
+                      >
+                        <ClipboardPaste class="h-4 w-4" />
+                      </button>
+                    </UiTooltip>
+
+                    <UiTooltip
+                      v-if="selectedImageDimensions"
+                      :content="sourceImageDimensionLabel"
                     >
-                      <X class="h-4 w-4" />
-                    </button>
-                  </UiTooltip>
+                      <button
+                        type="button"
+                        aria-label="Use source image resolution"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary-foreground/12 bg-primary text-primary-foreground shadow-sm transition hover:border-secondary hover:text-secondary focus:border-accent focus:ring-2 focus:ring-ring/25"
+                        @click.stop="applySourceImageResolution"
+                      >
+                        <Ruler class="h-4 w-4" />
+                      </button>
+                    </UiTooltip>
+
+                    <UiTooltip content="Clear image">
+                      <button
+                        type="button"
+                        aria-label="Clear image"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-destructive/25 bg-destructive text-destructive-foreground shadow-sm transition hover:bg-destructive/92 focus:border-accent focus:ring-2 focus:ring-ring/25"
+                        @click.stop="clearSelectedImage"
+                      >
+                        <X class="h-4 w-4" />
+                      </button>
+                    </UiTooltip>
+                  </div>
 
                   <div
                     v-else
@@ -172,6 +186,16 @@ onBeforeUnmount(() => {
                       <p class="text-xs text-primary-foreground/60">
                         {{ dropzoneResolutionHint }}
                       </p>
+                      <button
+                        type="button"
+                        class="mx-auto inline-flex h-9 items-center gap-2 rounded-md border border-secondary/35 bg-secondary px-3 text-xs font-semibold uppercase tracking-[0.1em] text-secondary-foreground shadow-sm transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60"
+                        aria-label="Paste input image from clipboard"
+                        :disabled="isUploadingInputImage"
+                        @click.stop="pasteImageFromClipboard"
+                      >
+                        <ClipboardPaste class="h-4 w-4" />
+                        Paste image
+                      </button>
                       <p class="text-sm text-muted-foreground">or click to browse from disk</p>
                     </div>
                   </div>

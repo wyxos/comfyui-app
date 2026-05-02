@@ -171,6 +171,7 @@ export async function handleControlNetPreview(request, response) {
     return sendJson(response, 200, await generateControlNetPreview({
       inputImageName,
       preprocessor: body.preprocessor,
+      lineartPolarity: body.lineartPolarity,
       resolution: body.resolution,
     }))
   } catch (error) {

@@ -216,6 +216,8 @@ function addCheckpointLora(checkpointName: string, name: string) {
     return
   }
 
+  checkpoint.enabled = true
+
   const existingSelection = checkpoint.loras.find((selection) => selection.name === normalizedName)
   if (existingSelection) {
     existingSelection.enabled = true

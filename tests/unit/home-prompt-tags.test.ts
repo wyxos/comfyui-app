@@ -54,6 +54,7 @@ describe('home prompt tags', () => {
     const state = createHomeState()
     const actions = createHomePromptTagActions(state)
 
+    state.prompt.value = 'legacy fallback prompt'
     state.promptSections.value.subject = [{ text: 'test', strength: '1' }]
     state.promptSections.value.others = [{ text: 'extra detail', strength: '1' }]
     state.promptSectionDrafts.value.details = 'unfinished detail'
@@ -64,6 +65,7 @@ describe('home prompt tags', () => {
     expect(state.promptSections.value.subject).toEqual([])
     expect(state.promptSections.value.others).toEqual([])
     expect(state.promptSectionDrafts.value.details).toBe('')
+    expect(state.prompt.value).toBe('')
     expect(state.negativePromptTags.value).toEqual([{ text: 'blur', strength: '1' }])
   })
 

@@ -260,6 +260,7 @@ async function generate() {
         model: controlNet.model,
         inputImageName: controlNet.inputImageName,
         preprocessor: controlNet.preprocessor,
+        lineartPolarity: controlNet.lineartPolarity,
         previewResolution: normalizeControlNetNumericField(
           controlNet.previewResolution,
           normalizeControlNetResolutionFromOutputSize(),

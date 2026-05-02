@@ -61,6 +61,7 @@ export const controlNetPreprocessorProfiles = [
 const controlNetPreprocessorProfilesById = new Map(
   controlNetPreprocessorProfiles.map((profile) => [profile.id, profile]),
 )
+const lineartPreprocessorIds = new Set(['lineart', 'anime-lineart'])
 
 export function serializeControlNetPreprocessors() {
   return controlNetPreprocessorProfiles.map(({ id, label, defaultResolution }) => ({
@@ -73,6 +74,16 @@ export function serializeControlNetPreprocessors() {
 export function getControlNetPreprocessorProfile(value) {
   const id = safeTrim(value) || 'none'
   return controlNetPreprocessorProfilesById.get(id) ?? controlNetPreprocessorProfilesById.get('none')
+}
+
+export function normalizeControlNetLineartPolarity(value) {
+  return safeTrim(value) === 'black-lines' ? 'black-lines' : 'white-lines'
+}
+
+export function shouldInvertControlNetLineart({ preprocessor, lineartPolarity } = {}) {
+  const profile = getControlNetPreprocessorProfile(preprocessor)
+  return lineartPreprocessorIds.has(profile?.id) &&
+    normalizeControlNetLineartPolarity(lineartPolarity) === 'black-lines'
 }
 
 export function normalizeControlNetPreviewResolution(value, fallback = 512) {
@@ -121,6 +132,9 @@ function normalizeControlNetEntry(entry) {
     model,
     inputImageName,
     preprocessor: getControlNetPreprocessorProfile(rawEntry.preprocessor)?.id ?? 'none',
+    lineartPolarity: normalizeControlNetLineartPolarity(
+      rawEntry.lineartPolarity ?? rawEntry.lineart_polarity,
+    ),
     previewResolution: normalizeControlNetPreviewResolution(rawEntry.previewResolution),
     strength: normalizeControlNetStrength(rawEntry.strength),
     startPercent,

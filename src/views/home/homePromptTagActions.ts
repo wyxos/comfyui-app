@@ -126,6 +126,7 @@ function clearPromptSectionTags(sectionId?: PromptSectionId) {
     promptSections.value[section.id] = []
     promptSectionDrafts.value[section.id] = ''
   }
+  prompt.value = ''
 }
 
 function clearNegativePromptTags() {
@@ -259,7 +260,8 @@ function setPromptTagEnabled(location: PromptTagLocation, enabled: boolean) {
     return false
   }
 
-  const { enabled: _enabled, ...tagWithoutEnabled } = tag
+  const tagWithoutEnabled = { ...tag }
+  delete tagWithoutEnabled.enabled
   const nextTags = [...tags]
   nextTags[location.index] = enabled ? tagWithoutEnabled : { ...tagWithoutEnabled, enabled: false }
   setPromptTagList(listLocation, nextTags)

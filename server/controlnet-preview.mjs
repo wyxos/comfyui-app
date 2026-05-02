@@ -3,7 +3,9 @@ import { comfyFetchJson, submitComfyPrompt } from './comfy-client.mjs'
 import { extractErrorFromHistory, extractImagesFromHistory } from './queue-state.mjs'
 import {
   getControlNetPreprocessorProfile,
+  normalizeControlNetLineartPolarity,
   normalizeControlNetPreviewResolution,
+  shouldInvertControlNetLineart,
 } from './controlnet-options.mjs'
 
 function createPreviewNodeIdGenerator() {
@@ -18,9 +20,11 @@ function buildFilenamePrefix(profile) {
 export function buildControlNetPreviewWorkflow({
   inputImageName,
   preprocessor,
+  lineartPolarity,
   resolution,
 }) {
   const profile = getControlNetPreprocessorProfile(preprocessor)
+  const normalizedLineartPolarity = normalizeControlNetLineartPolarity(lineartPolarity)
   const prompt = {}
   const nextNodeId = createPreviewNodeIdGenerator()
   const loadImageNodeId = nextNodeId()
@@ -46,6 +50,20 @@ export function buildControlNetPreviewWorkflow({
     imageRef = [preprocessorNodeId, 0]
   }
 
+  if (shouldInvertControlNetLineart({
+    preprocessor: profile?.id,
+    lineartPolarity: normalizedLineartPolarity,
+  })) {
+    const invertNodeId = nextNodeId()
+    prompt[invertNodeId] = {
+      class_type: 'ImageInvert',
+      inputs: {
+        image: imageRef,
+      },
+    }
+    imageRef = [invertNodeId, 0]
+  }
+
   const saveImageNodeId = nextNodeId()
   prompt[saveImageNodeId] = {
     class_type: 'SaveImage',
@@ -59,6 +77,7 @@ export function buildControlNetPreviewWorkflow({
     prompt,
     outputNodeId: saveImageNodeId,
     preprocessor: profile?.id ?? 'none',
+    lineartPolarity: normalizedLineartPolarity,
     resolution: normalizeControlNetPreviewResolution(resolution, profile?.defaultResolution ?? 512),
   }
 }
@@ -88,11 +107,13 @@ async function waitForControlNetPreview(promptId, outputNodeId) {
 export async function generateControlNetPreview({
   inputImageName,
   preprocessor,
+  lineartPolarity,
   resolution,
 }) {
   const workflow = buildControlNetPreviewWorkflow({
     inputImageName,
     preprocessor,
+    lineartPolarity,
     resolution,
   })
   const submission = await submitComfyPrompt(workflow.prompt)
@@ -109,6 +130,7 @@ export async function generateControlNetPreview({
     ok: true,
     promptId: submission.payload.prompt_id,
     preprocessor: workflow.preprocessor,
+    lineartPolarity: workflow.lineartPolarity,
     resolution: workflow.resolution,
     preview: {
       ...image,

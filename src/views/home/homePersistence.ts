@@ -108,6 +108,9 @@ function normalizePersistedControlNetSelection(entry: unknown) {
     enabled: entry.enabled !== false,
     model,
     preprocessor: coerceTrimmedFieldString(entry.preprocessor) || 'lineart',
+    lineartPolarity: coerceTrimmedFieldString(entry.lineartPolarity) === 'black-lines'
+      ? 'black-lines'
+      : 'white-lines',
     previewResolution: formatControlNetNumber(coerceFieldString(entry.previewResolution), 512, 64, 16384),
     strength: formatControlNetNumber(coerceFieldString(entry.strength), 1, 0, 10),
     startPercent: formatControlNetNumber(coerceFieldString(entry.startPercent), 0, 0, 1),
@@ -282,6 +285,7 @@ function persistFormState() {
       enabled: controlNet.enabled,
       model: controlNet.model,
       preprocessor: controlNet.preprocessor,
+      lineartPolarity: controlNet.lineartPolarity,
       previewResolution: controlNet.previewResolution,
       strength: controlNet.strength,
       startPercent: controlNet.startPercent,

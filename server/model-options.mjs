@@ -4,7 +4,7 @@ import { normalizeOptionalBoolean, safeTrim } from './shared.mjs'
 import { statFileIfExists } from './downloads/metadata.mjs'
 import { downloadsLoaded, readDownloadsState } from './downloads/state.mjs'
 import { getComfyCheckpointDir, getComfyLoraDir, readJsonFileIfExists, resolveModelPath } from './model-paths.mjs'
-import { getModelCompatibilityMetadata } from './model-metadata.mjs'
+import { getModelCompatibilityMetadata, normalizeModelCompatibilityMetadata } from './model-metadata.mjs'
 
 export async function readModelSidecar(rootPath, modelName) {
   const resolvedModelPath = resolveModelPath(rootPath, modelName)
@@ -84,6 +84,67 @@ function downloadModelNsfw(download) {
   return normalizeOptionalBoolean(download?.modelNsfw ?? download?.modelMetadata?.nsfw ?? download?.model?.nsfw)
 }
 
+function mergeStringList(primary = [], fallback = []) {
+  const seen = new Set()
+  const merged = []
+
+  for (const value of [...primary, ...fallback]) {
+    const text = safeTrim(value)
+    const key = text.toLowerCase()
+    if (!text || seen.has(key)) {
+      continue
+    }
+
+    seen.add(key)
+    merged.push(text)
+  }
+
+  return merged
+}
+
+function mergeCompatibilityMetadata(primary, fallback) {
+  const baseModel = safeTrim(primary?.baseModel) || safeTrim(fallback?.baseModel)
+  const baseModelKey = safeTrim(primary?.baseModelKey) || safeTrim(fallback?.baseModelKey)
+  const hasFallbackBasis = Boolean(
+    fallback?.baseModelKey ||
+      fallback?.checkpointNames?.length ||
+      Object.keys(fallback?.checkpointHashes ?? {}).length,
+  )
+  const hasPrimaryBasis = Boolean(
+    primary?.baseModelKey ||
+      primary?.checkpointNames?.length ||
+      Object.keys(primary?.checkpointHashes ?? {}).length,
+  )
+
+  return {
+    ...primary,
+    modelId: primary?.modelId ?? fallback?.modelId ?? null,
+    versionId: primary?.versionId ?? fallback?.versionId ?? null,
+    modelName: safeTrim(primary?.modelName) || safeTrim(fallback?.modelName),
+    versionName: safeTrim(primary?.versionName) || safeTrim(fallback?.versionName),
+    modelType: safeTrim(primary?.modelType) || safeTrim(fallback?.modelType) || null,
+    modelNsfw: primary?.modelNsfw ?? fallback?.modelNsfw ?? null,
+    baseModel,
+    baseModelKey,
+    trainedWords: mergeStringList(primary?.trainedWords, fallback?.trainedWords),
+    hashes: {
+      ...(fallback?.hashes ?? {}),
+      ...(primary?.hashes ?? {}),
+    },
+    checkpointNames: mergeStringList(primary?.checkpointNames, fallback?.checkpointNames),
+    checkpointHashes: {
+      ...(fallback?.checkpointHashes ?? {}),
+      ...(primary?.checkpointHashes ?? {}),
+    },
+    source: hasPrimaryBasis || !hasFallbackBasis ? primary?.source : fallback?.source,
+    status: !hasPrimaryBasis && hasFallbackBasis
+      ? fallback?.status
+      : primary?.status === 'missing' && fallback?.status === 'ready'
+        ? 'ready'
+        : primary?.status,
+  }
+}
+
 async function readDownloadMetadataItems() {
   if (downloadsLoaded) {
     return [...civitaiDownloads.values()]
@@ -119,17 +180,27 @@ async function buildDownloadMetadataIndex(modelType) {
 }
 
 function mergeDownloadMetadata(compatibility, download) {
+  const downloadCompatibility = download
+    ? normalizeModelCompatibilityMetadata(download, {
+        modelType: compatibility.modelType ?? download.modelType,
+        source: 'download',
+        status: 'ready',
+      })
+    : null
+  const mergedCompatibility = downloadCompatibility
+    ? mergeCompatibilityMetadata(compatibility, downloadCompatibility)
+    : compatibility
   const modelNsfw = downloadModelNsfw(download)
   if (modelNsfw === null) {
     return {
-      compatibility,
-      modelNsfw: compatibility.modelNsfw ?? null,
+      compatibility: mergedCompatibility,
+      modelNsfw: mergedCompatibility.modelNsfw ?? null,
     }
   }
 
   return {
     compatibility: {
-      ...compatibility,
+      ...mergedCompatibility,
       modelNsfw,
     },
     modelNsfw,

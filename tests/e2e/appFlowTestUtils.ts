@@ -64,6 +64,34 @@ export function pasteFile(target: EventTarget, file: File) {
   target.dispatchEvent(event)
 }
 
+export function dropFile(target: EventTarget, file: File) {
+  const dataTransfer = new DataTransfer()
+  dataTransfer.items.add(file)
+
+  target.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer }))
+  target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }))
+  target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }))
+}
+
+export function mockClipboardReadImages(files: File[]) {
+  const read = vi.fn().mockResolvedValue(
+    files.map((file) => ({
+      types: [file.type],
+      getType: vi.fn().mockResolvedValue(file),
+    })),
+  )
+
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: {
+      ...navigator.clipboard,
+      read,
+    },
+  })
+
+  return read
+}
+
 export function createJobOutput(filename: string, index: number) {
   return {
     filename,

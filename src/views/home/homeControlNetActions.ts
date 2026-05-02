@@ -5,6 +5,7 @@ import { createClientId, normalizeControlNetNumericField } from './homeValueHelp
 type HomeControlNetActionDeps = {
   apiJson: <T>(path: string, init?: RequestInit & { timeoutMs?: number }) => Promise<T>
   buildControlNetSelection: () => ControlNetSelection
+  getSupportedImageFileFromClipboard: () => Promise<File>
   getSupportedImageFileFromTransfer: (dataTransfer: DataTransfer | null | undefined) => File | null
   loadImageDimensions: (file: File) => Promise<{ width: number; height: number }>
   normalizeControlNetResolutionFromOutputSize: () => number
@@ -21,6 +22,7 @@ const {
 const {
   apiJson,
   buildControlNetSelection,
+  getSupportedImageFileFromClipboard,
   getSupportedImageFileFromTransfer,
   loadImageDimensions,
   normalizeControlNetResolutionFromOutputSize,
@@ -102,6 +104,14 @@ function setControlNetPreprocessor(id: string, preprocessor: string) {
   }
 }
 
+function setControlNetLineartPolarity(id: string, lineartPolarity: 'white-lines' | 'black-lines') {
+  const controlNet = getControlNetSelection(id)
+  if (controlNet) {
+    controlNet.lineartPolarity = lineartPolarity
+    clearControlNetGeneratedPreview(controlNet)
+  }
+}
+
 function setControlNetField(
   id: string,
   field: 'strength' | 'startPercent' | 'endPercent' | 'previewResolution',
@@ -156,6 +166,7 @@ async function setControlNetImage(id: string, file: File | null) {
   controlNetImageLoadIds.set(id, loadId)
   revokeControlNetPreview(controlNet)
   Object.assign(controlNet, {
+    enabled: true,
     inputImageName: '',
     inputImageDisplayName: file.name,
     inputImagePreviewUrl: URL.createObjectURL(file),
@@ -211,6 +222,7 @@ async function generateControlNetPreview(id: string) {
       body: JSON.stringify({
         inputImageName: controlNet.inputImageName,
         preprocessor: controlNet.preprocessor,
+        lineartPolarity: controlNet.lineartPolarity,
         resolution: normalizeControlNetNumericField(
           controlNet.previewResolution,
           normalizeControlNetResolutionFromOutputSize(),
@@ -231,6 +243,9 @@ async function generateControlNetPreview(id: string) {
     controlNet.previewImageType = payload.preview.type
     if (payload.preprocessor) {
       controlNet.preprocessor = payload.preprocessor
+    }
+    if (payload.lineartPolarity) {
+      controlNet.lineartPolarity = payload.lineartPolarity
     }
     if (payload.resolution) {
       controlNet.previewResolution = String(payload.resolution)
@@ -313,6 +328,26 @@ function handleControlNetImagePaste(id: string, event: ClipboardEvent) {
   void setControlNetImage(id, pastedFile)
 }
 
+async function pasteControlNetImageFromClipboard(id: string) {
+  const controlNet = getControlNetSelection(id)
+  if (!controlNet) {
+    return
+  }
+
+  controlNet.uploadError = ''
+
+  try {
+    const pastedFile = await getSupportedImageFileFromClipboard()
+    await setControlNetImage(id, pastedFile)
+  } catch (error) {
+    const latestControlNet = getControlNetSelection(id)
+    if (latestControlNet) {
+      latestControlNet.uploadError =
+        error instanceof Error ? error.message : 'Could not paste a ControlNet image from the clipboard.'
+    }
+  }
+}
+
 return {
   getControlNetSelection,
   revokeControlNetPreview,
@@ -323,6 +358,7 @@ return {
   setControlNetEnabled,
   setControlNetModel,
   setControlNetPreprocessor,
+  setControlNetLineartPolarity,
   setControlNetField,
   clearControlNetInstances,
   clearControlNetImage,
@@ -334,5 +370,6 @@ return {
   handleControlNetDragLeave,
   handleControlNetImageDrop,
   handleControlNetImagePaste,
+  pasteControlNetImageFromClipboard,
 }
 }

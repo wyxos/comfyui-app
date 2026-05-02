@@ -73,12 +73,17 @@ export function normalizeBaseModelKey(value) {
   return normalized
 }
 
-function collectFileHashes(payload) {
-  const files = Array.isArray(payload?.files) ? payload.files : []
+function collectFileHashes(payload, version) {
+  const files = [
+    ...(Array.isArray(payload?.files) ? payload.files : []),
+    ...(Array.isArray(version?.files) ? version.files : []),
+    ...(Array.isArray(payload?.modelVersion?.files) ? payload.modelVersion.files : []),
+  ]
   return normalizeHashes(
     payload?.hashes,
     payload?.file?.hashes,
     payload?.modelVersion?.file?.hashes,
+    version?.file?.hashes,
     ...files.map((file) => file?.hashes),
   )
 }
@@ -90,6 +95,36 @@ function normalizeModelType(value, fallback) {
   }
 
   return modelType.toLowerCase() === 'lora' ? 'LORA' : modelType
+}
+
+function getVersionCandidates(payload) {
+  if (payload?.modelVersion && typeof payload.modelVersion === 'object') {
+    return [payload.modelVersion]
+  }
+
+  if (payload?.version && typeof payload.version === 'object') {
+    return [payload.version]
+  }
+
+  if (Array.isArray(payload?.modelVersions)) {
+    return payload.modelVersions.filter((version) => version && typeof version === 'object')
+  }
+
+  if (Array.isArray(payload?.model?.modelVersions)) {
+    return payload.model.modelVersions.filter((version) => version && typeof version === 'object')
+  }
+
+  return []
+}
+
+function getVersionPayload(payload) {
+  const versions = getVersionCandidates(payload)
+  if (!versions.length) {
+    return payload
+  }
+
+  const expectedVersionId = normalizeInteger(payload.versionId ?? payload.modelVersionId)
+  return versions.find((version) => normalizeInteger(version.id) === expectedVersionId) ?? versions[0]
 }
 
 export function normalizeModelCompatibilityMetadata(payload, options = {}) {
@@ -113,11 +148,7 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
     }
   }
 
-  const version = payload.modelVersion && typeof payload.modelVersion === 'object'
-    ? payload.modelVersion
-    : payload.version && typeof payload.version === 'object'
-      ? payload.version
-      : payload
+  const version = getVersionPayload(payload)
   const model = payload.model && typeof payload.model === 'object' ? payload.model : payload
   const baseModel = safeTrim(payload.baseModel ?? version.baseModel ?? payload.metadata?.baseModel)
   const trainedWords = normalizeStringList([
@@ -125,7 +156,7 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
     ...normalizeStringList(version.trainedWords),
     ...normalizeStringList(payload.triggerWords),
   ])
-  const hashes = collectFileHashes(payload)
+  const hashes = collectFileHashes(payload, version)
   const checkpointHashes = normalizeHashes(payload.checkpointHashes, payload.compatibleCheckpointHashes)
 
   return {

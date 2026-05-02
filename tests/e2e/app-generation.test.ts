@@ -3,10 +3,13 @@ import {
   createHistoryJob,
   createImageFile,
   createJobOutput,
+  dropFile,
+  mockClipboardReadImages,
   pasteFile,
   renderCompanionApp,
   uploadFile,
 } from './appFlowTestUtils'
+import { checkpointName, loraName } from '../fixtures/mockApiData'
 
 describe('companion app e2e flows', () => {
   it('loads mocked generation dependencies, improves a prompt, and submits generation', async () => {
@@ -42,7 +45,19 @@ describe('companion app e2e flows', () => {
       })
       await expect.element(screen.getByText('mock-controlnet-preview.png')).toBeVisible()
       const firstPreviewCall = api.calls.find((call) => call.method === 'POST' && call.path === '/api/controlnet-preview')
-      expect(firstPreviewCall?.body).toMatchObject({ preprocessor: 'lineart', resolution: 1024 })
+      expect(firstPreviewCall?.body).toMatchObject({
+        preprocessor: 'lineart',
+        lineartPolarity: 'white-lines',
+        resolution: 1024,
+      })
+      await screen.getByRole('button', { name: 'Use black lines on white background' }).click()
+      await vi.waitFor(() => {
+        expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/controlnet-preview').length).toBeGreaterThan(1)
+      })
+      const polarityPreviewCall = api.calls
+        .filter((call) => call.method === 'POST' && call.path === '/api/controlnet-preview')
+        .at(-1)
+      expect(polarityPreviewCall?.body).toMatchObject({ lineartPolarity: 'black-lines' })
       const previewCallCount = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/controlnet-preview').length
       await screen.getByRole('button', { name: 'Use output size for ControlNet resolution' }).click()
       await vi.waitFor(() => {
@@ -145,6 +160,7 @@ describe('companion app e2e flows', () => {
             model: 'mistoLine_rank256.safetensors',
             inputImageName: 'mock-upload.png',
             preprocessor: 'lineart',
+            lineartPolarity: 'black-lines',
             previewResolution: 1920,
             strength: 1,
             startPercent: 0,
@@ -191,6 +207,19 @@ describe('companion app e2e flows', () => {
       await expect.element(screen.getByText('mock-controlnet-preview.png')).toBeVisible()
       expect(document.body.textContent).not.toContain('Choose a ControlNet model or disable the empty instance.')
       await expect.element(screen.getByRole('button', { name: 'Generate' })).toBeEnabled()
+    })
+
+  it('auto-enables a disabled checkpoint when adding a LoRA to it', async () => {
+      const { screen } = await renderCompanionApp()
+
+      await screen.getByRole('switch', { name: `Disable ${checkpointName}` }).click()
+      await expect.element(screen.getByRole('switch', { name: `Enable ${checkpointName}` })).toBeVisible()
+
+      await screen.getByLabelText(`Add LoRA for ${checkpointName}`).click()
+      await screen.getByRole('button', { name: loraName }).click()
+
+      await expect.element(screen.getByRole('switch', { name: `Disable ${checkpointName}` })).toBeVisible()
+      await expect.element(screen.getByRole('switch', { name: `Disable ${loraName}` })).toBeVisible()
     })
 
   it('uses job output URLs for capped history preview stacks', async () => {
@@ -286,6 +315,92 @@ describe('companion app e2e flows', () => {
       await expect.element(screen.getByText('clipboard-control.png')).toBeVisible()
       await vi.waitFor(() => {
         expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(2)
+      })
+    })
+
+  it('pastes clipboard images from visible dropzone CTAs', async () => {
+      const { api, screen } = await renderCompanionApp('/', {
+        uploadInputImageNames: ['cta-input.png', 'cta-control.png'],
+      })
+
+      await screen.getByRole('button', { name: /Image.*Input image and denoise/ }).click()
+      const inputClipboardRead = mockClipboardReadImages([createImageFile('clipboard-input-cta.png')])
+
+      await screen.getByRole('button', { name: 'Paste input image from clipboard' }).click()
+
+      await vi.waitFor(() => {
+        expect(inputClipboardRead).toHaveBeenCalled()
+      })
+      await expect.element(screen.getByText('clipboard-input-cta.png')).toBeVisible()
+      await vi.waitFor(() => {
+        expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(1)
+      })
+
+      await screen.getByRole('button', { name: /ControlNet.*Guided image controls/ }).click()
+      await screen.getByRole('button', { name: 'Add' }).click()
+      const controlClipboardRead = mockClipboardReadImages([createImageFile('clipboard-control-cta.png')])
+
+      await screen.getByRole('button', { name: 'Paste ControlNet image from clipboard' }).click()
+
+      await vi.waitFor(() => {
+        expect(controlClipboardRead).toHaveBeenCalled()
+      })
+      await expect.element(screen.getByText('clipboard-control-cta.png')).toBeVisible()
+      await vi.waitFor(() => {
+        expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(2)
+      })
+    })
+
+  it('auto-enables disabled image controls when files are dropped', async () => {
+      const { api, screen } = await renderCompanionApp('/', {
+        uploadInputImageNames: ['initial-input.png', 'dropped-input.png', 'dropped-control.png'],
+      })
+
+      await screen.getByRole('button', { name: /Image.*Input image and denoise/ }).click()
+      const inputImageDropzone = document.querySelector<HTMLElement>('[aria-label="Choose or paste input image"]')
+      const inputImageSwitch = document.querySelector<HTMLButtonElement>('[aria-label="Use input image"]')
+      expect(inputImageDropzone).not.toBeNull()
+      expect(inputImageSwitch).not.toBeNull()
+
+      dropFile(inputImageDropzone as HTMLElement, createImageFile('initial-source.png'))
+      await expect.element(screen.getByText('initial-source.png')).toBeVisible()
+      await vi.waitFor(() => {
+        expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(1)
+        expect(inputImageSwitch?.getAttribute('aria-checked')).toBe('true')
+      })
+
+      await screen.getByRole('switch', { name: 'Use input image' }).click()
+      await vi.waitFor(() => {
+        expect(inputImageSwitch?.getAttribute('aria-checked')).toBe('false')
+      })
+
+      dropFile(inputImageDropzone as HTMLElement, createImageFile('dropped-source.png'))
+      await expect.element(screen.getByText('dropped-source.png')).toBeVisible()
+      await vi.waitFor(() => {
+        expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(2)
+        expect(inputImageSwitch?.getAttribute('aria-checked')).toBe('true')
+      })
+
+      await screen.getByRole('button', { name: /ControlNet.*Guided image controls/ }).click()
+      await screen.getByRole('button', { name: 'Add' }).click()
+      const controlNetDropzone = document.querySelector<HTMLElement>(
+        '[aria-label="Choose or paste ControlNet image"]',
+      )
+      const controlNetSwitch = document.querySelector<HTMLButtonElement>(
+        'button[role="switch"][aria-label="Enable ControlNet instance"]',
+      )
+      expect(controlNetDropzone).not.toBeNull()
+      expect(controlNetSwitch).not.toBeNull()
+      await screen.getByRole('switch', { name: 'Enable ControlNet instance' }).click()
+      await vi.waitFor(() => {
+        expect(controlNetSwitch?.getAttribute('aria-checked')).toBe('false')
+      })
+
+      dropFile(controlNetDropzone as HTMLElement, createImageFile('dropped-control-source.png'))
+      await expect.element(screen.getByText('dropped-control-source.png')).toBeVisible()
+      await vi.waitFor(() => {
+        expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(3)
+        expect(controlNetSwitch?.getAttribute('aria-checked')).toBe('true')
       })
     })
 

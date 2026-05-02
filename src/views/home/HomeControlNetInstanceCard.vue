@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { RefreshCw, Ruler, Trash2, Upload, X } from 'lucide-vue-next'
+import { ClipboardPaste, RefreshCw, Ruler, Trash2, Upload, X } from 'lucide-vue-next'
 import UiSelect from '../../components/ui/UiSelect.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
 import { useProvidedHomeView } from './homeViewContext'
@@ -21,6 +21,7 @@ const {
   setControlNetEnabled,
   setControlNetModel,
   setControlNetPreprocessor,
+  setControlNetLineartPolarity,
   setControlNetField,
   clearControlNetImage,
   applyControlNetOutputResolution,
@@ -31,6 +32,7 @@ const {
   handleControlNetDragLeave,
   handleControlNetImageDrop,
   handleControlNetImagePaste,
+  pasteControlNetImageFromClipboard,
 } = useProvidedHomeView()
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -50,6 +52,9 @@ const canGeneratePreview = computed(() => {
       !props.controlNet.isGeneratingPreview,
   )
 })
+const usesLineartPolarity = computed(() =>
+  ['lineart', 'anime-lineart'].includes(props.controlNet.preprocessor),
+)
 const dimensionLabel = computed(() => {
   if (!props.controlNet.inputImageWidth || !props.controlNet.inputImageHeight) {
     return ''
@@ -75,6 +80,17 @@ function handleNumericInput(
   const target = event.target
   if (target instanceof HTMLInputElement) {
     setControlNetField(props.controlNet.id, field, target.value)
+  }
+}
+
+async function chooseLineartPolarity(lineartPolarity: 'white-lines' | 'black-lines') {
+  if (props.controlNet.lineartPolarity === lineartPolarity) {
+    return
+  }
+
+  setControlNetLineartPolarity(props.controlNet.id, lineartPolarity)
+  if (props.controlNet.inputImageName) {
+    await generateControlNetPreview(props.controlNet.id)
   }
 }
 
@@ -211,6 +227,49 @@ onBeforeUnmount(() => {
       </label>
     </div>
 
+    <div
+      v-if="usesLineartPolarity"
+      class="mt-3 flex flex-wrap items-center justify-between gap-3"
+    >
+      <span class="field-label text-card-foreground/70">Lineart</span>
+      <div class="grid w-full grid-cols-2 gap-2 sm:w-auto">
+        <button
+          type="button"
+          class="inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-xs font-semibold uppercase tracking-[0.1em] transition focus:border-accent focus:ring-2 focus:ring-ring/25"
+          :class="
+            controlNet.lineartPolarity === 'black-lines'
+              ? 'border-secondary bg-secondary text-secondary-foreground'
+              : 'border-input bg-primary text-primary-foreground/82 hover:border-accent/60'
+          "
+          :aria-pressed="controlNet.lineartPolarity === 'black-lines'"
+          aria-label="Use black lines on white background"
+          @click="chooseLineartPolarity('black-lines')"
+        >
+          <span class="relative h-4 w-4 rounded-sm border border-primary-foreground/20 bg-white">
+            <span class="absolute left-1/2 top-0 h-full w-0.5 -translate-x-1/2 rotate-45 rounded-full bg-black" />
+          </span>
+          Black lines
+        </button>
+        <button
+          type="button"
+          class="inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-xs font-semibold uppercase tracking-[0.1em] transition focus:border-accent focus:ring-2 focus:ring-ring/25"
+          :class="
+            controlNet.lineartPolarity === 'white-lines'
+              ? 'border-secondary bg-secondary text-secondary-foreground'
+              : 'border-input bg-primary text-primary-foreground/82 hover:border-accent/60'
+          "
+          :aria-pressed="controlNet.lineartPolarity === 'white-lines'"
+          aria-label="Use white lines on black background"
+          @click="chooseLineartPolarity('white-lines')"
+        >
+          <span class="relative h-4 w-4 rounded-sm border border-primary-foreground/20 bg-black">
+            <span class="absolute left-1/2 top-0 h-full w-0.5 -translate-x-1/2 rotate-45 rounded-full bg-white" />
+          </span>
+          White lines
+        </button>
+      </div>
+    </div>
+
     <input
       ref="fileInput"
       type="file"
@@ -255,6 +314,18 @@ onBeforeUnmount(() => {
           v-if="controlNet.inputImagePreviewUrl"
           class="absolute right-3 top-3 z-10 flex items-center gap-2"
         >
+          <UiTooltip content="Paste control image from clipboard">
+            <button
+              type="button"
+              aria-label="Paste ControlNet image from clipboard"
+              class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary-foreground/12 bg-primary text-primary-foreground shadow-sm transition hover:border-secondary hover:text-secondary focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
+              :disabled="controlNet.isUploading"
+              @click.stop="pasteControlNetImageFromClipboard(controlNet.id)"
+            >
+              <ClipboardPaste class="h-4 w-4" />
+            </button>
+          </UiTooltip>
+
           <UiTooltip :content="`Use output size (${controlNetOutputResolutionLabel})`">
             <button
               type="button"
@@ -287,6 +358,16 @@ onBeforeUnmount(() => {
           </div>
           <div class="space-y-1">
             <p class="text-sm font-semibold">Drop or paste control image</p>
+            <button
+              type="button"
+              class="mx-auto inline-flex h-9 items-center gap-2 rounded-md border border-secondary/35 bg-secondary px-3 text-xs font-semibold uppercase tracking-[0.1em] text-secondary-foreground shadow-sm transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60"
+              aria-label="Paste ControlNet image from clipboard"
+              :disabled="controlNet.isUploading"
+              @click.stop="pasteControlNetImageFromClipboard(controlNet.id)"
+            >
+              <ClipboardPaste class="h-4 w-4" />
+              Paste image
+            </button>
             <p class="text-xs text-muted-foreground">or click to browse from disk</p>
           </div>
         </div>

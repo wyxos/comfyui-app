@@ -94,11 +94,14 @@ export type ControlNetPreprocessorOption = {
   defaultResolution?: number
 }
 
+export type ControlNetLineartPolarity = 'white-lines' | 'black-lines'
+
 export type ControlNetSelection = {
   id: string
   enabled: boolean
   model: string
   preprocessor: string
+  lineartPolarity: ControlNetLineartPolarity
   previewResolution: string
   strength: string
   startPercent: string
@@ -130,6 +133,7 @@ export type ControlNetPreviewResponse = {
   ok: boolean
   promptId?: string
   preprocessor?: string
+  lineartPolarity?: ControlNetLineartPolarity
   resolution?: number
   preview?: {
     filename: string
@@ -335,6 +339,7 @@ export type PersistedControlNetSelection = Pick<
   | 'enabled'
   | 'model'
   | 'preprocessor'
+  | 'lineartPolarity'
   | 'previewResolution'
   | 'strength'
   | 'startPercent'
