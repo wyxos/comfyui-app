@@ -36,6 +36,7 @@ type HomePersistenceDeps = {
     enabled?: boolean,
     loraSelections?: LoraSelection[],
     loraPicker?: string,
+    controlNetSelections?: ControlNetSelection[],
   ) => CheckpointSelection
   buildControlNetSelection: (entry?: Partial<PersistedControlNetSelection>) => ControlNetSelection
   buildLoraSelection: (
@@ -71,7 +72,6 @@ const {
   promptSectionDrafts,
   promptSections,
   selectedCheckpoints,
-  selectedControlNets,
   selectedImageDimensions,
   selectedImageDisplayName,
   selectedImagePreviewUrl,
@@ -108,9 +108,9 @@ function normalizePersistedControlNetSelection(entry: unknown) {
     enabled: entry.enabled !== false,
     model,
     preprocessor: coerceTrimmedFieldString(entry.preprocessor) || 'lineart',
-    lineartPolarity: coerceTrimmedFieldString(entry.lineartPolarity) === 'black-lines'
-      ? 'black-lines'
-      : 'white-lines',
+    lineartPolarity: coerceTrimmedFieldString(entry.lineartPolarity) === 'white-lines'
+      ? 'white-lines'
+      : 'black-lines',
     previewResolution: formatControlNetNumber(coerceFieldString(entry.previewResolution), 512, 64, 16384),
     strength: formatControlNetNumber(coerceFieldString(entry.strength), 1, 0, 10),
     startPercent: formatControlNetNumber(coerceFieldString(entry.startPercent), 0, 0, 1),
@@ -125,6 +125,24 @@ function normalizePersistedControlNetSelection(entry: unknown) {
       typeof entry.inputImageHeight === 'number' && Number.isFinite(entry.inputImageHeight)
         ? entry.inputImageHeight
         : null,
+  }
+}
+
+function serializePersistedControlNetSelection(controlNet: ControlNetSelection): PersistedControlNetSelection {
+  return {
+    id: controlNet.id,
+    enabled: controlNet.enabled,
+    model: controlNet.model,
+    preprocessor: controlNet.preprocessor,
+    lineartPolarity: controlNet.lineartPolarity,
+    previewResolution: controlNet.previewResolution,
+    strength: controlNet.strength,
+    startPercent: controlNet.startPercent,
+    endPercent: controlNet.endPercent,
+    inputImageName: controlNet.inputImageName,
+    inputImageDisplayName: controlNet.inputImageDisplayName,
+    inputImageWidth: controlNet.inputImageWidth,
+    inputImageHeight: controlNet.inputImageHeight,
   }
 }
 
@@ -181,17 +199,17 @@ function readPersistedFormState(): Partial<PersistedFormState> {
                   })
                   .filter((lora): lora is LoraSelection => Boolean(lora))
               : []
+            const checkpointControlNets = Array.isArray(entry.controlNets)
+              ? entry.controlNets
+                  .map(normalizePersistedControlNetSelection)
+                  .filter((controlNet): controlNet is PersistedControlNetSelection => Boolean(controlNet))
+                  .map((controlNet) => buildControlNetSelection(controlNet))
+              : []
 
-            return buildCheckpointSelection(name, entry.enabled !== false, checkpointLoras)
+            return buildCheckpointSelection(name, entry.enabled !== false, checkpointLoras, '', checkpointControlNets)
           })
           .filter((entry): entry is CheckpointSelection => Boolean(entry))
       : []
-    const controlNetsFromState = Array.isArray(parsed.controlNets)
-      ? parsed.controlNets
-          .map(normalizePersistedControlNetSelection)
-          .filter((entry): entry is PersistedControlNetSelection => Boolean(entry))
-      : []
-
     return {
       prompt: typeof parsed.prompt === 'string' ? parsed.prompt : '',
       improvedPrompt: typeof parsed.improvedPrompt === 'string' ? parsed.improvedPrompt : '',
@@ -227,7 +245,6 @@ function readPersistedFormState(): Partial<PersistedFormState> {
         typeof parsed.inputImageHeight === 'number' && Number.isFinite(parsed.inputImageHeight)
           ? parsed.inputImageHeight
           : null,
-      controlNets: controlNetsFromState,
     }
   } catch {
     return {}
@@ -251,21 +268,21 @@ function persistFormState() {
     useOriginalPrompt: useOriginalPrompt.value,
     useImprovedPrompt: useImprovedPrompt.value,
     selectedCheckpoint: selectedCheckpointEntries.value[0]?.name ?? '',
-    selectedCheckpoints: selectedCheckpoints.value.map((selection) =>
-      buildCheckpointSelection(
-        selection.name,
-        selection.enabled,
-        selection.loras.map((lora) =>
-          buildLoraSelection(
-            lora.name,
-            lora.strength,
-            lora.enabled,
-            lora.enabledTriggerWords,
-            lora.triggerWordWeights,
-          ),
+    selectedCheckpoints: selectedCheckpoints.value.map((selection) => ({
+      name: selection.name,
+      enabled: selection.enabled,
+      loraPicker: '',
+      loras: selection.loras.map((lora) =>
+        buildLoraSelection(
+          lora.name,
+          lora.strength,
+          lora.enabled,
+          lora.enabledTriggerWords,
+          lora.triggerWordWeights,
         ),
       ),
-    ),
+      controlNets: (selection.controlNets ?? []).map(serializePersistedControlNetSelection),
+    })),
     selectedOllamaModel: selectedOllamaModel.value,
     width: coerceFieldString(width.value),
     height: coerceFieldString(height.value),
@@ -280,21 +297,6 @@ function persistFormState() {
     inputImageDisplayName: selectedImageDisplayName.value ?? '',
     inputImageWidth: selectedImageDimensions.value?.width ?? null,
     inputImageHeight: selectedImageDimensions.value?.height ?? null,
-    controlNets: selectedControlNets.value.map((controlNet) => ({
-      id: controlNet.id,
-      enabled: controlNet.enabled,
-      model: controlNet.model,
-      preprocessor: controlNet.preprocessor,
-      lineartPolarity: controlNet.lineartPolarity,
-      previewResolution: controlNet.previewResolution,
-      strength: controlNet.strength,
-      startPercent: controlNet.startPercent,
-      endPercent: controlNet.endPercent,
-      inputImageName: controlNet.inputImageName,
-      inputImageDisplayName: controlNet.inputImageDisplayName,
-      inputImageWidth: controlNet.inputImageWidth,
-      inputImageHeight: controlNet.inputImageHeight,
-    })),
   }
 
   window.localStorage.setItem(FORM_STATE_STORAGE_KEY, JSON.stringify(payload))
@@ -323,7 +325,13 @@ function restoreFormState() {
     typeof persisted.useImprovedPrompt === 'boolean' ? persisted.useImprovedPrompt : true
   selectedCheckpoints.value = Array.isArray(persisted.selectedCheckpoints)
     ? persisted.selectedCheckpoints.map((selection) =>
-        buildCheckpointSelection(selection.name, selection.enabled, selection.loras),
+        buildCheckpointSelection(
+          selection.name,
+          selection.enabled,
+          selection.loras,
+          '',
+          (selection.controlNets ?? []).map((controlNet) => buildControlNetSelection(controlNet)),
+        ),
       )
     : persisted.selectedCheckpoint
       ? [buildCheckpointSelection(persisted.selectedCheckpoint)]
@@ -357,9 +365,6 @@ function restoreFormState() {
   if (uploadedInputImageName.value) {
     selectedImagePreviewUrl.value = buildStoredInputImagePreviewUrl(uploadedInputImageName.value)
   }
-  selectedControlNets.value = Array.isArray(persisted.controlNets)
-    ? persisted.controlNets.map((controlNet) => buildControlNetSelection(controlNet))
-    : []
 }
 
 return {

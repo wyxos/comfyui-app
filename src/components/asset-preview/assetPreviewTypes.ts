@@ -111,6 +111,15 @@ export type AssetPreviewModalProps = {
   baseModel?: string | null
   trainedWords?: string[]
   fileName?: string | null
+  compatibility?: {
+    compatibleBaseModels?: string[]
+    controlType?: string
+    loaderType?: string
+    status?: string
+  } | null
+  editableCompatibility?: boolean
+  savingCompatibility?: boolean
+  compatibilityError?: string
   showDownloadActions?: boolean
   queuingDownloadKey?: string
   downloadForVersion?: (version: CivitaiModelVersion | null | undefined) => AssetPreviewDownload | null

@@ -29,6 +29,7 @@ const {
   getLoraPreviewMediaType,
   isVideoPreview,
   getLoraDisplayName,
+  getLoraCompatibilityStatus,
   getLoraCompatibilityLabel,
   getLoraCompatibilityMetadata,
   toggleCheckpointLora,
@@ -43,8 +44,12 @@ const loraPreviewIsVideo = computed(() =>
   isVideoPreview(loraPreviewUrl.value, loraPreviewMediaType.value),
 )
 const loraDisplayName = computed(() => getLoraDisplayName(props.lora.name))
-const loraTriggerWords = computed(() => getLoraTriggerWords(props.lora.name))
 const loraCompatibility = computed(() => getLoraCompatibilityMetadata(props.lora.name))
+const loraCompatibilityStatus = computed(() => getLoraCompatibilityStatus(props.checkpoint, {
+  name: props.lora.name,
+  compatibility: loraCompatibility.value,
+}))
+const loraTriggerWords = computed(() => getLoraTriggerWords(props.lora.name))
 const loraCivitaiModelId = computed(() => loraCompatibility.value?.modelId ?? null)
 const loraCivitaiVersionId = computed(() => loraCompatibility.value?.versionId ?? null)
 const canOpenLoraPreview = computed(() => Boolean(loraPreviewUrl.value || loraCivitaiModelId.value))
@@ -109,7 +114,14 @@ function openLoraPreview() {
           >
             {{ loraDisplayName }}
           </p>
-          <span class="rounded-sm border border-secondary/35 bg-secondary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-secondary">
+          <span
+            class="rounded-sm border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]"
+            :class="
+              loraCompatibilityStatus === 'warning'
+                ? 'border-accent/45 bg-accent/12 text-accent'
+                : 'border-secondary/35 bg-secondary/10 text-secondary'
+            "
+          >
             {{ getLoraCompatibilityLabel(checkpoint, lora.name) }}
           </span>
         </div>

@@ -113,7 +113,11 @@ function createDefaultUpstreamState(): UpstreamState {
       ControlNetLoader: {
         input: {
           required: {
-            control_net_name: [['mistoLine_rank256.safetensors', 'depth-sdxl.safetensors']],
+            control_net_name: [[
+              'mistoLine_rank256.safetensors',
+              'depth-sdxl.safetensors',
+              'controlnetxlCNXL_windsingaiPose.safetensors',
+            ]],
           },
         },
       },
@@ -198,6 +202,7 @@ export async function createServerHarness(options: HarnessOptions = {}) {
   const outputDir = join(root, 'output')
   const checkpointDir = join(root, 'models', 'checkpoints')
   const loraDir = join(root, 'models', 'loras')
+  const controlNetDir = join(root, 'models', 'controlnet')
   const openedFolders: string[] = []
   const calls: FetchCall[] = []
   const upstream = mergeUpstreamState(options.upstream)
@@ -208,6 +213,7 @@ export async function createServerHarness(options: HarnessOptions = {}) {
     mkdir(outputDir, { recursive: true }),
     mkdir(checkpointDir, { recursive: true }),
     mkdir(loraDir, { recursive: true }),
+    mkdir(controlNetDir, { recursive: true }),
   ])
 
   await Promise.all([
@@ -215,6 +221,9 @@ export async function createServerHarness(options: HarnessOptions = {}) {
     writeFile(join(checkpointDir, 'animaPencilXL.safetensors'), 'checkpoint', 'utf8'),
     writeFile(join(checkpointDir, 'waiIllustriousSDXL_v160.preview.png'), 'checkpoint preview', 'utf8'),
     writeFile(join(loraDir, 'detailBoost.safetensors'), 'lora', 'utf8'),
+    writeFile(join(controlNetDir, 'mistoLine_rank256.safetensors'), 'controlnet', 'utf8'),
+    writeFile(join(controlNetDir, 'depth-sdxl.safetensors'), 'controlnet', 'utf8'),
+    writeFile(join(controlNetDir, 'controlnetxlCNXL_windsingaiPose.safetensors'), 'controlnet', 'utf8'),
     writeFile(join(loraDir, 'detailBoost.preview.png'), 'lora preview', 'utf8'),
     writeFile(
       join(checkpointDir, 'waiIllustriousSDXL_v160.safetensors.civitai.info'),
@@ -250,6 +259,7 @@ export async function createServerHarness(options: HarnessOptions = {}) {
     COMFYUI_OUTPUT_DIR: process.env.COMFYUI_OUTPUT_DIR,
     COMFYUI_CHECKPOINT_DIR: process.env.COMFYUI_CHECKPOINT_DIR,
     COMFYUI_LORA_DIR: process.env.COMFYUI_LORA_DIR,
+    COMFYUI_CONTROLNET_DIR: process.env.COMFYUI_CONTROLNET_DIR,
     CIVITAI_DOWNLOAD_SEGMENTS: process.env.CIVITAI_DOWNLOAD_SEGMENTS,
   }
 
@@ -261,6 +271,7 @@ export async function createServerHarness(options: HarnessOptions = {}) {
     COMFYUI_OUTPUT_DIR: outputDir,
     COMFYUI_CHECKPOINT_DIR: checkpointDir,
     COMFYUI_LORA_DIR: loraDir,
+    COMFYUI_CONTROLNET_DIR: controlNetDir,
     CIVITAI_DOWNLOAD_SEGMENTS: '1',
   })
 
@@ -428,6 +439,7 @@ export async function createServerHarness(options: HarnessOptions = {}) {
     checkpointDir,
     close,
     configDir,
+    controlNetDir,
     fetchMock,
     inputDir,
     json,

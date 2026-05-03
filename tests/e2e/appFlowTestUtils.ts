@@ -11,18 +11,39 @@ const renderedApps: Array<{ app: VueApp<Element>; host: HTMLElement }> = []
 const onePixelPng =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lp2wngAAAABJRU5ErkJggg=='
 
-export async function renderCompanionApp(path = '/', apiOptions: Parameters<typeof installMockApi>[0] = {}) {
+type RenderCompanionAppOptions = {
+  preserveLocalStorage?: boolean
+}
+
+export async function renderCompanionApp(
+  path = '/',
+  apiOptions: Parameters<typeof installMockApi>[0] = {},
+  options: RenderCompanionAppOptions = {},
+) {
   const api = installMockApi(apiOptions)
   const router = createAppRouter(createMemoryHistory())
   await router.push(path)
-  window.localStorage.clear()
+  if (!options.preserveLocalStorage) {
+    window.localStorage.clear()
+  }
 
   Object.defineProperty(navigator, 'clipboard', {
     configurable: true,
     value: {
       writeText: vi.fn().mockResolvedValue(undefined),
+      write: vi.fn().mockResolvedValue(undefined),
     },
   })
+  vi.stubGlobal(
+    'ClipboardItem',
+    class MockClipboardItem {
+      items: Record<string, Blob>
+
+      constructor(items: Record<string, Blob>) {
+        this.items = items
+      }
+    },
+  )
 
   const host = document.body.appendChild(document.createElement('section'))
   const app = createApp(App)
@@ -33,12 +54,37 @@ export async function renderCompanionApp(path = '/', apiOptions: Parameters<type
   const screen = page.elementLocator(host) as Locator
   renderedApps.push({ app, host })
 
-  return { api, router, screen, host }
+  return { api, router, screen, host, cleanup: () => cleanupRenderedApp(host) }
+}
+
+export async function cleanupRenderedApp(host: HTMLElement) {
+  const renderedIndex = renderedApps.findIndex((entry) => entry.host === host)
+  const renderedApp = renderedIndex >= 0 ? renderedApps.splice(renderedIndex, 1)[0] : null
+  renderedApp?.app.unmount()
+  renderedApp?.host.remove()
 }
 
 export function createImageFile(name: string) {
   const bytes = Uint8Array.from(atob(onePixelPng), (char) => char.charCodeAt(0))
   return new File([bytes], name, { type: 'image/png' })
+}
+
+export async function createSizedImageFile(name: string, width: number, height: number) {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((nextBlob) => {
+      if (nextBlob) {
+        resolve(nextBlob)
+      } else {
+        reject(new Error('Could not create test image.'))
+      }
+    }, 'image/png')
+  })
+
+  return new File([blob], name, { type: 'image/png' })
 }
 
 export function uploadFile(input: HTMLInputElement, file: File) {

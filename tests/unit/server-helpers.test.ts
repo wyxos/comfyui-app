@@ -9,6 +9,7 @@ import {
   buildQueueSummaryForPromptIds,
   buildRequestedPromptVariants,
   buildWorkflow,
+  classifyControlNetCompatibility,
   classifyLoraCompatibility,
   createCompanionServer,
   createDownloadsResponse,
@@ -162,6 +163,35 @@ describe('server helper exports', () => {
     ])
 
     expect(
+      extractRequestedCheckpointJobs({
+        checkpoints: [
+          {
+            name: 'pony.safetensors',
+            controlNets: [
+              {
+                model: 'pony-canny.safetensors',
+                inputImageName: 'control.png',
+                preprocessor: 'canny',
+              },
+            ],
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        name: 'pony.safetensors',
+        loras: [],
+        controlNets: [
+          {
+            model: 'pony-canny.safetensors',
+            inputImageName: 'control.png',
+            preprocessor: 'canny',
+          },
+        ],
+      },
+    ])
+
+    expect(
       extractRequestedControlNets({
         controlNets: [
           {
@@ -210,13 +240,22 @@ describe('server helper exports', () => {
     const invertedLineartWorkflow = buildControlNetPreviewWorkflow({
       inputImageName: 'source.png',
       preprocessor: 'lineart',
-      lineartPolarity: 'black-lines',
       resolution: 768,
     })
     const invertedNodes = Object.values(invertedLineartWorkflow.prompt) as any[]
     expect(invertedLineartWorkflow.lineartPolarity).toBe('black-lines')
     expect(invertedNodes.some((node) => node.class_type === 'LineArtPreprocessor')).toBe(true)
     expect(invertedNodes.some((node) => node.class_type === 'ImageInvert')).toBe(true)
+
+    const whiteLineartWorkflow = buildControlNetPreviewWorkflow({
+      inputImageName: 'source.png',
+      preprocessor: 'lineart',
+      lineartPolarity: 'white-lines',
+      resolution: 768,
+    })
+    const whiteNodes = Object.values(whiteLineartWorkflow.prompt) as any[]
+    expect(whiteLineartWorkflow.lineartPolarity).toBe('white-lines')
+    expect(whiteNodes.some((node) => node.class_type === 'ImageInvert')).toBe(false)
   })
 
   it('normalizes Civitai metadata and classifies LoRA compatibility', () => {
@@ -232,17 +271,48 @@ describe('server helper exports', () => {
       { modelType: 'LORA', baseModel: 'Anima' },
       { modelType: 'LORA', source: 'sidecar' },
     )
+    const sameArchitectureLora = normalizeModelCompatibilityMetadata(
+      { modelType: 'LORA', baseModel: 'Illustrious' },
+      { modelType: 'LORA', source: 'sidecar' },
+    )
     const unverifiedLora = normalizeModelCompatibilityMetadata(null, {
       modelType: 'LORA',
       status: 'missing',
     })
+    const ponyControlNet = normalizeModelCompatibilityMetadata(
+      {
+        modelType: 'ControlNet',
+        compatibleBaseModels: ['Pony', 'Illustrious'],
+        controlType: 'canny',
+        loaderType: 'controlnet',
+      },
+      { modelType: 'ControlNet', source: 'manual' },
+    )
+    const animaControlNet = normalizeModelCompatibilityMetadata(
+      { modelType: 'ControlNet', compatibleBaseModels: ['Anima'] },
+      { modelType: 'ControlNet', source: 'manual' },
+    )
+    const sdxlControlNet = normalizeModelCompatibilityMetadata(
+      { modelType: 'ControlNet', compatibleBaseModels: ['SDXL'] },
+      { modelType: 'ControlNet', source: 'manual' },
+    )
+    const illustriousCheckpoint = normalizeModelCompatibilityMetadata(
+      { modelType: 'Checkpoint', baseModel: 'Illustrious' },
+      { modelType: 'Checkpoint', source: 'sidecar' },
+    )
 
     expect(normalizeBaseModelKey('SDXL 1.0')).toBe('sdxl')
     expect(checkpoint.modelNsfw).toBe(false)
     expect(compatibleLora.trainedWords).toEqual(['detail boost'])
     expect(classifyLoraCompatibility(checkpoint, compatibleLora)).toBe('compatible')
+    expect(classifyLoraCompatibility(checkpoint, sameArchitectureLora)).toBe('warning')
     expect(classifyLoraCompatibility(checkpoint, incompatibleLora)).toBe('incompatible')
     expect(classifyLoraCompatibility(checkpoint, unverifiedLora)).toBe('unverified')
+    expect(ponyControlNet.compatibleBaseModelKeys).toEqual(['pony', 'illustrious'])
+    expect(ponyControlNet.controlType).toBe('canny')
+    expect(classifyControlNetCompatibility(checkpoint, ponyControlNet)).toBe('compatible')
+    expect(classifyControlNetCompatibility(illustriousCheckpoint, sdxlControlNet, 'sdxl')).toBe('compatible')
+    expect(classifyControlNetCompatibility(checkpoint, animaControlNet)).toBe('incompatible')
   })
 
   it('normalizes Civitai model payloads with nested versions', () => {

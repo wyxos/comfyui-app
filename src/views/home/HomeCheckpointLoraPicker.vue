@@ -107,12 +107,12 @@ function selectLora(value: string) {
     {{ loraLoadingError }}
   </p>
 
-  <HomeAssetPickerModal
-    :open="isLoraPickerOpen"
-    title="Select LoRA"
-    :subtitle="`Compatible LoRAs for ${checkpoint.displayName}.`"
-    :options="loraOptions"
-    search-placeholder="Search compatible LoRAs..."
+    <HomeAssetPickerModal
+      :open="isLoraPickerOpen"
+      title="Select LoRA"
+      :subtitle="`Compatible and same-architecture LoRAs for ${checkpoint.displayName}.`"
+      :options="loraOptions"
+      search-placeholder="Search compatible LoRAs..."
     empty-title="No LoRAs found"
     empty-text="No compatible LoRAs match the current search."
     @close="isLoraPickerOpen = false"

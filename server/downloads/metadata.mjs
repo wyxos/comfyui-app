@@ -8,7 +8,7 @@ import { normalizeOptionalBoolean, normalizePlainObject, safeTrim } from '../sha
 import { getStoredCivitaiApiKey } from '../settings.mjs'
 import { scheduleDownloadsPersist } from './state.mjs'
 import { verifyCivitaiDownloadHash } from './transfer.mjs'
-import { getComfyCheckpointDir, getComfyLoraDir, normalizeNumericField, readJsonFileIfExists } from '../model-paths.mjs'
+import { getComfyCheckpointDir, getComfyControlNetDir, getComfyLoraDir, normalizeNumericField, readJsonFileIfExists } from '../model-paths.mjs'
 import { fetchCivitaiVersionMetadata } from '../model-metadata.mjs'
 
 const pendingModelMetadataRefreshes = new Set()
@@ -63,7 +63,11 @@ export async function resolveCivitaiDownloadTargetDir(modelType) {
     return getComfyLoraDir()
   }
 
-  const error = new Error('Only Checkpoint and LoRA downloads are supported.')
+  if (normalizedType === 'controlnet' || normalizedType === 'control net') {
+    return getComfyControlNetDir()
+  }
+
+  const error = new Error('Only Checkpoint, LoRA, and ControlNet downloads are supported.')
   error.code = 'unsupported-model-type'
   throw error
 }

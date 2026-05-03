@@ -78,6 +78,37 @@ describe('companion server API routes', () => {
         }),
       })
 
+      const controlGeneration = await server.json('POST', '/api/generate', {
+        prompt: 'controlled portrait',
+        checkpoints: [
+          {
+            name: 'waiIllustriousSDXL_v160.safetensors',
+            controlNets: [
+              {
+                model: 'mistoLine_rank256.safetensors',
+                inputImageName: upload.payload.inputImageName,
+                preprocessor: 'lineart',
+              },
+            ],
+          },
+        ],
+      })
+      expect(controlGeneration.payload).toMatchObject({
+        ok: true,
+        promptId: 'prompt-3',
+      })
+      await expect(server.request('/api/jobs/prompt-3')).resolves.toMatchObject({
+        payload: expect.objectContaining({
+          promptId: 'prompt-3',
+          controlNets: expect.arrayContaining([
+            expect.objectContaining({
+              model: 'mistoLine_rank256.safetensors',
+              inputImageName: upload.payload.inputImageName,
+            }),
+          ]),
+        }),
+      })
+
       const invalidUpload = new FormData()
       invalidUpload.set('image', new File(['text'], 'source.txt', { type: 'text/plain' }))
       await expect(server.request('/api/upload-input-image', { method: 'POST', body: invalidUpload })).resolves.toMatchObject({

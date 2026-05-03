@@ -34,6 +34,7 @@ export const checkpointName = 'waiIllustriousSDXL_v160.safetensors'
 export const secondCheckpointName = 'animaPencilXL.safetensors'
 export const loraName = 'detailBoost.safetensors'
 export const animaLoraName = 'animaSketch.safetensors'
+export const sameArchitectureLoraName = 'illustriousGlow.safetensors'
 export const unverifiedLoraName = 'mysteryStyle.safetensors'
 
 export function jsonResponse(payload: unknown, status = 200) {
@@ -283,6 +284,27 @@ export function defaultLoras() {
         baseModel: 'Anima',
         baseModelKey: 'anima',
         trainedWords: ['anima sketch'],
+        source: 'sidecar',
+        status: 'ready',
+      },
+    },
+    {
+      name: sameArchitectureLoraName,
+      displayName: sameArchitectureLoraName,
+      downloaded: true,
+      previewUrl: null,
+      previewMediaType: null,
+      civitai: {
+        trainedWords: ['illustrious glow'],
+      },
+      triggerWords: ['illustrious glow'],
+      compatibility: {
+        modelId: 103,
+        versionId: 203,
+        modelType: 'LORA',
+        baseModel: 'Illustrious',
+        baseModelKey: 'illustrious',
+        trainedWords: ['illustrious glow'],
         source: 'sidecar',
         status: 'ready',
       },

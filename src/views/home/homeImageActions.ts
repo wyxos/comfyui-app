@@ -9,8 +9,8 @@ type HomeImageActionDeps = {
   apiJson: <T>(path: string, init?: RequestInit & { timeoutMs?: number }) => Promise<T>
   applySizeValues: (nextWidth: string | number, nextHeight: string | number) => void
   clearControlNetGeneratedPreview: (controlNet: ControlNetSelection | null) => void
-  generateControlNetPreview: (id: string) => Promise<void>
-  getControlNetSelection: (id: string) => ControlNetSelection | null
+  generateControlNetPreview: (id: string, checkpointName?: string) => Promise<void>
+  getControlNetSelection: (id: string, checkpointName?: string) => ControlNetSelection | null
   normalizeControlNetResolutionFromOutputSize: () => number
 }
 
@@ -72,12 +72,25 @@ function revokeSelectedImagePreview() {
   selectedImagePreviewUrl.value = null
 }
 
-function normalizeDimensionInput(value: number) {
-  const clamped = Math.min(Math.max(value, 64), 16384)
-  return Math.max(64, Math.round(clamped / 32) * 32)
+function loadImageDimensions(file: File) {
+  if (typeof createImageBitmap === 'function') {
+    return createImageBitmap(file)
+      .then((bitmap) => {
+        const dimensions = {
+          width: bitmap.width,
+          height: bitmap.height,
+        }
+
+        bitmap.close()
+        return dimensions
+      })
+      .catch(() => loadImageElementDimensions(file))
+  }
+
+  return loadImageElementDimensions(file)
 }
 
-function loadImageDimensions(file: File) {
+function loadImageElementDimensions(file: File) {
   return new Promise<{ width: number; height: number }>((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file)
     const image = new Image()
@@ -184,20 +197,20 @@ function applySourceImageResolution() {
   }
 
   applySizeValues(
-    normalizeDimensionInput(selectedImageDimensions.value.width),
-    normalizeDimensionInput(selectedImageDimensions.value.height),
+    selectedImageDimensions.value.width,
+    selectedImageDimensions.value.height,
   )
 }
 
-function applyControlNetOutputResolution(id: string) {
-  const controlNet = getControlNetSelection(id)
+function applyControlNetOutputResolution(id: string, checkpointName = '') {
+  const controlNet = getControlNetSelection(id, checkpointName)
   if (!controlNet) {
     return
   }
 
   controlNet.previewResolution = String(normalizeControlNetResolutionFromOutputSize())
   clearControlNetGeneratedPreview(controlNet)
-  void generateControlNetPreview(id)
+  void generateControlNetPreview(id, checkpointName)
 }
 
 function openImagePicker() {
@@ -345,7 +358,6 @@ return {
   handleImageSelection,
   clearSelectedImage,
   revokeSelectedImagePreview,
-  normalizeDimensionInput,
   loadImageDimensions,
   uploadInputImage,
   setSelectedImage,

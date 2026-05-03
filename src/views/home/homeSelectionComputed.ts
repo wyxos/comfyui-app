@@ -44,7 +44,6 @@ const {
   promptSections,
   seed,
   selectedCheckpoints,
-  selectedControlNets,
   selectedImageDimensions,
   selectedImageDisplayName,
   selectedImageFile,
@@ -89,6 +88,7 @@ const selectedCheckpointEntries = computed(() => {
 
       return {
         ...selection,
+        controlNets: selection.controlNets ?? [],
         family: meta.family,
         displayName: meta.displayName ?? meta.name,
         downloaded: meta.downloaded === true,
@@ -138,32 +138,46 @@ const controlNetPreprocessorOptions = computed(() => {
     value: preprocessor.id,
   }))
 })
-const enabledControlNetSelections = computed(() => {
-  return selectedControlNets.value.filter((controlNet) => controlNet.enabled)
+const enabledControlNetSelections = computed(() => [])
+const enabledCheckpointControlNetSelections = computed(() => {
+  return enabledCheckpointEntries.value.flatMap((checkpoint) =>
+    (checkpoint.controlNets ?? []).filter((controlNet) => controlNet.enabled),
+  )
 })
 const isUploadingAnyControlNetImage = computed(() => {
-  return selectedControlNets.value.some((controlNet) => controlNet.isUploading)
+  return selectedCheckpointEntries.value.flatMap((checkpoint) => checkpoint.controlNets ?? [])
+    .some((controlNet) => controlNet.isUploading)
 })
 const controlNetGenerationBlocker = computed(() => {
-  for (const controlNet of enabledControlNetSelections.value) {
+  const scopedControlNets = enabledCheckpointEntries.value.flatMap((checkpoint) =>
+    (checkpoint.controlNets ?? [])
+      .filter((controlNet) => controlNet.enabled)
+      .map((controlNet) => ({ controlNet, checkpoint })),
+  )
+
+  for (const { controlNet, checkpoint } of scopedControlNets) {
+    const prefix = checkpoint ? `${checkpoint.displayName}: ` : ''
     if (controlNet.isUploading) {
-      return 'ControlNet image is still uploading.'
+      return `${prefix}ControlNet image is still uploading.`
     }
 
     if (!controlNet.model) {
-      return 'Choose a ControlNet model or disable the empty instance.'
+      return `${prefix}Choose a ControlNet model or disable the empty instance.`
     }
 
     if (!controlNet.inputImageName) {
-      return 'Attach a control image or disable the empty ControlNet instance.'
+      return `${prefix}Attach a control image or disable the empty ControlNet instance.`
     }
   }
 
   return ''
 })
 const controlNetSummary = computed(() => {
-  const total = selectedControlNets.value.length
-  const enabled = enabledControlNetSelections.value.length
+  const total = selectedCheckpointEntries.value.reduce(
+    (count, checkpoint) => count + (checkpoint.controlNets?.length ?? 0),
+    0,
+  )
+  const enabled = enabledCheckpointControlNetSelections.value.length
   if (!total) {
     return 'No ControlNet instances.'
   }
@@ -244,7 +258,6 @@ const canResetForm = computed(() => {
       selectedImageDisplayName.value ||
       uploadedInputImageName.value ||
       selectedImageDimensions.value ||
-      selectedControlNets.value.length ||
       submissionError.value ||
       promptImprovementError.value ||
       promptImprovementNotice.value ||
@@ -288,6 +301,7 @@ return {
   controlNetOptions,
   controlNetPreprocessorOptions,
   enabledControlNetSelections,
+  enabledCheckpointControlNetSelections,
   isUploadingAnyControlNetImage,
   controlNetGenerationBlocker,
   controlNetSummary,

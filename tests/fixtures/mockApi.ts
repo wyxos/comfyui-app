@@ -71,7 +71,7 @@ export function installMockApi(options: MockApiOptions = {}) {
         promptId: 'controlnet-preview-1',
         preprocessor: (body as Record<string, unknown> | null)?.preprocessor ?? 'lineart',
         lineartPolarity:
-          (body as Record<string, unknown> | null)?.lineartPolarity ?? 'white-lines',
+          (body as Record<string, unknown> | null)?.lineartPolarity ?? 'black-lines',
         resolution: (body as Record<string, unknown> | null)?.resolution ?? 512,
         preview: {
           filename: 'mock-controlnet-preview.png',

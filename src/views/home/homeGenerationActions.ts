@@ -67,7 +67,6 @@ const {
   compiledNegativePrompt,
   compiledPrompt,
   enabledCheckpointEntries,
-  enabledControlNetSelections,
   promptImproverCheckpointName,
   requestedPromptVariants,
   selectedInputImageName,
@@ -229,6 +228,24 @@ async function generate() {
               loras: [lora],
             }),
           })),
+        controlNets: (checkpoint.controlNets ?? [])
+          .filter((controlNet) => controlNet.enabled)
+          .map((controlNet) => ({
+            id: controlNet.id,
+            model: controlNet.model,
+            inputImageName: controlNet.inputImageName,
+            preprocessor: controlNet.preprocessor,
+            lineartPolarity: controlNet.lineartPolarity,
+            previewResolution: normalizeControlNetNumericField(
+              controlNet.previewResolution,
+              normalizeControlNetResolutionFromOutputSize(),
+              64,
+              16384,
+            ),
+            strength: normalizeControlNetNumericField(controlNet.strength, 1, 0, 10),
+            startPercent: normalizeControlNetNumericField(controlNet.startPercent, 0, 0, 1),
+            endPercent: normalizeControlNetNumericField(controlNet.endPercent, 1, 0, 1),
+          })),
       })),
       width: requestedSize.width,
       height: requestedSize.height,
@@ -252,25 +269,6 @@ async function generate() {
       if (trimmedImageDenoise) {
         payloadBody.imageDenoise = Number.parseFloat(trimmedImageDenoise)
       }
-    }
-
-    if (enabledControlNetSelections.value.length) {
-      payloadBody.controlNets = enabledControlNetSelections.value.map((controlNet) => ({
-        id: controlNet.id,
-        model: controlNet.model,
-        inputImageName: controlNet.inputImageName,
-        preprocessor: controlNet.preprocessor,
-        lineartPolarity: controlNet.lineartPolarity,
-        previewResolution: normalizeControlNetNumericField(
-          controlNet.previewResolution,
-          normalizeControlNetResolutionFromOutputSize(),
-          64,
-          16384,
-        ),
-        strength: normalizeControlNetNumericField(controlNet.strength, 1, 0, 10),
-        startPercent: normalizeControlNetNumericField(controlNet.startPercent, 0, 0, 1),
-        endPercent: normalizeControlNetNumericField(controlNet.endPercent, 1, 0, 1),
-      }))
     }
 
     const payload = await apiJson<GenerateResponse>('/api/generate', {

@@ -16,6 +16,7 @@ import {
   handleLoraList,
   handleOllamaModels,
   handlePostDownload,
+  handlePutModelMetadata,
   handleRepairDownloadPreviews,
 } from './handlers/core.mjs'
 import {
@@ -149,6 +150,10 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
 
   if (url.pathname === '/api/model-preview' && request.method === 'GET') {
     return handleModelPreview(url, response)
+  }
+
+  if (url.pathname === '/api/model-metadata' && request.method === 'PUT') {
+    return handlePutModelMetadata(url, request, response)
   }
 
   if (url.pathname === '/api/improve-prompt' && request.method === 'POST') {

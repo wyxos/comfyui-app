@@ -17,6 +17,7 @@ export type CheckpointSelection = {
   enabled: boolean
   loras: LoraSelection[]
   loraPicker: string
+  controlNets: ControlNetSelection[]
 }
 
 export type CheckpointResponse = {
@@ -58,11 +59,16 @@ export type ModelCompatibilityMetadata = {
   hashes?: Record<string, string>
   checkpointNames?: string[]
   checkpointHashes?: Record<string, string>
+  compatibleBaseModels?: string[]
+  compatibleBaseModelKeys?: string[]
+  controlType?: string
+  loaderType?: string
   source?: string
   status?: string
 }
 
-export type LoraCompatibilityStatus = 'compatible' | 'incompatible' | 'unverified'
+export type LoraCompatibilityStatus = 'compatible' | 'warning' | 'incompatible' | 'unverified'
+export type ModelCompatibilityStatus = 'compatible' | 'incompatible' | 'unverified'
 
 export type CheckpointEntry = CheckpointSelection & {
   family: CheckpointFamily
@@ -86,6 +92,10 @@ export type LoraResponse = {
 export type ControlNetOption = {
   name: string
   displayName?: string
+  downloaded?: boolean
+  compatibility?: ModelCompatibilityMetadata | null
+  controlType?: string
+  loaderType?: string
 }
 
 export type ControlNetPreprocessorOption = {
@@ -120,6 +130,9 @@ export type ControlNetSelection = {
   previewImageType: string
   isGeneratingPreview: boolean
   previewError: string
+  isCopyingPreview: boolean
+  previewCopyNotice: string
+  previewCopyError: string
 }
 
 export type ControlNetResponse = {
@@ -298,7 +311,7 @@ export type CancelQueuedJobsResponse = {
 }
 
 export type JobListTab = 'running' | 'queued' | 'history'
-export type FormTab = 'assets' | 'prompt' | 'config' | 'image' | 'controlnet' | 'ipadapter'
+export type FormTab = 'assets' | 'prompt' | 'config' | 'image'
 export type PromptField = 'prompt' | 'negativePrompt'
 export type PromptSectionId = 'subject' | 'details' | 'environment' | 'style' | 'lighting' | 'quality' | 'others'
 export type PromptSectionDefinition = {
@@ -349,6 +362,9 @@ export type PersistedControlNetSelection = Pick<
   | 'inputImageWidth'
   | 'inputImageHeight'
 >
+export type PersistedCheckpointSelection = Omit<CheckpointSelection, 'controlNets'> & {
+  controlNets?: PersistedControlNetSelection[]
+}
 export type PersistedFormState = {
   prompt: string
   improvedPrompt: string
@@ -358,7 +374,7 @@ export type PersistedFormState = {
   useOriginalPrompt: boolean
   useImprovedPrompt: boolean
   selectedCheckpoint?: string
-  selectedCheckpoints?: CheckpointSelection[]
+  selectedCheckpoints?: PersistedCheckpointSelection[]
   selectedOllamaModel: string
   width: string
   height: string
@@ -373,5 +389,4 @@ export type PersistedFormState = {
   inputImageDisplayName: string
   inputImageWidth: number | null
   inputImageHeight: number | null
-  controlNets?: PersistedControlNetSelection[]
 }

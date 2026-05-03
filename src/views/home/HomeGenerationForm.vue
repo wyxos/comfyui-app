@@ -4,8 +4,6 @@ import HomeAssetsTab from './HomeAssetsTab.vue'
 import HomePromptTab from './HomePromptTab.vue'
 import HomeConfigTab from './HomeConfigTab.vue'
 import HomeImageTab from './HomeImageTab.vue'
-import HomeControlNetTab from './HomeControlNetTab.vue'
-import HomeIpAdapterTab from './HomeIpAdapterTab.vue'
 import { useProvidedHomeView } from './homeViewContext'
 
 const {
@@ -38,7 +36,7 @@ const {
         <div class="companion-scroll min-h-0 flex-1 overflow-y-auto pr-3 sm:pr-4">
           <div class="sticky top-0 z-10 -mr-3 bg-primary pb-4 pr-3 sm:-mr-4 sm:pr-4">
             <div class="rounded-lg border border-primary-foreground/12 bg-primary-foreground/6 p-1">
-              <div class="grid gap-1 sm:grid-cols-2 xl:grid-cols-6">
+              <div class="grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
                 <button
                   v-for="tab in formTabs"
                   :key="tab.id"
@@ -68,8 +66,6 @@ const {
             <HomePromptTab />
             <HomeConfigTab />
             <HomeImageTab />
-            <HomeControlNetTab />
-            <HomeIpAdapterTab />
           </div>
         </div>
 

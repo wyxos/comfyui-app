@@ -61,17 +61,19 @@ function buildCheckpointSelection(
   enabled = true,
   loraSelections: LoraSelection[] = [],
   loraPicker = '',
+  controlNetSelections: ControlNetSelection[] = [],
 ): CheckpointSelection {
   return {
     name,
     enabled,
     loras: loraSelections,
     loraPicker,
+    controlNets: controlNetSelections,
   }
 }
 
 function normalizeControlNetLineartPolarity(value: unknown): ControlNetLineartPolarity {
-  return coerceTrimmedFieldString(value) === 'black-lines' ? 'black-lines' : 'white-lines'
+  return coerceTrimmedFieldString(value) === 'white-lines' ? 'white-lines' : 'black-lines'
 }
 
 function buildControlNetSelection(
@@ -109,6 +111,9 @@ function buildControlNetSelection(
     previewImageType: 'output',
     isGeneratingPreview: false,
     previewError: '',
+    isCopyingPreview: false,
+    previewCopyNotice: '',
+    previewCopyError: '',
   }
 }
 

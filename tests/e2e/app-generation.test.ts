@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   createHistoryJob,
   createImageFile,
+  createSizedImageFile,
   createJobOutput,
   dropFile,
   mockClipboardReadImages,
@@ -9,7 +10,8 @@ import {
   renderCompanionApp,
   uploadFile,
 } from './appFlowTestUtils'
-import { checkpointName, loraName } from '../fixtures/mockApiData'
+import { FORM_STATE_STORAGE_KEY } from '../../src/views/home/homeConstants'
+import { checkpointName, loraName, sameArchitectureLoraName } from '../fixtures/mockApiData'
 
 describe('companion app e2e flows', () => {
   it('loads mocked generation dependencies, improves a prompt, and submits generation', async () => {
@@ -22,6 +24,9 @@ describe('companion app e2e flows', () => {
       await screen.getByRole('button', { name: 'animaPencilXL.safetensors' }).click()
 
       await screen.getByLabelText('Add LoRA for waiIllustriousSDXL_v160.safetensors').click()
+      await expect.element(
+        screen.getByRole('button', { name: new RegExp(`${sameArchitectureLoraName}.*Same SDXL architecture`) }),
+      ).toBeVisible()
       await expect.element(screen.getByRole('button', { name: /mysteryStyle\.safetensors.*Unverified/ })).toBeVisible()
       expect(document.body.textContent).not.toContain('animaSketch.safetensors')
       await screen.getByRole('button', { name: 'detailBoost.safetensors' }).click()
@@ -29,9 +34,7 @@ describe('companion app e2e flows', () => {
       await screen.getByLabelText('Add LoRA for animaPencilXL.safetensors').click()
       await screen.getByRole('button', { name: 'animaSketch.safetensors' }).click()
 
-      await screen.getByRole('button', { name: /ControlNet.*Guided image controls/ }).click()
-      await screen.getByRole('button', { name: 'Add' }).click()
-      await screen.getByLabelText('Choose ControlNet model').click()
+      await screen.getByLabelText(`Add ControlNet for ${checkpointName}`).click()
       await screen.getByRole('button', { name: 'mistoLine_rank256.safetensors' }).click()
       const controlNetImageInput = document.querySelector<HTMLInputElement>(
         'input[aria-label="ControlNet image file"]',
@@ -44,24 +47,39 @@ describe('companion app e2e flows', () => {
         expect(api.calls.some((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toBe(true)
       })
       await expect.element(screen.getByText('mock-controlnet-preview.png')).toBeVisible()
+      await screen.getByRole('button', { name: 'Copy ControlNet preview image to clipboard' }).click()
+      await vi.waitFor(() => {
+        expect(navigator.clipboard.write).toHaveBeenCalled()
+      })
+      expect(api.calls.some((call) => call.method === 'GET' && call.path === '/api/view')).toBe(true)
+      await expect.element(screen.getByText('Copied preview image')).toBeVisible()
       const firstPreviewCall = api.calls.find((call) => call.method === 'POST' && call.path === '/api/controlnet-preview')
       expect(firstPreviewCall?.body).toMatchObject({
         preprocessor: 'lineart',
-        lineartPolarity: 'white-lines',
+        lineartPolarity: 'black-lines',
         resolution: 1024,
       })
-      await screen.getByRole('button', { name: 'Use black lines on white background' }).click()
+      await screen.getByRole('button', { name: 'Use white lines on black background' }).click()
       await vi.waitFor(() => {
         expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/controlnet-preview').length).toBeGreaterThan(1)
       })
       const polarityPreviewCall = api.calls
         .filter((call) => call.method === 'POST' && call.path === '/api/controlnet-preview')
         .at(-1)
-      expect(polarityPreviewCall?.body).toMatchObject({ lineartPolarity: 'black-lines' })
+      expect(polarityPreviewCall?.body).toMatchObject({ lineartPolarity: 'white-lines' })
       const previewCallCount = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/controlnet-preview').length
-      await screen.getByRole('button', { name: 'Use output size for ControlNet resolution' }).click()
+      await screen.getByRole('button', { name: 'Use black lines on white background' }).click()
       await vi.waitFor(() => {
         expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/controlnet-preview').length).toBeGreaterThan(previewCallCount)
+      })
+      const restoredPolarityPreviewCall = api.calls
+        .filter((call) => call.method === 'POST' && call.path === '/api/controlnet-preview')
+        .at(-1)
+      expect(restoredPolarityPreviewCall?.body).toMatchObject({ lineartPolarity: 'black-lines' })
+      const restoredPreviewCallCount = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/controlnet-preview').length
+      await screen.getByRole('button', { name: 'Use output size for ControlNet resolution' }).click()
+      await vi.waitFor(() => {
+        expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/controlnet-preview').length).toBeGreaterThan(restoredPreviewCallCount)
       })
       await screen.getByRole('button', { name: /Size, seed, and CFG/ }).click()
       const widthInput = screen.getByRole('spinbutton', { name: 'Width' })
@@ -143,6 +161,18 @@ describe('companion app e2e flows', () => {
                 triggerWords: [{ word: 'detail boost', weight: 1 }],
               },
             ],
+            controlNets: [
+              {
+                model: 'mistoLine_rank256.safetensors',
+                inputImageName: 'mock-upload.png',
+                preprocessor: 'lineart',
+                lineartPolarity: 'black-lines',
+                previewResolution: 1920,
+                strength: 1,
+                startPercent: 0,
+                endPercent: 1,
+              },
+            ],
           },
           {
             name: 'animaPencilXL.safetensors',
@@ -155,20 +185,9 @@ describe('companion app e2e flows', () => {
             ],
           },
         ],
-        controlNets: [
-          {
-            model: 'mistoLine_rank256.safetensors',
-            inputImageName: 'mock-upload.png',
-            preprocessor: 'lineart',
-            lineartPolarity: 'black-lines',
-            previewResolution: 1920,
-            strength: 1,
-            startPercent: 0,
-            endPercent: 1,
-          },
-        ],
       })
-      const submittedControlNet = (generateCall?.body as any).controlNets[0]
+      expect((generateCall?.body as any).controlNets).toBeUndefined()
+      const submittedControlNet = (generateCall?.body as any).checkpoints[0].controlNets[0]
       expect(typeof submittedControlNet.strength).toBe('number')
       expect(typeof submittedControlNet.startPercent).toBe('number')
       expect(typeof submittedControlNet.endPercent).toBe('number')
@@ -180,7 +199,7 @@ describe('companion app e2e flows', () => {
       expect(api.calls.some((call) => call.method === 'POST' && call.path === '/api/open-parent-folder')).toBe(true)
     })
 
-  it('defaults the only available ControlNet model on new instances', async () => {
+  it('adds a checkpoint-scoped ControlNet from the checkpoint card', async () => {
       const onlyControlNet = {
         name: 'mistoLine_rank256.safetensors',
         displayName: 'mistoLine_rank256.safetensors',
@@ -192,8 +211,9 @@ describe('companion app e2e flows', () => {
       await screen.getByRole('button', { name: /Prompt text and improver/ }).click()
       await screen.getByRole('textbox', { name: 'Subject', exact: true }).fill('line guided portrait')
 
-      await screen.getByRole('button', { name: /ControlNet.*Guided image controls/ }).click()
-      await screen.getByRole('button', { name: 'Add' }).click()
+      await screen.getByRole('button', { name: /Assets.*Checkpoints and LoRAs/ }).click()
+      await screen.getByLabelText(`Add ControlNet for ${checkpointName}`).click()
+      await screen.getByRole('button', { name: 'mistoLine_rank256.safetensors' }).click()
       await vi.waitFor(() => {
         expect(document.body.textContent).toContain('mistoLine_rank256.safetensors')
       })
@@ -207,6 +227,32 @@ describe('companion app e2e flows', () => {
       await expect.element(screen.getByText('mock-controlnet-preview.png')).toBeVisible()
       expect(document.body.textContent).not.toContain('Choose a ControlNet model or disable the empty instance.')
       await expect.element(screen.getByRole('button', { name: 'Generate' })).toBeEnabled()
+    })
+
+  it('retains a checkpoint-scoped ControlNet model after the app remounts', async () => {
+      const firstRender = await renderCompanionApp()
+
+      await firstRender.screen.getByLabelText(`Add ControlNet for ${checkpointName}`).click()
+      await firstRender.screen.getByRole('button', { name: 'mistoLine_rank256.safetensors' }).click()
+
+      await vi.waitFor(() => {
+        const persisted = JSON.parse(window.localStorage.getItem(FORM_STATE_STORAGE_KEY) ?? '{}')
+        expect(persisted.selectedCheckpoints?.[0]?.controlNets?.[0]?.model).toBe(
+          'mistoLine_rank256.safetensors',
+        )
+      })
+
+      await firstRender.cleanup()
+
+      const secondRender = await renderCompanionApp('/', {}, { preserveLocalStorage: true })
+
+      await expect.element(secondRender.screen.getByText('mistoLine_rank256.safetensors').first()).toBeVisible()
+      await vi.waitFor(() => {
+        const persisted = JSON.parse(window.localStorage.getItem(FORM_STATE_STORAGE_KEY) ?? '{}')
+        expect(persisted.selectedCheckpoints?.[0]?.controlNets?.[0]?.model).toBe(
+          'mistoLine_rank256.safetensors',
+        )
+      })
     })
 
   it('auto-enables a disabled checkpoint when adding a LoRA to it', async () => {
@@ -288,6 +334,43 @@ describe('companion app e2e flows', () => {
       )
     })
 
+  it('copies selected image pixel dimensions into the config size fields', async () => {
+      const { screen } = await renderCompanionApp('/', {
+        uploadInputImageNames: ['scan-source.png', 'control-source.png'],
+      })
+
+      await screen.getByRole('button', { name: /Image.*Input image and denoise/ }).click()
+      const inputImageInput = document.querySelector<HTMLInputElement>('input[type="file"]:not([aria-label])')
+      expect(inputImageInput).not.toBeNull()
+      uploadFile(inputImageInput as HTMLInputElement, await createSizedImageFile('scan-source.png', 1501, 1620))
+
+      await expect.element(screen.getByText('Source image detected at 1501 x 1620.')).toBeVisible()
+      await screen.getByRole('button', { name: 'Use source image resolution' }).click()
+
+      await screen.getByRole('button', { name: /Size, seed, and CFG/ }).click()
+      await expect.element(screen.getByRole('spinbutton', { name: 'Width' })).toHaveValue(1501)
+      await expect.element(screen.getByRole('spinbutton', { name: 'Height' })).toHaveValue(1620)
+
+      await screen.getByRole('button', { name: /Assets.*Checkpoints and LoRAs/ }).click()
+      await screen.getByLabelText(`Add ControlNet for ${checkpointName}`).click()
+      await screen.getByRole('button', { name: 'mistoLine_rank256.safetensors' }).click()
+      const controlNetImageInput = document.querySelector<HTMLInputElement>(
+        'input[aria-label="ControlNet image file"]',
+      )
+      expect(controlNetImageInput).not.toBeNull()
+      uploadFile(
+        controlNetImageInput as HTMLInputElement,
+        await createSizedImageFile('control-source.png', 777, 913),
+      )
+
+      await expect.element(screen.getByText('777 x 913')).toBeVisible()
+      await screen.getByRole('button', { name: 'Use ControlNet source image resolution' }).click()
+
+      await screen.getByRole('button', { name: /Size, seed, and CFG/ }).click()
+      await expect.element(screen.getByRole('spinbutton', { name: 'Width' })).toHaveValue(777)
+      await expect.element(screen.getByRole('spinbutton', { name: 'Height' })).toHaveValue(913)
+    })
+
   it('pastes clipboard images into image dropzones', async () => {
       const { api, screen } = await renderCompanionApp('/', {
         uploadInputImageNames: ['pasted-input.png', 'pasted-control.png'],
@@ -303,8 +386,9 @@ describe('companion app e2e flows', () => {
         expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(1)
       })
 
-      await screen.getByRole('button', { name: /ControlNet.*Guided image controls/ }).click()
-      await screen.getByRole('button', { name: 'Add' }).click()
+      await screen.getByRole('button', { name: /Assets.*Checkpoints and LoRAs/ }).click()
+      await screen.getByLabelText(`Add ControlNet for ${checkpointName}`).click()
+      await screen.getByRole('button', { name: 'mistoLine_rank256.safetensors' }).click()
       const controlNetDropzone = document.querySelector<HTMLElement>(
         '[aria-label="Choose or paste ControlNet image"]',
       )
@@ -336,8 +420,9 @@ describe('companion app e2e flows', () => {
         expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(1)
       })
 
-      await screen.getByRole('button', { name: /ControlNet.*Guided image controls/ }).click()
-      await screen.getByRole('button', { name: 'Add' }).click()
+      await screen.getByRole('button', { name: /Assets.*Checkpoints and LoRAs/ }).click()
+      await screen.getByLabelText(`Add ControlNet for ${checkpointName}`).click()
+      await screen.getByRole('button', { name: 'mistoLine_rank256.safetensors' }).click()
       const controlClipboardRead = mockClipboardReadImages([createImageFile('clipboard-control-cta.png')])
 
       await screen.getByRole('button', { name: 'Paste ControlNet image from clipboard' }).click()
@@ -381,17 +466,18 @@ describe('companion app e2e flows', () => {
         expect(inputImageSwitch?.getAttribute('aria-checked')).toBe('true')
       })
 
-      await screen.getByRole('button', { name: /ControlNet.*Guided image controls/ }).click()
-      await screen.getByRole('button', { name: 'Add' }).click()
+      await screen.getByRole('button', { name: /Assets.*Checkpoints and LoRAs/ }).click()
+      await screen.getByLabelText(`Add ControlNet for ${checkpointName}`).click()
+      await screen.getByRole('button', { name: 'mistoLine_rank256.safetensors' }).click()
       const controlNetDropzone = document.querySelector<HTMLElement>(
         '[aria-label="Choose or paste ControlNet image"]',
       )
       const controlNetSwitch = document.querySelector<HTMLButtonElement>(
-        'button[role="switch"][aria-label="Enable ControlNet instance"]',
+        'button[role="switch"][aria-label="Enable mistoLine_rank256.safetensors"]',
       )
       expect(controlNetDropzone).not.toBeNull()
       expect(controlNetSwitch).not.toBeNull()
-      await screen.getByRole('switch', { name: 'Enable ControlNet instance' }).click()
+      await screen.getByRole('switch', { name: 'Enable mistoLine_rank256.safetensors' }).click()
       await vi.waitFor(() => {
         expect(controlNetSwitch?.getAttribute('aria-checked')).toBe('false')
       })

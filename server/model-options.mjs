@@ -3,7 +3,7 @@ import { civitaiDownloads, supportedPreviewExtensions, supportedVideoExtensions 
 import { normalizeOptionalBoolean, safeTrim } from './shared.mjs'
 import { statFileIfExists } from './downloads/metadata.mjs'
 import { downloadsLoaded, readDownloadsState } from './downloads/state.mjs'
-import { getComfyCheckpointDir, getComfyLoraDir, readJsonFileIfExists, resolveModelPath } from './model-paths.mjs'
+import { getComfyCheckpointDir, getComfyControlNetDir, getComfyLoraDir, readJsonFileIfExists, resolveModelPath } from './model-paths.mjs'
 import { getModelCompatibilityMetadata, normalizeModelCompatibilityMetadata } from './model-metadata.mjs'
 
 export async function readModelSidecar(rootPath, modelName) {
@@ -13,9 +13,11 @@ export async function readModelSidecar(rootPath, modelName) {
   }
 
   const candidates = [
+    `${resolvedModelPath}.companion.info`,
     `${resolvedModelPath}.civitai.info`,
     `${resolvedModelPath}.cm-info.json`,
     `${resolvedModelPath}.json`,
+    `${resolvedModelPath.slice(0, -extname(resolvedModelPath).length)}.companion.info`,
     `${resolvedModelPath.slice(0, -extname(resolvedModelPath).length)}.civitai.info`,
     `${resolvedModelPath.slice(0, -extname(resolvedModelPath).length)}.cm-info.json`,
     `${resolvedModelPath.slice(0, -extname(resolvedModelPath).length)}.json`,
@@ -105,13 +107,17 @@ function mergeStringList(primary = [], fallback = []) {
 function mergeCompatibilityMetadata(primary, fallback) {
   const baseModel = safeTrim(primary?.baseModel) || safeTrim(fallback?.baseModel)
   const baseModelKey = safeTrim(primary?.baseModelKey) || safeTrim(fallback?.baseModelKey)
+  const compatibleBaseModels = mergeStringList(primary?.compatibleBaseModels, fallback?.compatibleBaseModels)
+  const compatibleBaseModelKeys = mergeStringList(primary?.compatibleBaseModelKeys, fallback?.compatibleBaseModelKeys)
   const hasFallbackBasis = Boolean(
     fallback?.baseModelKey ||
+      fallback?.compatibleBaseModelKeys?.length ||
       fallback?.checkpointNames?.length ||
       Object.keys(fallback?.checkpointHashes ?? {}).length,
   )
   const hasPrimaryBasis = Boolean(
     primary?.baseModelKey ||
+      primary?.compatibleBaseModelKeys?.length ||
       primary?.checkpointNames?.length ||
       Object.keys(primary?.checkpointHashes ?? {}).length,
   )
@@ -136,6 +142,10 @@ function mergeCompatibilityMetadata(primary, fallback) {
       ...(fallback?.checkpointHashes ?? {}),
       ...(primary?.checkpointHashes ?? {}),
     },
+    compatibleBaseModels,
+    compatibleBaseModelKeys,
+    controlType: safeTrim(primary?.controlType) || safeTrim(fallback?.controlType),
+    loaderType: safeTrim(primary?.loaderType) || safeTrim(fallback?.loaderType),
     source: hasPrimaryBasis || !hasFallbackBasis ? primary?.source : fallback?.source,
     status: !hasPrimaryBasis && hasFallbackBasis
       ? fallback?.status
@@ -279,6 +289,124 @@ export async function enrichLoraOptions(loras) {
       previewMediaType: previewPath ? modelPreviewMediaType(previewPath) : null,
       modelNsfw,
       compatibility,
+      civitai: sidecar?.payload ?? null,
+    }
+  }))
+}
+
+function inferControlNetCompatibilityPayload(controlNetName) {
+  const name = safeTrim(controlNetName)
+  const normalized = name.toLowerCase()
+  const controlType = inferControlTypeFromName(normalized)
+  const payload = {
+    source: 'inferred',
+    modelName: name,
+    modelType: 'ControlNet',
+    status: 'ready',
+    compatibleBaseModels: [],
+    controlType,
+    loaderType: 'controlnet',
+  }
+
+  if (normalized.includes('anima') || normalized.includes('lllite')) {
+    return {
+      ...payload,
+      baseModel: 'Anima',
+      compatibleBaseModels: ['Anima'],
+      controlType,
+      loaderType: 'anima-lllite',
+    }
+  }
+
+  if (normalized.includes('pony')) {
+    return {
+      ...payload,
+      baseModel: 'Pony',
+      compatibleBaseModels: ['Pony'],
+      controlType,
+    }
+  }
+
+  if (normalized.includes('illustrious')) {
+    return {
+      ...payload,
+      baseModel: 'Illustrious',
+      compatibleBaseModels: ['Illustrious'],
+      controlType,
+    }
+  }
+
+  if (normalized.includes('sdxl') || normalized.includes('xl') || normalized.includes('mistoline')) {
+    return {
+      ...payload,
+      baseModel: 'SDXL',
+      compatibleBaseModels: ['SDXL'],
+      controlType,
+    }
+  }
+
+  return null
+}
+
+function inferControlTypeFromName(normalizedName) {
+  if (normalizedName.includes('openpose') || normalizedName.includes('pose')) {
+    return 'pose'
+  }
+
+  if (normalizedName.includes('mistoline') || normalizedName.includes('lineart') || normalizedName.includes('line')) {
+    return 'lineart'
+  }
+
+  if (normalizedName.includes('depth')) {
+    return 'depth'
+  }
+
+  if (normalizedName.includes('canny')) {
+    return 'canny'
+  }
+
+  if (normalizedName.includes('tile')) {
+    return 'tile'
+  }
+
+  return ''
+}
+
+export async function enrichControlNetOptions(controlNets) {
+  let rootPath = null
+  try {
+    rootPath = await getComfyControlNetDir()
+  } catch {}
+
+  if (!rootPath) {
+    return controlNets
+  }
+
+  return Promise.all(controlNets.map(async (controlNet) => {
+    const sidecar = await readModelSidecar(rootPath, controlNet.name)
+    const inferredPayload = inferControlNetCompatibilityPayload(controlNet.name)
+    const metadataSidecar = sidecar ?? (inferredPayload ? { payload: inferredPayload } : null)
+    const baseCompatibility = await getModelCompatibilityMetadata({
+      rootPath,
+      modelName: controlNet.name,
+      modelType: 'ControlNet',
+      sidecar: metadataSidecar,
+    })
+    const inferredCompatibility = normalizeModelCompatibilityMetadata(inferredPayload, {
+      modelName: controlNet.name,
+      modelType: 'ControlNet',
+      source: 'inferred',
+      status: inferredPayload ? 'ready' : 'missing',
+    })
+    const compatibility = mergeCompatibilityMetadata(baseCompatibility, inferredCompatibility)
+
+    return {
+      ...controlNet,
+      displayName: buildModelDisplayName(controlNet.name, sidecar?.payload),
+      downloaded: Boolean(sidecar),
+      compatibility,
+      controlType: compatibility.controlType,
+      loaderType: compatibility.loaderType,
       civitai: sidecar?.payload ?? null,
     }
   }))

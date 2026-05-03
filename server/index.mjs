@@ -9,12 +9,14 @@ export { buildQueueSummaryForPromptIds, extractInputImageNameFromHistory, getQue
 export { buildRequestedPromptVariants, normalizeImprovedPromptText } from './ollama.mjs'
 export { buildWorkflow } from './workflow.mjs'
 export { buildControlNetPreviewWorkflow } from './controlnet-preview.mjs'
-export { extractRequestedControlNets } from './controlnet-options.mjs'
+export { extractControlNetEntries, extractRequestedControlNets } from './controlnet-options.mjs'
 export {
+  classifyControlNetCompatibility,
   classifyLoraCompatibility,
   fetchCivitaiVersionMetadata,
   normalizeBaseModelKey,
   normalizeModelCompatibilityMetadata,
+  writeManualModelCompatibilityMetadata,
 } from './model-metadata.mjs'
 export {
   extractRequestedCheckpoints,

@@ -18,7 +18,11 @@ function normalizeInteger(value) {
 }
 
 function normalizeStringList(value) {
-  const values = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/[\r\n,|]+/g) : []
+  const values = Array.isArray(value)
+    ? value.flatMap((entry) => (Array.isArray(entry) ? entry : [entry]))
+    : typeof value === 'string'
+      ? value.split(/[\r\n,|]+/g)
+      : []
   const seen = new Set()
   const normalized = []
 
@@ -56,6 +60,18 @@ function normalizeHashes(...values) {
   return hashes
 }
 
+function normalizeBaseModelList(...values) {
+  return normalizeStringList(values.flatMap((value) => {
+    if (Array.isArray(value)) {
+      return value
+    }
+    if (typeof value === 'string') {
+      return value.split(/[\r\n,|]+/g)
+    }
+    return []
+  }))
+}
+
 export function normalizeBaseModelKey(value) {
   const normalized = safeTrim(value)
     .toLowerCase()
@@ -71,6 +87,23 @@ export function normalizeBaseModelKey(value) {
   }
 
   return normalized
+}
+
+const sdxlArchitectureBaseModelKeys = new Set(['sdxl', 'pony', 'illustrious'])
+
+export function expandBaseModelCompatibilityKeys(...values) {
+  const keys = new Set()
+  for (const value of values.flat()) {
+    const key = normalizeBaseModelKey(value)
+    if (!key) {
+      continue
+    }
+    keys.add(key)
+    if (sdxlArchitectureBaseModelKeys.has(key)) {
+      keys.add('sdxl')
+    }
+  }
+  return keys
 }
 
 function collectFileHashes(payload, version) {
@@ -143,6 +176,10 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
       hashes: {},
       checkpointNames: [],
       checkpointHashes: {},
+      compatibleBaseModels: [],
+      compatibleBaseModelKeys: [],
+      controlType: '',
+      loaderType: '',
       source,
       status: options.status ?? 'missing',
     }
@@ -158,6 +195,18 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
   ])
   const hashes = collectFileHashes(payload, version)
   const checkpointHashes = normalizeHashes(payload.checkpointHashes, payload.compatibleCheckpointHashes)
+  const compatibleBaseModels = normalizeBaseModelList(
+    payload.compatibleBaseModels,
+    payload.compatibleBases,
+    payload.supportedBaseModels,
+    payload.supportedBases,
+    payload.metadata?.compatibleBaseModels,
+  )
+  const compatibleBaseModelKeys = normalizeStringList([
+    ...compatibleBaseModels.map(normalizeBaseModelKey),
+    ...normalizeStringList(payload.compatibleBaseModelKeys),
+    ...normalizeStringList(payload.supportedBaseModelKeys),
+  ]).filter(Boolean)
 
   return {
     modelId: normalizeInteger(payload.modelId ?? model.id ?? version.modelId),
@@ -172,6 +221,10 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
     hashes,
     checkpointNames: normalizeStringList(payload.checkpointNames ?? payload.compatibleCheckpoints),
     checkpointHashes,
+    compatibleBaseModels,
+    compatibleBaseModelKeys,
+    controlType: safeTrim(payload.controlType ?? payload.control_type ?? payload.metadata?.controlType),
+    loaderType: safeTrim(payload.loaderType ?? payload.loader_type ?? payload.metadata?.loaderType),
     source,
     status: options.status ?? 'ready',
   }
@@ -179,7 +232,8 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
 
 function hasCompatibilityBasis(metadata) {
   return Boolean(
-    metadata?.baseModelKey ||
+      metadata?.baseModelKey ||
+      metadata?.compatibleBaseModelKeys?.length ||
       metadata?.checkpointNames?.length ||
       Object.keys(metadata?.checkpointHashes ?? {}).length,
   )
@@ -266,6 +320,36 @@ async function writeMetadataPayload(modelPath, cachePath, payload) {
     await mkdir(dirname(cachePath), { recursive: true })
     await writeFile(cachePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
     return cachePath
+  }
+}
+
+export async function writeManualModelCompatibilityMetadata({ rootPath, modelName, modelType, payload }) {
+  const modelPath = resolveModelPath(rootPath, modelName)
+  if (!modelPath) {
+    const error = new Error('Model name is invalid.')
+    error.code = 'invalid-model-name'
+    throw error
+  }
+
+  const normalized = normalizeModelCompatibilityMetadata(
+    {
+      ...(payload && typeof payload === 'object' ? payload : {}),
+      modelName,
+      modelType,
+      source: 'manual',
+    },
+    {
+      modelName,
+      modelType,
+      source: 'manual',
+      status: 'ready',
+    },
+  )
+  const sidecarPath = `${modelPath}.companion.info`
+  await writeFile(sidecarPath, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8')
+  return {
+    path: sidecarPath,
+    metadata: normalized,
   }
 }
 
@@ -358,10 +442,49 @@ export function classifyLoraCompatibility(checkpointMetadata, loraMetadata) {
     return 'compatible'
   }
 
-  const checkpointBaseModel = checkpointMetadata?.baseModelKey ?? ''
-  const loraBaseModel = loraMetadata?.baseModelKey ?? ''
+  const checkpointBaseModel = checkpointMetadata?.baseModelKey || normalizeBaseModelKey(checkpointMetadata?.baseModel)
+  const loraBaseModel = loraMetadata?.baseModelKey || normalizeBaseModelKey(loraMetadata?.baseModel)
   if (checkpointBaseModel && loraBaseModel) {
-    return checkpointBaseModel === loraBaseModel ? 'compatible' : 'incompatible'
+    if (checkpointBaseModel === loraBaseModel) {
+      return 'compatible'
+    }
+
+    if (
+      sdxlArchitectureBaseModelKeys.has(checkpointBaseModel) &&
+      sdxlArchitectureBaseModelKeys.has(loraBaseModel)
+    ) {
+      return 'warning'
+    }
+
+    return 'incompatible'
+  }
+
+  return 'unverified'
+}
+
+export function classifyControlNetCompatibility(checkpointMetadata, controlNetMetadata, checkpointFamily = '') {
+  if (hasExplicitMatch(checkpointMetadata, controlNetMetadata)) {
+    return 'compatible'
+  }
+
+  const checkpointKeys = expandBaseModelCompatibilityKeys(
+    checkpointMetadata?.baseModelKey,
+    checkpointMetadata?.baseModel,
+    checkpointFamily,
+  )
+  const controlNetKeys = expandBaseModelCompatibilityKeys(
+    controlNetMetadata?.baseModelKey,
+    controlNetMetadata?.baseModel,
+    controlNetMetadata?.compatibleBaseModelKeys ?? [],
+    controlNetMetadata?.compatibleBaseModels ?? [],
+  )
+
+  if ([...checkpointKeys].some((key) => controlNetKeys.has(key))) {
+    return 'compatible'
+  }
+
+  if (checkpointKeys.size && controlNetKeys.size) {
+    return 'incompatible'
   }
 
   return 'unverified'

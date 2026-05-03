@@ -4,6 +4,7 @@ import { X } from 'lucide-vue-next'
 import AssetPreviewModal from '../../components/asset-preview/AssetPreviewModal.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
 import { useProvidedHomeView } from './homeViewContext'
+import HomeCheckpointControlNetPicker from './HomeCheckpointControlNetPicker.vue'
 import HomeCheckpointLoraPicker from './HomeCheckpointLoraPicker.vue'
 import type { HomeCheckpointEntry } from './useHomeView'
 
@@ -134,6 +135,7 @@ function openCheckpointPreview() {
     </div>
 
     <HomeCheckpointLoraPicker :checkpoint="checkpoint" />
+    <HomeCheckpointControlNetPicker :checkpoint="checkpoint" />
 
     <AssetPreviewModal
       :open="isCheckpointPreviewOpen"

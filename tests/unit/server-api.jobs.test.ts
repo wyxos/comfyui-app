@@ -30,8 +30,12 @@ describe('companion server API routes', () => {
       await expect(
         server.json('POST', '/api/generate', {
           prompt: 'portrait',
-          checkpoint: 'waiIllustriousSDXL_v160.safetensors',
-          controlNets: [{ model: 'mistoLine_rank256.safetensors', inputImageName: 'missing.png' }],
+          checkpoints: [
+            {
+              name: 'waiIllustriousSDXL_v160.safetensors',
+              controlNets: [{ model: 'mistoLine_rank256.safetensors', inputImageName: 'missing.png' }],
+            },
+          ],
         }),
       ).resolves.toMatchObject({
         response: expect.objectContaining({ status: 400 }),
@@ -39,6 +43,28 @@ describe('companion server API routes', () => {
       })
 
       await writeFile(join(server.inputDir, 'control.png'), 'control image', 'utf8')
+      await expect(
+        server.json('POST', '/api/generate', {
+          prompt: 'portrait',
+          checkpoints: [
+            {
+              name: 'animaPencilXL.safetensors',
+              controlNets: [
+                {
+                  model: 'mistoLine_rank256.safetensors',
+                  inputImageName: 'control.png',
+                },
+              ],
+            },
+          ],
+        }),
+      ).resolves.toMatchObject({
+        response: expect.objectContaining({ status: 400 }),
+        payload: expect.objectContaining({
+          error: 'invalid-controlnet',
+          message: expect.stringContaining('mistoLine_rank256.safetensors is not compatible'),
+        }),
+      })
 
       const generated = await server.json('POST', '/api/generate', {
         prompt: 'portrait',
@@ -51,6 +77,15 @@ describe('companion server API routes', () => {
                 name: 'detailBoost.safetensors',
                 strength: 0.7,
                 triggerWords: [{ word: 'detail boost', weight: 1.2 }],
+              },
+            ],
+            controlNets: [
+              {
+                model: 'mistoLine_rank256.safetensors',
+                inputImageName: 'control.png',
+                strength: 0.8,
+                startPercent: 0.1,
+                endPercent: 0.9,
               },
             ],
           },
@@ -69,15 +104,6 @@ describe('companion server API routes', () => {
         height: 1024,
         cfg: 7,
         seed: 123,
-        controlNets: [
-          {
-            model: 'mistoLine_rank256.safetensors',
-            inputImageName: 'control.png',
-            strength: 0.8,
-            startPercent: 0.1,
-            endPercent: 0.9,
-          },
-        ],
       })
       expect(generated.payload).toMatchObject({
         ok: true,

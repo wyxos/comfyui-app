@@ -1,22 +1,24 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { ClipboardPaste, RefreshCw, Ruler, Trash2, Upload, X } from 'lucide-vue-next'
+import { Check, ClipboardPaste, Copy, RefreshCw, Ruler, SlidersHorizontal, Trash2, Upload, X } from 'lucide-vue-next'
 import UiSelect from '../../components/ui/UiSelect.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
 import { useProvidedHomeView } from './homeViewContext'
-import type { HomeViewContext } from './useHomeView'
-
-type ControlNetSelection = HomeViewContext['selectedControlNets']['value'][number]
+import type { HomeCheckpointEntry } from './useHomeView'
+import type { ControlNetSelection } from './homeTypes'
 
 const props = defineProps<{
+  checkpoint: HomeCheckpointEntry
   controlNet: ControlNetSelection
+  checkpointName: string
+  compatibilityLabel?: string
 }>()
 
 const {
-  controlNetOptions,
   controlNetPreprocessorOptions,
   controlNetOutputResolutionLabel,
   loadingControlNets,
+  getCheckpointControlNetModelOptions,
   removeControlNetInstance,
   setControlNetEnabled,
   setControlNetModel,
@@ -24,8 +26,10 @@ const {
   setControlNetLineartPolarity,
   setControlNetField,
   clearControlNetImage,
+  applyControlNetSourceImageResolution,
   applyControlNetOutputResolution,
   generateControlNetPreview,
+  copyControlNetPreviewToClipboard,
   handleControlNetImageSelection,
   handleControlNetDragEnter,
   handleControlNetDragOver,
@@ -39,12 +43,15 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const acceptsClipboardPaste = ref(false)
 const selectedModel = computed({
   get: () => props.controlNet.model,
-  set: (value) => setControlNetModel(props.controlNet.id, value),
+  set: (value) => setControlNetModel(props.controlNet.id, value, props.checkpointName),
 })
 const selectedPreprocessor = computed({
   get: () => props.controlNet.preprocessor,
-  set: (value) => setControlNetPreprocessor(props.controlNet.id, value),
+  set: (value) => setControlNetPreprocessor(props.controlNet.id, value, props.checkpointName),
 })
+const checkpointControlNetOptions = computed(() =>
+  getCheckpointControlNetModelOptions(props.checkpoint, props.controlNet.model),
+)
 const canGeneratePreview = computed(() => {
   return Boolean(
     props.controlNet.inputImageName &&
@@ -52,6 +59,7 @@ const canGeneratePreview = computed(() => {
       !props.controlNet.isGeneratingPreview,
   )
 })
+const canCopyPreview = computed(() => Boolean(props.controlNet.previewImageUrl && !props.controlNet.isCopyingPreview))
 const usesLineartPolarity = computed(() =>
   ['lineart', 'anime-lineart'].includes(props.controlNet.preprocessor),
 )
@@ -69,7 +77,7 @@ function openImagePicker() {
 
 function handleWindowPaste(event: ClipboardEvent) {
   if (acceptsClipboardPaste.value) {
-    handleControlNetImagePaste(props.controlNet.id, event)
+    handleControlNetImagePaste(props.controlNet.id, event, props.checkpointName)
   }
 }
 
@@ -79,7 +87,7 @@ function handleNumericInput(
 ) {
   const target = event.target
   if (target instanceof HTMLInputElement) {
-    setControlNetField(props.controlNet.id, field, target.value)
+    setControlNetField(props.controlNet.id, field, target.value, props.checkpointName)
   }
 }
 
@@ -88,9 +96,9 @@ async function chooseLineartPolarity(lineartPolarity: 'white-lines' | 'black-lin
     return
   }
 
-  setControlNetLineartPolarity(props.controlNet.id, lineartPolarity)
+  setControlNetLineartPolarity(props.controlNet.id, lineartPolarity, props.checkpointName)
   if (props.controlNet.inputImageName) {
-    await generateControlNetPreview(props.controlNet.id)
+    await generateControlNetPreview(props.controlNet.id, props.checkpointName)
   }
 }
 
@@ -111,7 +119,7 @@ onBeforeUnmount(() => {
           {{ controlNet.model || 'ControlNet instance' }}
         </p>
         <p class="mt-1 text-xs text-muted-foreground">
-          {{ controlNet.enabled ? 'Enabled' : 'Disabled' }}
+          {{ compatibilityLabel || (controlNet.enabled ? 'Enabled' : 'Disabled') }}
         </p>
       </div>
 
@@ -127,7 +135,7 @@ onBeforeUnmount(() => {
               ? 'border-secondary bg-secondary'
               : 'border-border bg-muted hover:border-accent'
           "
-          @click="setControlNetEnabled(controlNet.id, !controlNet.enabled)"
+          @click="setControlNetEnabled(controlNet.id, !controlNet.enabled, checkpointName)"
         >
           <span
             class="inline-block h-4 w-4 rounded-full bg-primary-foreground shadow-sm transition-transform"
@@ -140,7 +148,7 @@ onBeforeUnmount(() => {
             type="button"
             :aria-label="`Remove ${controlNet.model || 'ControlNet instance'}`"
             class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-destructive/25 bg-destructive/10 text-destructive transition hover:bg-destructive hover:text-destructive-foreground focus:border-accent focus:ring-2 focus:ring-ring/25"
-            @click="removeControlNetInstance(controlNet.id)"
+            @click="removeControlNetInstance(controlNet.id, checkpointName)"
           >
             <Trash2 class="h-4 w-4" />
           </button>
@@ -153,12 +161,12 @@ onBeforeUnmount(() => {
         <span class="field-label text-card-foreground/70">Model</span>
         <UiSelect
           v-model="selectedModel"
-          :options="controlNetOptions"
+          :options="checkpointControlNetOptions"
           placeholder="Choose ControlNet"
           searchable
           search-placeholder="Search ControlNet models..."
           aria-label="Choose ControlNet model"
-          :disabled="loadingControlNets || !controlNetOptions.length"
+          :disabled="loadingControlNets || !checkpointControlNetOptions.length"
         />
       </label>
 
@@ -276,7 +284,7 @@ onBeforeUnmount(() => {
       accept="image/png,image/jpeg,image/webp,image/avif"
       class="hidden"
       aria-label="ControlNet image file"
-      @change="handleControlNetImageSelection(controlNet.id, $event)"
+      @change="handleControlNetImageSelection(controlNet.id, $event, checkpointName)"
     />
 
     <div class="mt-3 grid gap-3 xl:grid-cols-2">
@@ -297,11 +305,11 @@ onBeforeUnmount(() => {
         @blur="acceptsClipboardPaste = false"
         @pointerenter="acceptsClipboardPaste = true"
         @pointerleave="acceptsClipboardPaste = false"
-        @dragenter.prevent="handleControlNetDragEnter(controlNet.id)"
-        @dragover.prevent="handleControlNetDragOver(controlNet.id, $event)"
-        @dragleave.prevent="handleControlNetDragLeave(controlNet.id, $event)"
-        @drop.prevent="handleControlNetImageDrop(controlNet.id, $event)"
-        @paste="handleControlNetImagePaste(controlNet.id, $event)"
+        @dragenter.prevent="handleControlNetDragEnter(controlNet.id, checkpointName)"
+        @dragover.prevent="handleControlNetDragOver(controlNet.id, $event, checkpointName)"
+        @dragleave.prevent="handleControlNetDragLeave(controlNet.id, $event, checkpointName)"
+        @drop.prevent="handleControlNetImageDrop(controlNet.id, $event, checkpointName)"
+        @paste="handleControlNetImagePaste(controlNet.id, $event, checkpointName)"
       >
         <img
           v-if="controlNet.inputImagePreviewUrl"
@@ -320,20 +328,34 @@ onBeforeUnmount(() => {
               aria-label="Paste ControlNet image from clipboard"
               class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary-foreground/12 bg-primary text-primary-foreground shadow-sm transition hover:border-secondary hover:text-secondary focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
               :disabled="controlNet.isUploading"
-              @click.stop="pasteControlNetImageFromClipboard(controlNet.id)"
+              @click.stop="pasteControlNetImageFromClipboard(controlNet.id, checkpointName)"
             >
               <ClipboardPaste class="h-4 w-4" />
             </button>
           </UiTooltip>
 
-          <UiTooltip :content="`Use output size (${controlNetOutputResolutionLabel})`">
+          <UiTooltip
+            v-if="dimensionLabel"
+            :content="`Use source image resolution (${dimensionLabel})`"
+          >
+            <button
+              type="button"
+              aria-label="Use ControlNet source image resolution"
+              class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary-foreground/12 bg-primary text-primary-foreground shadow-sm transition hover:border-secondary hover:text-secondary focus:border-accent focus:ring-2 focus:ring-ring/25"
+              @click.stop="applyControlNetSourceImageResolution(controlNet.id, checkpointName)"
+            >
+              <Ruler class="h-4 w-4" />
+            </button>
+          </UiTooltip>
+
+          <UiTooltip :content="`Set Control res from output size (${controlNetOutputResolutionLabel})`">
             <button
               type="button"
               aria-label="Use output size for ControlNet resolution"
               class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary-foreground/12 bg-primary text-primary-foreground shadow-sm transition hover:border-secondary hover:text-secondary focus:border-accent focus:ring-2 focus:ring-ring/25"
-              @click.stop="applyControlNetOutputResolution(controlNet.id)"
+              @click.stop="applyControlNetOutputResolution(controlNet.id, checkpointName)"
             >
-              <Ruler class="h-4 w-4" />
+              <SlidersHorizontal class="h-4 w-4" />
             </button>
           </UiTooltip>
 
@@ -342,7 +364,7 @@ onBeforeUnmount(() => {
               type="button"
               aria-label="Clear ControlNet image"
               class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-destructive/25 bg-destructive text-destructive-foreground shadow-sm transition hover:bg-destructive/92 focus:border-accent focus:ring-2 focus:ring-ring/25"
-              @click.stop="clearControlNetImage(controlNet.id)"
+              @click.stop="clearControlNetImage(controlNet.id, checkpointName)"
             >
               <X class="h-4 w-4" />
             </button>
@@ -363,7 +385,7 @@ onBeforeUnmount(() => {
               class="mx-auto inline-flex h-9 items-center gap-2 rounded-md border border-secondary/35 bg-secondary px-3 text-xs font-semibold uppercase tracking-[0.1em] text-secondary-foreground shadow-sm transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60"
               aria-label="Paste ControlNet image from clipboard"
               :disabled="controlNet.isUploading"
-              @click.stop="pasteControlNetImageFromClipboard(controlNet.id)"
+              @click.stop="pasteControlNetImageFromClipboard(controlNet.id, checkpointName)"
             >
               <ClipboardPaste class="h-4 w-4" />
               Paste image
@@ -413,12 +435,34 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="absolute right-3 top-3 z-10">
+        <div class="absolute right-3 top-3 z-10 flex items-center gap-2">
+          <UiTooltip
+            v-if="controlNet.previewImageUrl"
+            :content="controlNet.previewCopyNotice || 'Copy preview image to clipboard'"
+          >
+            <button
+              type="button"
+              class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary-foreground/12 bg-primary text-primary-foreground shadow-sm transition hover:border-secondary hover:text-secondary focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
+              aria-label="Copy ControlNet preview image to clipboard"
+              :disabled="!canCopyPreview"
+              @click="copyControlNetPreviewToClipboard(controlNet.id, checkpointName)"
+            >
+              <Check
+                v-if="controlNet.previewCopyNotice"
+                class="h-4 w-4 text-secondary"
+              />
+              <Copy
+                v-else
+                class="h-4 w-4"
+              />
+            </button>
+          </UiTooltip>
+
           <button
             type="button"
             class="inline-flex h-9 items-center gap-2 rounded-md border border-secondary/35 bg-secondary px-3 text-xs font-semibold uppercase tracking-[0.1em] text-secondary-foreground shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-55"
             :disabled="!canGeneratePreview"
-            @click="generateControlNetPreview(controlNet.id)"
+            @click="generateControlNetPreview(controlNet.id, checkpointName)"
           >
             <RefreshCw
               class="h-4 w-4"
@@ -447,6 +491,18 @@ onBeforeUnmount(() => {
       class="mt-2 text-xs text-destructive"
     >
       {{ controlNet.previewError }}
+    </p>
+    <p
+      v-if="controlNet.previewCopyNotice && controlNet.previewImageUrl"
+      class="mt-2 text-xs text-secondary"
+    >
+      {{ controlNet.previewCopyNotice }}
+    </p>
+    <p
+      v-if="controlNet.previewCopyError && controlNet.previewImageUrl"
+      class="mt-2 text-xs text-destructive"
+    >
+      {{ controlNet.previewCopyError }}
     </p>
 
     <p

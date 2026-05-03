@@ -5,7 +5,6 @@ import type {
   CheckpointSelection,
   ControlNetOption,
   ControlNetPreprocessorOption,
-  ControlNetSelection,
   FormTab,
   InputImageSnapshot,
   JobOutput,
@@ -45,7 +44,6 @@ const controlNetPreprocessors = ref<ControlNetPreprocessorOption[]>([
   { id: 'pose', label: 'OpenPose', defaultResolution: 512 },
   { id: 'tile', label: 'Tile', defaultResolution: 512 },
 ])
-const selectedControlNets = ref<ControlNetSelection[]>([])
 const ollamaModels = ref<string[]>([])
 const selectedOllamaModel = ref('')
 const defaultOllamaModel = ref('')
@@ -146,7 +144,6 @@ return {
   defaultLoraStrength,
   controlNets,
   controlNetPreprocessors,
-  selectedControlNets,
   ollamaModels,
   selectedOllamaModel,
   defaultOllamaModel,

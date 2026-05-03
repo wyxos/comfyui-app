@@ -90,7 +90,6 @@ const {
   seed,
   selectedCheckpointPicker,
   selectedCheckpoints,
-  selectedControlNets,
   selectedOllamaModel,
   statusLine,
   submissionError,
@@ -399,9 +398,12 @@ async function loadControlNets() {
     if (Array.isArray(payload.preprocessors) && payload.preprocessors.length) {
       controlNetPreprocessors.value = payload.preprocessors
     }
-    selectedControlNets.value = selectedControlNets.value.map((selection) => ({
-      ...selection,
-      model: resolveAvailableControlNetModel(selection.model),
+    selectedCheckpoints.value = selectedCheckpoints.value.map((checkpoint) => ({
+      ...checkpoint,
+      controlNets: (checkpoint.controlNets ?? []).map((selection) => ({
+        ...selection,
+        model: resolveAvailableControlNetModel(selection.model),
+      })),
     }))
 
     if (!controlNets.value.length) {

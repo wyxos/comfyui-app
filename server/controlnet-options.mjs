@@ -77,7 +77,7 @@ export function getControlNetPreprocessorProfile(value) {
 }
 
 export function normalizeControlNetLineartPolarity(value) {
-  return safeTrim(value) === 'black-lines' ? 'black-lines' : 'white-lines'
+  return safeTrim(value) === 'white-lines' ? 'white-lines' : 'black-lines'
 }
 
 export function shouldInvertControlNetLineart({ preprocessor, lineartPolarity } = {}) {
@@ -155,6 +155,10 @@ function tryParseControlNetEntry(value) {
   }
 }
 
+export function extractControlNetEntries(rawEntries) {
+  return (Array.isArray(rawEntries) ? rawEntries : []).map(normalizeControlNetEntry).filter(Boolean)
+}
+
 export function extractRequestedControlNets(body) {
   const rawEntries =
     body instanceof FormData
@@ -163,5 +167,5 @@ export function extractRequestedControlNets(body) {
         ? body.controlNets
         : []
 
-  return rawEntries.map(normalizeControlNetEntry).filter(Boolean)
+  return extractControlNetEntries(rawEntries)
 }

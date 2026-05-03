@@ -11,6 +11,7 @@ import UiPaginatedCardGrid from '../components/ui/UiPaginatedCardGrid.vue'
 import UiPreviewCard from '../components/ui/UiPreviewCard.vue'
 import { fetchAppSettings } from '../composables/useAppSettings'
 import { useAssetDownloads, type AssetDownloadItem } from '../composables/useAssetDownloads'
+import type { ModelCompatibilityMetadata } from './home/homeTypes'
 
 const PAGE_SIZE = 40
 
@@ -18,9 +19,42 @@ const typeFilters = [
   { label: 'All', value: 'all' },
   { label: 'Checkpoints', value: 'checkpoint' },
   { label: 'LoRAs', value: 'lora' },
+  { label: 'ControlNets', value: 'controlnet' },
 ] as const
 
 type LibraryTypeFilter = (typeof typeFilters)[number]['value']
+type LibraryItemKind = Exclude<LibraryTypeFilter, 'all'>
+type ControlNetLibraryItem = {
+  id: string
+  itemKind: 'controlnet'
+  modelName: string
+  modelType: 'ControlNet'
+  modelId: number | null
+  versionId: number | null
+  versionName: string
+  baseModel: string
+  fileName: string
+  updatedAt: number
+  previewUrl: null
+  previewPaths: []
+  compatibility: ModelCompatibilityMetadata | null
+  controlType: string
+  loaderType: string
+}
+type LibraryModelItem =
+  | (AssetDownloadItem & { itemKind: 'checkpoint' | 'lora'; compatibility?: ModelCompatibilityMetadata | null })
+  | ControlNetLibraryItem
+type ControlNetResponse = {
+  ok: boolean
+  controlNets?: Array<{
+    name: string
+    displayName?: string
+    compatibility?: ModelCompatibilityMetadata | null
+    controlType?: string
+    loaderType?: string
+  }>
+  message?: string
+}
 
 const {
   completedDownloads,
@@ -33,22 +67,35 @@ const query = ref('')
 const includeNsfw = ref(false)
 const typeFilter = ref<LibraryTypeFilter>('all')
 const currentPage = ref(1)
-const selectedModel = ref<AssetDownloadItem | null>(null)
+const selectedModel = ref<LibraryModelItem | null>(null)
+const controlNetModels = ref<ControlNetLibraryItem[]>([])
+const controlNetLoadingError = ref('')
+const savingCompatibility = ref(false)
+const compatibilitySaveError = ref('')
 
-const downloadedModels = computed(() => {
+const downloadedModels = computed<LibraryModelItem[]>(() => {
   return completedDownloads.value
     .filter((item) => isCheckpointOrLora(item))
+    .map((item) => ({
+      ...item,
+      itemKind: normalizedModelType(item) as 'checkpoint' | 'lora',
+      compatibility: null,
+    }))
     .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
 })
+const libraryModels = computed(() =>
+  [...downloadedModels.value, ...controlNetModels.value]
+    .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0)),
+)
 
 const filteredModels = computed(() => {
   const search = query.value.trim().toLowerCase()
-  return downloadedModels.value.filter((item) => {
+  return libraryModels.value.filter((item) => {
     if (!includeNsfw.value && modelHasNsfw(item)) {
       return false
     }
 
-    if (typeFilter.value !== 'all' && normalizedModelType(item) !== typeFilter.value) {
+    if (typeFilter.value !== 'all' && item.itemKind !== typeFilter.value) {
       return false
     }
 
@@ -61,7 +108,7 @@ const filteredModels = computed(() => {
       item.versionName,
       item.fileName,
       item.baseModel,
-      item.targetPath,
+      'targetPath' in item ? item.targetPath : '',
     ]
       .filter(Boolean)
       .join(' ')
@@ -82,9 +129,10 @@ const visibleRangeLabel = computed(() => {
   return `${pageStart.value + 1}-${Math.min(pageEnd.value, filteredModels.value.length)} of ${filteredModels.value.length}`
 })
 const typeCounts = computed(() => ({
-  all: downloadedModels.value.length,
-  checkpoint: downloadedModels.value.filter((item) => normalizedModelType(item) === 'checkpoint').length,
-  lora: downloadedModels.value.filter((item) => normalizedModelType(item) === 'lora').length,
+  all: libraryModels.value.length,
+  checkpoint: libraryModels.value.filter((item) => item.itemKind === 'checkpoint').length,
+  lora: libraryModels.value.filter((item) => item.itemKind === 'lora').length,
+  controlnet: libraryModels.value.filter((item) => item.itemKind === 'controlnet').length,
 }))
 
 watch([query, typeFilter, includeNsfw], () => {
@@ -95,28 +143,52 @@ watch(pageCount, (nextPageCount) => {
   currentPage.value = Math.min(currentPage.value, nextPageCount)
 })
 
-function normalizedModelType(item: AssetDownloadItem) {
+watch(controlNetModels, () => {
+  if (selectedModel.value?.itemKind !== 'controlnet') {
+    return
+  }
+
+  selectedModel.value = controlNetModels.value.find((item) => item.fileName === selectedModel.value?.fileName) ?? selectedModel.value
+})
+
+function normalizedModelType(item: AssetDownloadItem): LibraryItemKind | '' {
   const normalized = item.modelType.trim().toLowerCase()
-  return normalized === 'checkpoint' ? 'checkpoint' : normalized === 'lora' ? 'lora' : ''
+  if (normalized === 'checkpoint') {
+    return 'checkpoint'
+  }
+
+  if (normalized === 'lora') {
+    return 'lora'
+  }
+
+  if (normalized === 'controlnet' || normalized === 'control net') {
+    return 'controlnet'
+  }
+
+  return ''
 }
 
 function isCheckpointOrLora(item: AssetDownloadItem) {
   return Boolean(normalizedModelType(item))
 }
 
-function modelTypeLabel(item: AssetDownloadItem) {
-  return normalizedModelType(item) === 'lora' ? 'LoRA' : 'Checkpoint'
+function modelTypeLabel(item: LibraryModelItem) {
+  if (item.itemKind === 'controlnet') {
+    return 'ControlNet'
+  }
+
+  return item.itemKind === 'lora' ? 'LoRA' : 'Checkpoint'
 }
 
-function primaryPreviewPath(item: AssetDownloadItem) {
+function primaryPreviewPath(item: LibraryModelItem) {
   return item.previewPaths?.find((preview) => preview.url) ?? null
 }
 
-function previewFor(item: AssetDownloadItem) {
+function previewFor(item: LibraryModelItem) {
   return item.previewUrl ?? primaryPreviewPath(item)?.url ?? ''
 }
 
-function isVideoPreview(item: AssetDownloadItem) {
+function isVideoPreview(item: LibraryModelItem) {
   const previewUrl = previewFor(item)
   return primaryPreviewPath(item)?.mediaType === 'video' || isVideoUrl(previewUrl)
 }
@@ -138,15 +210,16 @@ function isNsfwValue(value: unknown) {
   return false
 }
 
-function modelHasNsfw(item: AssetDownloadItem) {
-  return isNsfwValue(item.modelNsfw ?? item.modelMetadata?.nsfw)
+function modelHasNsfw(item: LibraryModelItem) {
+  return 'modelNsfw' in item ? isNsfwValue(item.modelNsfw ?? item.modelMetadata?.nsfw) : false
 }
 
 function goToPage(page: number) {
   currentPage.value = Math.max(1, Math.min(page, pageCount.value))
 }
 
-function openModelPreview(item: AssetDownloadItem) {
+function openModelPreview(item: LibraryModelItem) {
+  compatibilitySaveError.value = ''
   selectedModel.value = item
 }
 
@@ -162,9 +235,96 @@ async function loadAppSettingsDefaults() {
   }
 }
 
+function controlNetBaseModelLabel(compatibility: ModelCompatibilityMetadata | null | undefined) {
+  const bases = compatibility?.compatibleBaseModels ?? []
+  return bases.length ? bases.join(', ') : compatibility?.baseModel ?? ''
+}
+
+function controlNetDisplayName(controlNet: NonNullable<ControlNetResponse['controlNets']>[number]) {
+  return controlNet.displayName ?? controlNet.name
+}
+
+async function refreshControlNets() {
+  controlNetLoadingError.value = ''
+  try {
+    const response = await fetch('/api/controlnets', {
+      headers: { Accept: 'application/json' },
+    })
+    const payload = (await response.json()) as ControlNetResponse
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.message ?? `ControlNets returned ${response.status}`)
+    }
+
+    const loadedAt = Date.now()
+    controlNetModels.value = (payload.controlNets ?? []).map((controlNet) => ({
+      id: `controlnet:${controlNet.name}`,
+      itemKind: 'controlnet',
+      modelName: controlNetDisplayName(controlNet),
+      modelType: 'ControlNet',
+      modelId: controlNet.compatibility?.modelId ?? null,
+      versionId: controlNet.compatibility?.versionId ?? null,
+      versionName: controlNet.compatibility?.versionName ?? controlNet.controlType ?? 'Local ControlNet',
+      baseModel: controlNetBaseModelLabel(controlNet.compatibility),
+      fileName: controlNet.name,
+      updatedAt: loadedAt,
+      previewUrl: null,
+      previewPaths: [],
+      compatibility: controlNet.compatibility ?? null,
+      controlType: controlNet.controlType ?? controlNet.compatibility?.controlType ?? '',
+      loaderType: controlNet.loaderType ?? controlNet.compatibility?.loaderType ?? '',
+    }))
+  } catch (error) {
+    controlNetLoadingError.value = error instanceof Error ? error.message : 'Could not load ControlNets.'
+  }
+}
+
+async function refreshLibrary() {
+  await Promise.allSettled([refreshDownloads(), refreshControlNets()])
+}
+
+async function saveControlNetCompatibility(payload: {
+  compatibleBaseModels: string[]
+  controlType: string
+  loaderType: string
+}) {
+  if (selectedModel.value?.itemKind !== 'controlnet') {
+    return
+  }
+
+  savingCompatibility.value = true
+  compatibilitySaveError.value = ''
+  try {
+    const response = await fetch(
+      `/api/model-metadata?type=controlnet&name=${encodeURIComponent(selectedModel.value.fileName)}`,
+      {
+        method: 'PUT',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+        body: JSON.stringify({
+          ...payload,
+          modelName: selectedModel.value.modelName,
+          modelType: 'ControlNet',
+        }),
+      },
+    )
+    const result = await response.json().catch(() => null)
+    if (!response.ok || result?.ok === false) {
+      throw new Error(result?.message ?? `Metadata save returned ${response.status}`)
+    }
+
+    await refreshControlNets()
+  } catch (error) {
+    compatibilitySaveError.value = error instanceof Error ? error.message : 'Could not save compatibility metadata.'
+  } finally {
+    savingCompatibility.value = false
+  }
+}
+
 onMounted(() => {
   void loadAppSettingsDefaults()
-  void refreshDownloads()
+  void refreshLibrary()
 })
 </script>
 
@@ -175,7 +335,7 @@ onMounted(() => {
         <div class="min-w-0">
           <h1 class="text-base font-semibold tracking-normal">Library</h1>
           <p class="mt-1 text-xs text-muted-foreground">
-            {{ typeCounts.all }} downloaded models, {{ typeCounts.checkpoint }} checkpoints, {{ typeCounts.lora }} LoRAs
+            {{ typeCounts.all }} local models, {{ typeCounts.checkpoint }} checkpoints, {{ typeCounts.lora }} LoRAs, {{ typeCounts.controlnet }} ControlNets
           </p>
         </div>
 
@@ -183,7 +343,7 @@ onMounted(() => {
           class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold text-card-foreground transition hover:border-secondary/60 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
           type="button"
           :disabled="loading"
-          @click="refreshDownloads"
+          @click="refreshLibrary"
         >
           <LoaderCircle
             v-if="loading"
@@ -238,10 +398,10 @@ onMounted(() => {
       </div>
 
       <p
-        v-if="error"
+        v-if="error || controlNetLoadingError"
         class="mt-3 inline-flex rounded-sm border border-destructive/45 bg-destructive/16 px-3 py-2 text-xs font-semibold text-destructive"
       >
-        {{ error }}
+        {{ error || controlNetLoadingError }}
       </p>
     </section>
 
@@ -297,7 +457,7 @@ onMounted(() => {
       </UiPreviewCard>
 
       <template #empty>
-        No downloaded checkpoints or LoRAs match the current filters.
+        No local models match the current filters.
       </template>
     </UiPaginatedCardGrid>
 
@@ -313,7 +473,12 @@ onMounted(() => {
       :model-type="selectedModel?.modelType ?? null"
       :base-model="selectedModel?.baseModel ?? null"
       :file-name="selectedModel?.fileName ?? null"
+      :compatibility="selectedModel?.compatibility ?? null"
+      :editable-compatibility="selectedModel?.itemKind === 'controlnet'"
+      :saving-compatibility="savingCompatibility"
+      :compatibility-error="compatibilitySaveError"
       @close="closeModelPreview"
+      @save-compatibility="saveControlNetCompatibility"
     />
   </main>
 </template>

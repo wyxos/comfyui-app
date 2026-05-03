@@ -1,5 +1,5 @@
 import { civitaiDownloads, civitaiImagesUrl, civitaiModelsUrl, comfyUrl } from '../config.mjs'
-import { tryParseJson } from '../shared.mjs'
+import { safeTrim, tryParseJson } from '../shared.mjs'
 import { readJsonBody, sendError, sendJson, streamFile } from '../http.mjs'
 import { comfyFetchJson } from '../comfy-client.mjs'
 import { getStoredCivitaiApiKey } from '../settings.mjs'
@@ -7,9 +7,10 @@ import { clearDismissibleDownloads, ensureDownloadsLoaded, scheduleDownloadsPers
 import { cleanPreviewOutputs, refreshCompletedDownloadPreviews, refreshMissingDownloadModelMetadataInBackground, safeUnlink, statFileIfExists } from '../downloads/metadata.mjs'
 import { markCivitaiDownloadComplete } from '../downloads/transfer.mjs'
 import { enqueueCivitaiDownload, processDownloadQueue } from '../downloads/queue.mjs'
-import { enrichCheckpointOptions, enrichLoraOptions } from '../model-options.mjs'
+import { enrichCheckpointOptions, enrichControlNetOptions, enrichLoraOptions } from '../model-options.mjs'
 import { buildCivitaiImagesQueryParams, buildCivitaiModelsQueryParams, parseInteger } from '../civitai-query.mjs'
-import { readLoraTriggerWords } from '../model-paths.mjs'
+import { getComfyCheckpointDir, getComfyControlNetDir, getComfyLoraDir, readLoraTriggerWords } from '../model-paths.mjs'
+import { writeManualModelCompatibilityMetadata } from '../model-metadata.mjs'
 import { extractOllamaModels, extractPromptRejectionMessage, getPreferredOllamaModel, ollamaFetchJson } from '../ollama.mjs'
 import { extractCheckpointList, extractControlNetList, extractDefaultLoraStrength, extractLoraList, getPreferredCheckpoint } from '../comfy-options.mjs'
 import { serializeControlNetPreprocessors } from '../controlnet-options.mjs'
@@ -86,10 +87,11 @@ export async function handleLoraList(response) {
 export async function handleControlNetList(response) {
   try {
     const objectInfo = await comfyFetchJson('/object_info/ControlNetLoader')
+    const controlNets = await enrichControlNetOptions(extractControlNetList(objectInfo))
 
     return sendJson(response, 200, {
       ok: true,
-      controlNets: extractControlNetList(objectInfo),
+      controlNets,
       preprocessors: serializeControlNetPreprocessors(),
     })
   } catch (error) {
@@ -107,6 +109,70 @@ export async function handleControlNetList(response) {
       'comfyui-unreachable',
       'Could not load ControlNet models from ComfyUI.',
       error.payload ?? error.message,
+    )
+  }
+}
+
+function resolveMetadataModelType(value) {
+  const normalized = safeTrim(value).toLowerCase()
+  if (normalized === 'checkpoint') {
+    return { label: 'Checkpoint', getRootPath: getComfyCheckpointDir }
+  }
+
+  if (normalized === 'lora') {
+    return { label: 'LORA', getRootPath: getComfyLoraDir }
+  }
+
+  if (normalized === 'controlnet' || normalized === 'control-net') {
+    return { label: 'ControlNet', getRootPath: getComfyControlNetDir }
+  }
+
+  return null
+}
+
+export async function handlePutModelMetadata(url, request, response) {
+  const modelName = safeTrim(url.searchParams.get('name'))
+  const modelType = resolveMetadataModelType(url.searchParams.get('type'))
+  if (!modelName || !modelType) {
+    return sendError(
+      response,
+      400,
+      'invalid-model-metadata-request',
+      'Provide a model type and model name for metadata updates.',
+    )
+  }
+
+  let body
+  try {
+    body = await readJsonBody(request)
+  } catch {
+    return sendError(response, 400, 'invalid-request', 'Request body must be valid JSON.')
+  }
+
+  try {
+    const { metadata, path } = await writeManualModelCompatibilityMetadata({
+      rootPath: await modelType.getRootPath(),
+      modelName,
+      modelType: modelType.label,
+      payload: body?.metadata ?? body,
+    })
+
+    return sendJson(response, 200, {
+      ok: true,
+      metadata,
+      path,
+    })
+  } catch (error) {
+    if (error?.code === 'invalid-model-name') {
+      return sendError(response, 400, 'invalid-model-name', error.message)
+    }
+
+    return sendError(
+      response,
+      500,
+      'model-metadata-write-failed',
+      'Could not save model compatibility metadata.',
+      error.message,
     )
   }
 }

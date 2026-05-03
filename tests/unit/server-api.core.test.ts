@@ -55,7 +55,20 @@ describe('companion server API routes', () => {
         payload: expect.objectContaining({
           ok: true,
           controlNets: expect.arrayContaining([
-            expect.objectContaining({ name: 'mistoLine_rank256.safetensors' }),
+            expect.objectContaining({
+              name: 'mistoLine_rank256.safetensors',
+              compatibility: expect.objectContaining({
+                baseModel: 'SDXL',
+                compatibleBaseModels: ['SDXL'],
+                controlType: 'lineart',
+              }),
+            }),
+            expect.objectContaining({
+              name: 'controlnetxlCNXL_windsingaiPose.safetensors',
+              compatibility: expect.objectContaining({
+                controlType: 'pose',
+              }),
+            }),
           ]),
           preprocessors: expect.arrayContaining([
             expect.objectContaining({ id: 'lineart', label: 'Line art' }),
@@ -203,6 +216,22 @@ describe('companion server API routes', () => {
         name: 'waiIllustriousSDXL_v160.safetensors',
         modelNsfw: true,
         compatibility: expect.objectContaining({ modelNsfw: true }),
+      })
+
+      await expect(
+        server.json('PUT', '/api/model-metadata?type=controlnet&name=mistoLine_rank256.safetensors', {
+          compatibleBaseModels: ['Pony', 'Illustrious'],
+          controlType: 'lineart',
+          loaderType: 'controlnet',
+        }),
+      ).resolves.toMatchObject({
+        payload: expect.objectContaining({
+          ok: true,
+          metadata: expect.objectContaining({
+            compatibleBaseModelKeys: ['pony', 'illustrious'],
+            controlType: 'lineart',
+          }),
+        }),
       })
     })
 

@@ -3,9 +3,10 @@ import { defaultOllamaModel } from '../config.mjs'
 import { safeTrim } from '../shared.mjs'
 import { readFormDataBody, readJsonBody, sendError, sendJson, streamFile } from '../http.mjs'
 import { submitComfyPrompt } from '../comfy-client.mjs'
-import { findModelPreviewPath } from '../model-options.mjs'
+import { enrichCheckpointOptions, enrichControlNetOptions, findModelPreviewPath } from '../model-options.mjs'
 import { appendTriggerWordsToPrompt, extractRequestedCheckpointJobs, getComfyCheckpointDir, getComfyLoraDir, isFileLike, resolveStoredInputImageName, safeModelName, storeInputImageFile } from '../model-paths.mjs'
-import { extractRequestedControlNets } from '../controlnet-options.mjs'
+import { classifyControlNetCompatibility } from '../model-metadata.mjs'
+import { extractControlNetEntries } from '../controlnet-options.mjs'
 import { generateControlNetPreview } from '../controlnet-preview.mjs'
 import { buildWorkflow, detectCheckpointFamily } from '../workflow.mjs'
 import { ensureJob } from '../job-state.mjs'
@@ -220,7 +221,6 @@ export async function handleGenerate(request, response) {
   const inputImageDisplayName = safeTrim(
     body instanceof FormData ? body.get('inputImageDisplayName') : body.inputImageDisplayName,
   )
-  const requestedControlNets = extractRequestedControlNets(body)
   const promptVariants = buildRequestedPromptVariants(promptText, improvedPromptText)
 
   if (!promptVariants.length) {
@@ -281,43 +281,91 @@ export async function handleGenerate(request, response) {
     }
   }
 
-  const controlNets = []
-  for (const controlNet of requestedControlNets) {
-    if (!controlNet.model || !controlNet.inputImageName) {
-      return sendError(
-        response,
-        400,
-        'invalid-controlnet',
-        'Each enabled ControlNet needs a model and uploaded control image.',
-      )
+  async function resolveControlNetImages(controlNetEntries) {
+    const resolvedControlNets = []
+    for (const controlNet of controlNetEntries) {
+      if (!controlNet.model || !controlNet.inputImageName) {
+        return {
+          ok: false,
+          status: 400,
+          error: 'invalid-controlnet',
+          message: 'Each enabled ControlNet needs a model and uploaded control image.',
+        }
+      }
+
+      let controlImageName
+      try {
+        controlImageName = await resolveStoredInputImageName(controlNet.inputImageName)
+      } catch (error) {
+        return {
+          ok: false,
+          status: 500,
+          error: 'controlnet-image-lookup-failed',
+          message: 'Could not verify a selected ControlNet image.',
+          details: error.message,
+        }
+      }
+
+      if (!controlImageName) {
+        return {
+          ok: false,
+          status: 400,
+          error: 'missing-controlnet-image',
+          message: 'A selected ControlNet image is no longer available. Reattach it and try again.',
+        }
+      }
+
+      resolvedControlNets.push({
+        ...controlNet,
+        inputImageName: controlImageName,
+      })
     }
 
-    let controlImageName
+    return {
+      ok: true,
+      controlNets: resolvedControlNets,
+    }
+  }
+
+  async function validateControlNetCompatibility(checkpointName, controlNetEntries) {
+    if (!controlNetEntries.length) {
+      return { ok: true }
+    }
+
+    const checkpointFamily = detectCheckpointFamily(checkpointName)
+    let checkpoint
+    let controlNetOptions
     try {
-      controlImageName = await resolveStoredInputImageName(controlNet.inputImageName)
-    } catch (error) {
-      return sendError(
-        response,
-        500,
-        'controlnet-image-lookup-failed',
-        'Could not verify a selected ControlNet image.',
-        error.message,
+      ;[checkpoint] = await enrichCheckpointOptions([{ name: checkpointName, family: checkpointFamily }])
+      controlNetOptions = await enrichControlNetOptions(
+        [...new Set(controlNetEntries.map((controlNet) => controlNet.model))]
+          .map((name) => ({ name, displayName: name })),
       )
+    } catch {
+      return { ok: true }
     }
 
-    if (!controlImageName) {
-      return sendError(
-        response,
-        400,
-        'missing-controlnet-image',
-        'A selected ControlNet image is no longer available. Reattach it and try again.',
+    const controlNetMetadataByName = new Map(
+      controlNetOptions.map((controlNet) => [controlNet.name, controlNet.compatibility ?? null]),
+    )
+
+    for (const controlNet of controlNetEntries) {
+      const status = classifyControlNetCompatibility(
+        checkpoint?.compatibility ?? null,
+        controlNetMetadataByName.get(controlNet.model) ?? null,
+        checkpointFamily,
       )
+      if (status === 'incompatible') {
+        return {
+          ok: false,
+          status: 400,
+          error: 'invalid-controlnet',
+          message: `${controlNet.model} is not compatible with ${checkpoint?.displayName ?? checkpointName}.`,
+        }
+      }
     }
 
-    controlNets.push({
-      ...controlNet,
-      inputImageName: controlImageName,
-    })
+    return { ok: true }
   }
 
   try {
@@ -338,6 +386,27 @@ export async function handleGenerate(request, response) {
         checkpointPromptText,
         checkpointImprovedPromptText,
       )
+      const nestedControlNets = extractControlNetEntries(checkpointJob.controlNets)
+      const resolvedCheckpointControlNets = await resolveControlNetImages(nestedControlNets)
+      if (!resolvedCheckpointControlNets.ok) {
+        return sendError(
+          response,
+          resolvedCheckpointControlNets.status,
+          resolvedCheckpointControlNets.error,
+          resolvedCheckpointControlNets.message,
+          resolvedCheckpointControlNets.details ?? null,
+        )
+      }
+      const controlNets = resolvedCheckpointControlNets.controlNets ?? []
+      const controlNetCompatibility = await validateControlNetCompatibility(checkpointJob.name, controlNets)
+      if (!controlNetCompatibility.ok) {
+        return sendError(
+          response,
+          controlNetCompatibility.status,
+          controlNetCompatibility.error,
+          controlNetCompatibility.message,
+        )
+      }
       const {
         prompt,
         nodeLabels,

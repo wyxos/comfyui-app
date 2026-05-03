@@ -10,11 +10,13 @@ let comfyOutputDir = process.env.COMFYUI_OUTPUT_DIR ?? null
 let comfyInputDir = process.env.COMFYUI_INPUT_DIR ?? null
 let comfyLoraDir = process.env.COMFYUI_LORA_DIR ?? null
 let comfyCheckpointDir = process.env.COMFYUI_CHECKPOINT_DIR ?? null
+let comfyControlNetDir = process.env.COMFYUI_CONTROLNET_DIR ?? null
 export function resetComfyModelDirsFromEnv() {
   comfyOutputDir = process.env.COMFYUI_OUTPUT_DIR ?? null
   comfyInputDir = process.env.COMFYUI_INPUT_DIR ?? null
   comfyLoraDir = process.env.COMFYUI_LORA_DIR ?? null
   comfyCheckpointDir = process.env.COMFYUI_CHECKPOINT_DIR ?? null
+  comfyControlNetDir = process.env.COMFYUI_CONTROLNET_DIR ?? null
 }
 export function safeModelName(value) {
   const trimmed = safeTrim(value)
@@ -137,11 +139,19 @@ export function extractRequestedCheckpointJobs(body, defaultStrength = 1) {
       entry && typeof entry === 'object' && Array.isArray(entry.loras)
         ? extractRequestedLoraEntries(entry.loras, defaultStrength)
         : []
+    const controlNets =
+      entry && typeof entry === 'object' && Array.isArray(entry.controlNets)
+        ? entry.controlNets
+        : []
     seen.add(name)
-    requested.push({
+    const checkpointJob = {
       name,
       loras,
-    })
+    }
+    if (controlNets.length) {
+      checkpointJob.controlNets = controlNets
+    }
+    requested.push(checkpointJob)
   }
   return requested
 }
@@ -317,6 +327,31 @@ export async function getComfyCheckpointDir() {
     }
   }
   throw new Error('ComfyUI checkpoint directory could not be determined.')
+}
+export async function getComfyControlNetDir() {
+  if (comfyControlNetDir) {
+    return comfyControlNetDir
+  }
+  const candidateDirs = []
+  try {
+    candidateDirs.push(join(dirname(await getComfyInputDir()), 'models', 'controlnet'))
+    candidateDirs.push(join(dirname(await getComfyInputDir()), 'models', 'controlnets'))
+  } catch {}
+  try {
+    candidateDirs.push(join(dirname(await getComfyOutputDir()), 'models', 'controlnet'))
+    candidateDirs.push(join(dirname(await getComfyOutputDir()), 'models', 'controlnets'))
+  } catch {}
+  for (const candidate of candidateDirs) {
+    if (!candidate) {
+      continue
+    }
+    const normalizedCandidate = normalize(candidate)
+    if (existsSync(normalizedCandidate)) {
+      comfyControlNetDir = normalizedCandidate
+      return comfyControlNetDir
+    }
+  }
+  throw new Error('ComfyUI ControlNet directory could not be determined.')
 }
 export function resolveModelPath(rootPath, modelName) {
   const normalizedName = safeTrim(modelName).replace(/\\/g, '/')

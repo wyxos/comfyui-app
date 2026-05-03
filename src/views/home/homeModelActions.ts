@@ -45,11 +45,19 @@ function getCompatibilityMetadataBaseKey(metadata: ModelCompatibilityMetadata | 
 }
 
 function normalizeBaseModelKey(value: unknown) {
-  return coerceTrimmedFieldString(value)
+  const normalized = coerceTrimmedFieldString(value)
     .toLowerCase()
     .replace(/\b(stable diffusion|sd)\b/g, 'sd')
     .replace(/[^a-z0-9]+/g, '')
+
+  if (normalized === 'sdxl10' || normalized === 'sdxlbase10') {
+    return 'sdxl'
+  }
+
+  return normalized
 }
+
+const sdxlArchitectureBaseModelKeys = new Set(['sdxl', 'pony', 'illustrious'])
 
 function loraHasExplicitCheckpointMatch(
   checkpoint: CheckpointEntry,
@@ -86,7 +94,18 @@ function getLoraCompatibilityStatus(
   const checkpointBaseModel = getCompatibilityMetadataBaseKey(checkpoint.compatibility)
   const loraBaseModel = getCompatibilityMetadataBaseKey(lora.compatibility)
   if (checkpointBaseModel && loraBaseModel) {
-    return checkpointBaseModel === loraBaseModel ? 'compatible' : 'incompatible'
+    if (checkpointBaseModel === loraBaseModel) {
+      return 'compatible'
+    }
+
+    if (
+      sdxlArchitectureBaseModelKeys.has(checkpointBaseModel) &&
+      sdxlArchitectureBaseModelKeys.has(loraBaseModel)
+    ) {
+      return 'warning'
+    }
+
+    return 'incompatible'
   }
 
   return 'unverified'
@@ -101,6 +120,12 @@ function getLoraCompatibilityLabel(checkpoint: CheckpointEntry, loraName: string
   const status = getLoraCompatibilityStatus(checkpoint, lora)
   if (status === 'compatible') {
     return lora.compatibility?.baseModel ? `Compatible with ${lora.compatibility.baseModel}` : 'Compatible'
+  }
+
+  if (status === 'warning') {
+    return lora.compatibility?.baseModel
+      ? `Same SDXL architecture (${lora.compatibility.baseModel})`
+      : 'Same SDXL architecture'
   }
 
   return lora.compatibility?.status === 'loading' ? 'Metadata loading' : 'Unverified'
@@ -120,13 +145,25 @@ function getCheckpointLoraOptions(checkpoint: CheckpointEntry) {
     .filter((entry) => entry.status !== 'incompatible' && !selectedNames.has(entry.lora.name))
     .sort((first, second) => {
       if (first.status !== second.status) {
-        return first.status === 'compatible' ? -1 : 1
+        const statusOrder: Record<LoraCompatibilityStatus, number> = {
+          compatible: 0,
+          warning: 1,
+          unverified: 2,
+          incompatible: 3,
+        }
+        return statusOrder[first.status] - statusOrder[second.status]
       }
 
       return (first.lora.displayName ?? first.lora.name).localeCompare(second.lora.displayName ?? second.lora.name)
     })
     .map(({ lora, status }) => ({
-      label: `${lora.displayName ?? lora.name}${status === 'unverified' ? ' · Unverified' : ''}`,
+      label: `${lora.displayName ?? lora.name}${
+        status === 'warning'
+          ? ' · Same SDXL architecture'
+          : status === 'unverified'
+            ? ' · Unverified'
+            : ''
+      }`,
       value: lora.name,
       previewUrl: lora.previewUrl ?? null,
       previewMediaType: lora.previewMediaType ?? null,

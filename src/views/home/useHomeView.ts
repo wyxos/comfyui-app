@@ -138,6 +138,7 @@ runtimeActions = createHomeRuntimeActions(state, selection, preview, status, {
 })
 controlNetActions = createHomeControlNetActions(state, {
   apiJson,
+  applySizeValues: aspectActions.applySizeValues,
   buildControlNetSelection: loraActions.buildControlNetSelection,
   getSupportedImageFileFromClipboard: () => imageActions.getSupportedImageFileFromClipboard(),
   getSupportedImageFileFromTransfer: (dataTransfer) =>
@@ -150,7 +151,8 @@ imageActions = createHomeImageActions(state, selection, status, {
   apiJson,
   applySizeValues: aspectActions.applySizeValues,
   clearControlNetGeneratedPreview: controlNetActions.clearControlNetGeneratedPreview,
-  generateControlNetPreview: (id) => controlNetActions.generateControlNetPreview(id),
+  generateControlNetPreview: (id, checkpointName) =>
+    controlNetActions.generateControlNetPreview(id, checkpointName),
   getControlNetSelection: controlNetActions.getControlNetSelection,
   normalizeControlNetResolutionFromOutputSize: aspectActions.normalizeControlNetResolutionFromOutputSize,
 })
@@ -212,7 +214,6 @@ watch(() => [status.sizeValidation.value.width, status.sizeValidation.value.heig
 
 watch(() => ({
   cfg: state.cfg.value,
-  controlNets: state.selectedControlNets.value,
   height: state.height.value,
   imageDenoise: state.imageDenoise.value,
   inputImage: state.uploadedInputImageName.value,
@@ -303,7 +304,10 @@ onBeforeUnmount(() => {
   runtimeActions.clearCopiedPathTimer()
   promptTimer.clearPromptImprovementTimer()
   imageActions.revokeSelectedImagePreview()
-  state.selectedControlNets.value.forEach((controlNet) => controlNetActions.revokeControlNetPreview(controlNet))
+  controlNetActions.getAllControlNetSelections().forEach((controlNet) =>
+    controlNetActions.revokeControlNetPreview(controlNet),
+  )
+  controlNetActions.clearControlNetPreviewCopyTimers()
   generationActions.suppressNextPromptImprovementStoppedNotice()
   generationActions.stopPromptImprovement()
   window.removeEventListener('keydown', previewModalActions.handlePreviewModalKeydown)

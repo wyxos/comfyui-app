@@ -178,6 +178,10 @@ function getOnlyAvailableControlNetModel() {
 
 function resolveAvailableControlNetModel(model: unknown) {
   const trimmedModel = coerceTrimmedFieldString(model)
+  if (trimmedModel && controlNets.value.length === 0) {
+    return trimmedModel
+  }
+
   const availableControlNets = new Set(controlNets.value.map((controlNet) => controlNet.name))
   if (trimmedModel && availableControlNets.has(trimmedModel)) {
     return trimmedModel
