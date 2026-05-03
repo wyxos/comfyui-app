@@ -1,12 +1,13 @@
 import { jobs } from './config.mjs'
-import { buildOutputFileMeta } from './model-paths.mjs'
+import { buildOutputFileMeta, sanitizeSubfolder } from './model-paths.mjs'
 import { comfySocketConnected } from './comfy-socket.mjs'
 import { ensureJobsLoaded, persistJob } from './job-store.mjs'
 
 export function normalizeImage(image) {
+  const subfolder = sanitizeSubfolder(image.subfolder ?? '')
   return {
     filename: image.filename ?? '',
-    subfolder: image.subfolder ?? '',
+    subfolder: subfolder ?? '',
     type: image.type ?? 'output',
     variantId: image.variantId ?? null,
     variantLabel: image.variantLabel ?? null,

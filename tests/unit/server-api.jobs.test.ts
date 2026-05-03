@@ -191,7 +191,7 @@ describe('companion server API routes', () => {
           status: { status_str: 'success' },
           outputs: {
             9: {
-              images: [{ filename: 'mock-output.png', subfolder: '', type: 'output' }],
+              images: [{ filename: 'mock-output.png', subfolder: '2026-05-04\\txt2img', type: 'output' }],
             },
           },
         },
@@ -201,7 +201,13 @@ describe('companion server API routes', () => {
         payload: expect.objectContaining({
           ok: true,
           state: 'complete',
-          outputs: [expect.objectContaining({ filename: 'mock-output.png' })],
+          outputs: [
+            expect.objectContaining({
+              filename: 'mock-output.png',
+              subfolder: '2026-05-04/txt2img',
+              url: '/api/view?filename=mock-output.png&subfolder=2026-05-04%2Ftxt2img&type=output',
+            }),
+          ],
         }),
       })
 

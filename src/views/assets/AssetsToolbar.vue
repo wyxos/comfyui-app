@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Search } from 'lucide-vue-next'
+import { Hash, Search } from 'lucide-vue-next'
 import UiSelect from '../../components/ui/UiSelect.vue'
 import { useProvidedAssetsView } from './assetsViewContext'
 
@@ -10,6 +10,8 @@ const {
   ASSET_SEARCH_PRESETS,
   BASE_MODEL_OPTIONS,
   query,
+  modelIdQuery,
+  modelVersionIdQuery,
   includeNsfw,
   selectedType,
   selectedSort,
@@ -26,6 +28,8 @@ const {
   clearBaseModelFilters,
   applySearchPreset,
   clearCreatorFilter,
+  searchByModelId,
+  searchByModelVersionId,
 } = useProvidedAssetsView()
 </script>
 
@@ -50,6 +54,48 @@ const {
             type="search"
             autocomplete="off"
           />
+        </div>
+
+        <div class="grid shrink-0 grid-cols-2 gap-2 sm:flex">
+          <label
+            class="sr-only"
+            for="asset-model-id"
+          >
+            Model ID
+          </label>
+          <div class="relative min-w-0">
+            <Hash class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              id="asset-model-id"
+              v-model="modelIdQuery"
+              class="h-12 w-full rounded-md border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-ring/25 sm:w-32"
+              placeholder="Model ID"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              @keydown.enter.prevent="searchByModelId"
+            />
+          </div>
+
+          <label
+            class="sr-only"
+            for="asset-version-id"
+          >
+            Version ID
+          </label>
+          <div class="relative min-w-0">
+            <Hash class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              id="asset-version-id"
+              v-model="modelVersionIdQuery"
+              class="h-12 w-full rounded-md border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-ring/25 sm:w-36"
+              placeholder="Version ID"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              @keydown.enter.prevent="searchByModelVersionId"
+            />
+          </div>
         </div>
 
         <div class="flex shrink-0 flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em]">

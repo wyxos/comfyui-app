@@ -6,6 +6,7 @@ import {
   buildAssetSearchRouteQuery,
   firstQueryValue,
   makeSearchKey,
+  parseRouteCivitaiId,
   parseRouteBaseModels,
   parseRouteCursor,
   parseRouteNsfw,
@@ -31,6 +32,8 @@ import {
 
 type AssetSearchState = {
   activeQuery: Ref<string>
+  activeModelId: Ref<string>
+  activeModelVersionId: Ref<string>
   activeUsername: Ref<string>
   blacklistedModelIdSet: ComputedRef<Set<number>>
   currentCursor: Ref<string>
@@ -39,6 +42,8 @@ type AssetSearchState = {
   hasStoredCivitaiApiKey: Ref<boolean>
   includeNsfw: Ref<boolean>
   loading: Ref<boolean>
+  modelIdQuery: Ref<string>
+  modelVersionIdQuery: Ref<string>
   models: Ref<CivitaiModel[]>
   nextCursor: Ref<string>
   primaryFileOnly: Ref<boolean>
@@ -102,6 +107,8 @@ export function createAssetSearchController(state: AssetSearchState) {
     period = state.selectedPeriod.value,
     baseModels = state.selectedBaseModels.value,
     primaryFileOnly = state.primaryFileOnly.value,
+    modelId = state.modelIdQuery.value,
+    modelVersionId = state.modelVersionIdQuery.value,
   ) {
     return buildAssetSearchRouteQuery(state.route.query, {
       searchTerm,
@@ -109,6 +116,8 @@ export function createAssetSearchController(state: AssetSearchState) {
       nsfw,
       defaultNsfw: defaultIncludeNsfw,
       cursor,
+      modelId,
+      modelVersionId,
       username,
       typeFilter,
       sort,
@@ -130,6 +139,8 @@ export function createAssetSearchController(state: AssetSearchState) {
     period = state.selectedPeriod.value,
     baseModels = state.selectedBaseModels.value,
     primaryFileOnly = state.primaryFileOnly.value,
+    modelId = state.modelIdQuery.value,
+    modelVersionId = state.modelVersionIdQuery.value,
   ) {
     await state.router[mode]({
       query: buildSearchRouteQuery(
@@ -143,6 +154,8 @@ export function createAssetSearchController(state: AssetSearchState) {
         period,
         baseModels,
         primaryFileOnly,
+        modelId,
+        modelVersionId,
       ),
     })
   }
@@ -158,6 +171,8 @@ export function createAssetSearchController(state: AssetSearchState) {
     period = state.selectedPeriod.value,
     baseModels = state.selectedBaseModels.value,
     primaryFileOnly = state.primaryFileOnly.value,
+    modelId = state.modelIdQuery.value,
+    modelVersionId = state.modelVersionIdQuery.value,
   ) {
     return state.router.resolve({
       path: '/assets',
@@ -172,6 +187,8 @@ export function createAssetSearchController(state: AssetSearchState) {
         period,
         baseModels,
         primaryFileOnly,
+        modelId,
+        modelVersionId,
       ),
     }).href
   }
@@ -184,6 +201,8 @@ export function createAssetSearchController(state: AssetSearchState) {
     const period = state.selectedPeriod.value
     const baseModels = state.selectedBaseModels.value
     const primaryFileOnly = state.primaryFileOnly.value
+    const modelId = parseRouteCivitaiId(state.modelIdQuery.value)
+    const modelVersionId = parseRouteCivitaiId(state.modelVersionIdQuery.value)
     const normalizedCursor = cursor.trim()
     const searchKey = makeSearchKey(
       term,
@@ -195,8 +214,9 @@ export function createAssetSearchController(state: AssetSearchState) {
       sort,
       period,
       baseModels,
+      modelId,
+      modelVersionId,
     )
-
     if (state.loading.value && searchKey === lastSearchKey) {
       return
     }
@@ -209,6 +229,8 @@ export function createAssetSearchController(state: AssetSearchState) {
     state.error.value = ''
     state.searched.value = true
     state.activeQuery.value = term
+    state.activeModelId.value = modelId
+    state.activeModelVersionId.value = modelVersionId
     state.activeUsername.value = username
     state.currentPage.value = page
     state.currentCursor.value = normalizedCursor
@@ -217,40 +239,46 @@ export function createAssetSearchController(state: AssetSearchState) {
 
     const params = new URLSearchParams({
       limit: String(PAGE_SIZE),
-      nsfw: nsfw ? 'true' : 'false',
-      period,
     })
 
-    if (sort) {
-      params.set('sort', sort)
-    }
+    if (modelVersionId) {
+      params.set('modelVersionId', modelVersionId)
+    } else if (modelId) {
+      params.set('modelId', modelId)
+    } else {
+      params.set('nsfw', nsfw ? 'true' : 'false')
+      params.set('period', period)
 
-    if (term.length >= 2) {
-      params.set('query', term)
-    }
+      if (sort) {
+        params.set('sort', sort)
+      }
 
-    if (username) {
-      params.set('username', username)
-    }
+      if (term.length >= 2) {
+        params.set('query', term)
+      }
 
-    if (typeFilter) {
-      params.set('types', typeFilter)
-    }
+      if (username) {
+        params.set('username', username)
+      }
 
-    if (primaryFileOnly) {
-      params.set('primaryFileOnly', 'true')
-    }
+      if (typeFilter) {
+        params.set('types', typeFilter)
+      }
 
-    for (const baseModel of baseModels) {
-      params.append('baseModels', baseModel)
-    }
+      if (primaryFileOnly) {
+        params.set('primaryFileOnly', 'true')
+      }
 
-    if (normalizedCursor) {
-      params.set('cursor', normalizedCursor)
-    } else if (page > 1) {
-      params.set('page', String(page))
-    }
+      for (const baseModel of baseModels) {
+        params.append('baseModels', baseModel)
+      }
 
+      if (normalizedCursor) {
+        params.set('cursor', normalizedCursor)
+      } else if (page > 1) {
+        params.set('page', String(page))
+      }
+    }
     try {
       const response = await fetch(`/api/civitai/models?${params.toString()}`, {
         headers: {
@@ -297,6 +325,10 @@ export function createAssetSearchController(state: AssetSearchState) {
     const routeQuery = queryStringValue(firstQueryValue(state.route.query.q))
     const routePage = parseRoutePage(state.route.query.page)
     const routeCursor = parseRouteCursor(state.route.query.cursor)
+    const routeModelId = parseRouteCivitaiId(state.route.query.modelId)
+    const routeModelVersionId = parseRouteCivitaiId(
+      state.route.query.modelVersionId ?? state.route.query.versionId,
+    )
     const hasRouteNsfw = firstQueryValue(state.route.query.nsfw) !== undefined
     const routeNsfw = hasRouteNsfw ? parseRouteNsfw(state.route.query.nsfw) : defaultIncludeNsfw
     const routePrimaryFileOnly = parseRoutePrimaryFileOnly(state.route.query.primaryFileOnly)
@@ -309,6 +341,8 @@ export function createAssetSearchController(state: AssetSearchState) {
     routeSyncVersion = syncVersion
     suppressQueryWatch = true
     state.query.value = routeQuery
+    state.modelIdQuery.value = routeModelId
+    state.modelVersionIdQuery.value = routeModelVersionId
     state.includeNsfw.value = routeNsfw
     state.primaryFileOnly.value = routePrimaryFileOnly
     state.selectedType.value = routeType
@@ -334,6 +368,8 @@ export function createAssetSearchController(state: AssetSearchState) {
       routeSort,
       routePeriod,
       routeBaseModels,
+      routeModelId,
+      routeModelVersionId,
     )
     if (searchKey === lastSearchKey && state.searched.value) {
       return
@@ -350,8 +386,48 @@ export function createAssetSearchController(state: AssetSearchState) {
 
       window.clearTimeout(debounceId)
       debounceId = window.setTimeout(() => {
-        void replaceSearchUrl(value, 1, state.includeNsfw.value, '', 'replace', '')
+        void replaceSearchUrl(
+          value,
+          1,
+          state.includeNsfw.value,
+          '',
+          'replace',
+          '',
+          state.selectedType.value,
+          state.selectedSort.value,
+          state.selectedPeriod.value,
+          state.selectedBaseModels.value,
+          state.primaryFileOnly.value,
+          '',
+          '',
+        )
       }, 450)
+    })
+
+    watch([state.modelIdQuery, state.modelVersionIdQuery], ([modelId, modelVersionId]) => {
+      if (suppressQueryWatch) {
+        return
+      }
+
+      window.clearTimeout(debounceId)
+      cursorHistory.length = 0
+      debounceId = window.setTimeout(() => {
+        void replaceSearchUrl(
+          '',
+          1,
+          state.includeNsfw.value,
+          '',
+          'replace',
+          '',
+          state.selectedType.value,
+          state.selectedSort.value,
+          state.selectedPeriod.value,
+          state.selectedBaseModels.value,
+          state.primaryFileOnly.value,
+          modelId,
+          modelVersionId,
+        )
+      }, 350)
     })
 
     watch(state.includeNsfw, (value) => {
@@ -396,6 +472,9 @@ export function createAssetSearchController(state: AssetSearchState) {
         state.route.query.nsfw,
         state.route.query.primaryFileOnly,
         state.route.query.cursor,
+        state.route.query.modelId,
+        state.route.query.modelVersionId,
+        state.route.query.versionId,
         state.route.query.username,
         state.route.query.types,
         state.route.query.sort,
@@ -410,17 +489,100 @@ export function createAssetSearchController(state: AssetSearchState) {
     const nextUsername = safeCreatorUsername(username)
     if (nextUsername) {
       cursorHistory.length = 0
-      void replaceSearchUrl('', 1, state.includeNsfw.value, '', 'push', nextUsername)
+      void replaceSearchUrl(
+        '',
+        1,
+        state.includeNsfw.value,
+        '',
+        'push',
+        nextUsername,
+        state.selectedType.value,
+        state.selectedSort.value,
+        state.selectedPeriod.value,
+        state.selectedBaseModels.value,
+        state.primaryFileOnly.value,
+        '',
+        '',
+      )
     }
   }
 
   function creatorFilterHref(username: string | null | undefined) {
     const nextUsername = safeCreatorUsername(username)
-    return nextUsername ? searchRouteHref('', 1, state.includeNsfw.value, '', nextUsername) : ''
+    return nextUsername
+      ? searchRouteHref(
+          '',
+          1,
+          state.includeNsfw.value,
+          '',
+          nextUsername,
+          state.selectedType.value,
+          state.selectedSort.value,
+          state.selectedPeriod.value,
+          state.selectedBaseModels.value,
+          state.primaryFileOnly.value,
+          '',
+          '',
+        )
+      : ''
   }
 
   function clearCreatorFilter() {
-    void replaceSearchUrl(state.query.value, 1, state.includeNsfw.value, '', 'push', '')
+    void replaceSearchUrl(
+      state.query.value,
+      1,
+      state.includeNsfw.value,
+      '',
+      'push',
+      '',
+      state.selectedType.value,
+      state.selectedSort.value,
+      state.selectedPeriod.value,
+      state.selectedBaseModels.value,
+      state.primaryFileOnly.value,
+      '',
+      '',
+    )
+  }
+
+  function searchByModelId() {
+    window.clearTimeout(debounceId)
+    cursorHistory.length = 0
+    void replaceSearchUrl(
+      '',
+      1,
+      state.includeNsfw.value,
+      '',
+      'push',
+      '',
+      state.selectedType.value,
+      state.selectedSort.value,
+      state.selectedPeriod.value,
+      state.selectedBaseModels.value,
+      state.primaryFileOnly.value,
+      state.modelIdQuery.value,
+      '',
+    )
+  }
+
+  function searchByModelVersionId() {
+    window.clearTimeout(debounceId)
+    cursorHistory.length = 0
+    void replaceSearchUrl(
+      '',
+      1,
+      state.includeNsfw.value,
+      '',
+      'push',
+      '',
+      state.selectedType.value,
+      state.selectedSort.value,
+      state.selectedPeriod.value,
+      state.selectedBaseModels.value,
+      state.primaryFileOnly.value,
+      '',
+      state.modelVersionIdQuery.value,
+    )
   }
 
   function applySearchPreset(preset: AssetSearchPreset) {
@@ -437,6 +599,8 @@ export function createAssetSearchController(state: AssetSearchState) {
       preset.period,
       [...DEFAULT_BASE_MODELS],
       preset.primaryFileOnly,
+      '',
+      '',
     )
   }
 
@@ -501,5 +665,7 @@ export function createAssetSearchController(state: AssetSearchState) {
     filterByCreator,
     goToPage,
     mount,
+    searchByModelId,
+    searchByModelVersionId,
   }
 }

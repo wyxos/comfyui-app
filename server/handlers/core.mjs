@@ -1,4 +1,4 @@
-import { civitaiDownloads, civitaiImagesUrl, civitaiModelsUrl, comfyUrl } from '../config.mjs'
+import { civitaiDownloads, civitaiImagesUrl, civitaiModelsUrl, civitaiModelVersionsUrl, comfyUrl } from '../config.mjs'
 import { safeTrim, tryParseJson } from '../shared.mjs'
 import { readJsonBody, sendError, sendJson, streamFile } from '../http.mjs'
 import { comfyFetchJson } from '../comfy-client.mjs'
@@ -275,7 +275,197 @@ export async function proxyCivitaiRequest(upstreamUrl, response, unavailableMess
   }
 }
 
+async function fetchCivitaiJson(upstreamUrl, response, unavailableMessage, request = null) {
+  let apiKey
+  try {
+    apiKey = await getStoredCivitaiApiKey()
+  } catch (error) {
+    sendError(
+      response,
+      500,
+      'settings-read-failed',
+      'Could not read Civitai settings.',
+      error.message,
+    )
+    return null
+  }
+
+  const headers = {
+    Accept: 'application/json',
+  }
+
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`
+  }
+
+  const abortController = new AbortController()
+  const abortProxyRequest = () => {
+    if (!abortController.signal.aborted && !response.writableEnded) {
+      abortController.abort()
+    }
+  }
+
+  request?.once('aborted', abortProxyRequest)
+  response.once('close', abortProxyRequest)
+
+  try {
+    const upstreamResponse = await fetch(upstreamUrl, {
+      headers,
+      signal: abortController.signal,
+    })
+    const text = await upstreamResponse.text()
+
+    if (!upstreamResponse.ok) {
+      sendError(
+        response,
+        upstreamResponse.status >= 500 ? 502 : upstreamResponse.status,
+        'civitai-request-failed',
+        `Civitai returned ${upstreamResponse.status}.`,
+        text ? tryParseJson(text) ?? text.slice(0, 1000) : null,
+      )
+      return null
+    }
+
+    const payload = tryParseJson(text)
+    if (!payload || typeof payload !== 'object') {
+      sendError(
+        response,
+        502,
+        'civitai-invalid-response',
+        unavailableMessage,
+        text.slice(0, 1000),
+      )
+      return null
+    }
+
+    return payload
+  } catch (error) {
+    if (abortController.signal.aborted) {
+      return null
+    }
+
+    sendError(
+      response,
+      502,
+      'civitai-unreachable',
+      unavailableMessage,
+      error.message,
+    )
+    return null
+  } finally {
+    request?.off('aborted', abortProxyRequest)
+    response.off('close', abortProxyRequest)
+  }
+}
+
+function parseCivitaiLookupId(value) {
+  if (typeof value === 'string' && !/^\d+$/.test(value.trim())) {
+    return null
+  }
+
+  const parsed = parseInteger(value)
+  return parsed && Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+function firstCivitaiLookupId(searchParams, keys) {
+  for (const key of keys) {
+    const parsed = parseCivitaiLookupId(searchParams.get(key))
+    if (parsed) {
+      return parsed
+    }
+  }
+
+  return null
+}
+
+function civitaiSingleModelMetadata(items) {
+  return {
+    totalItems: items.length,
+    currentPage: 1,
+    pageSize: items.length,
+    totalPages: items.length ? 1 : 0,
+    nextCursor: null,
+    nextPage: null,
+    prevPage: null,
+  }
+}
+
+function normalizeCivitaiVersionForModel(version) {
+  if (!version || typeof version !== 'object') {
+    return null
+  }
+
+  const versionId = parseCivitaiLookupId(version.id)
+  if (!versionId) {
+    return null
+  }
+
+  return {
+    ...version,
+    id: versionId,
+  }
+}
+
+function modelFromCivitaiVersion(version) {
+  const modelId = parseCivitaiLookupId(version?.modelId ?? version?.model?.id)
+  const modelVersion = normalizeCivitaiVersionForModel(version)
+  if (!modelId || !modelVersion) {
+    return null
+  }
+
+  return {
+    id: modelId,
+    name: safeTrim(version?.model?.name) || `Civitai model ${modelId}`,
+    type: safeTrim(version?.model?.type) || 'Unknown',
+    nsfw: version?.model?.nsfw === true,
+    creator: version?.model?.creator ?? null,
+    stats: version?.model?.stats ?? version?.stats ?? undefined,
+    tags: Array.isArray(version?.model?.tags) ? version.model.tags : [],
+    modelVersions: [modelVersion],
+  }
+}
+
+function sendCivitaiSingleModelResponse(response, model) {
+  const items = model ? [model] : []
+  return sendJson(response, 200, {
+    items,
+    metadata: civitaiSingleModelMetadata(items),
+  })
+}
+
 export async function handleCivitaiModelsProxy(url, response, request) {
+  const modelVersionId = firstCivitaiLookupId(url.searchParams, ['modelVersionId', 'versionId'])
+  if (modelVersionId) {
+    const versionUrl = new URL(`${civitaiModelVersionsUrl.toString().replace(/\/$/, '')}/${modelVersionId}`)
+    const version = await fetchCivitaiJson(versionUrl, response, 'Could not load Civitai model version.', request)
+    if (!version || response.writableEnded) {
+      return
+    }
+
+    const model = modelFromCivitaiVersion(version)
+    if (!model) {
+      return sendError(
+        response,
+        502,
+        'civitai-invalid-response',
+        'Civitai did not return a model id for that model version.',
+      )
+    }
+
+    return sendCivitaiSingleModelResponse(response, model)
+  }
+
+  const modelId = firstCivitaiLookupId(url.searchParams, ['modelId'])
+  if (modelId) {
+    const modelUrl = new URL(`${civitaiModelsUrl.toString().replace(/\/$/, '')}/${modelId}`)
+    const model = await fetchCivitaiJson(modelUrl, response, 'Could not load Civitai model.', request)
+    if (!model || response.writableEnded) {
+      return
+    }
+
+    return sendCivitaiSingleModelResponse(response, model)
+  }
+
   const upstreamUrl = new URL(civitaiModelsUrl.toString())
   upstreamUrl.search = buildCivitaiModelsQueryParams(url.searchParams).toString()
 

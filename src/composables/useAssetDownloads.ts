@@ -183,6 +183,8 @@ export function useAssetDownloads() {
   subscribers += 1
   if (subscribers === 1) {
     startPolling()
+  } else {
+    void refreshDownloads()
   }
 
   onBeforeUnmount(() => {

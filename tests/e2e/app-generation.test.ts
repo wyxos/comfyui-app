@@ -335,7 +335,7 @@ describe('companion app e2e flows', () => {
     })
 
   it('copies selected image pixel dimensions into the config size fields', async () => {
-      const { screen } = await renderCompanionApp('/', {
+      const { api, screen } = await renderCompanionApp('/', {
         uploadInputImageNames: ['scan-source.png', 'control-source.png'],
       })
 
@@ -364,7 +364,13 @@ describe('companion app e2e flows', () => {
       )
 
       await expect.element(screen.getByText('777 x 913')).toBeVisible()
+      await expect.element(screen.getByText('mock-controlnet-preview.png')).toBeVisible()
+      const previewCallCount = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/controlnet-preview').length
       await screen.getByRole('button', { name: 'Use ControlNet source image resolution' }).click()
+      expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/controlnet-preview')).toHaveLength(
+        previewCallCount,
+      )
+      await expect.element(screen.getByText('mock-controlnet-preview.png')).toBeVisible()
 
       await screen.getByRole('button', { name: /Size, seed, and CFG/ }).click()
       await expect.element(screen.getByRole('spinbutton', { name: 'Width' })).toHaveValue(777)

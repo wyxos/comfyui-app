@@ -42,12 +42,14 @@ describe('server helper exports', () => {
         ['query', 'pony'],
         ['limit', '999'],
         ['nsfw', 'yes'],
+        ['modelId', '42'],
+        ['modelVersionId', '9001'],
         ['ids', '1,bad'],
         ['ignored', 'value'],
       ]),
     )
 
-    expect(modelParams.toString()).toBe('query=pony&limit=100&nsfw=true')
+    expect(modelParams.toString()).toBe('query=pony&limit=100&nsfw=true&modelId=42&modelVersionId=9001')
 
     const imageParams = buildCivitaiImagesQueryParams(
       new URLSearchParams([
@@ -92,9 +94,11 @@ describe('server helper exports', () => {
     expect(sanitizeFilename('nested/output.png')).toBeNull()
 
     expect(sanitizeSubfolder('session/one')).toBe('session/one')
-    expect(sanitizeSubfolder('session\\one')).toBeNull()
+    expect(sanitizeSubfolder('session\\one')).toBe('session/one')
+    expect(sanitizeSubfolder('session//one')).toBe('session/one')
     expect(sanitizeSubfolder('../escape')).toBeNull()
     expect(sanitizeSubfolder('/absolute')).toBeNull()
+    expect(sanitizeSubfolder('C:\\absolute')).toBeNull()
   })
 
   it('extracts requested checkpoints and LoRAs with de-duplication', () => {

@@ -138,7 +138,7 @@ runtimeActions = createHomeRuntimeActions(state, selection, preview, status, {
 })
 controlNetActions = createHomeControlNetActions(state, {
   apiJson,
-  applySizeValues: aspectActions.applySizeValues,
+  applySizeValues: applySourceImageSizeValues,
   buildControlNetSelection: loraActions.buildControlNetSelection,
   getSupportedImageFileFromClipboard: () => imageActions.getSupportedImageFileFromClipboard(),
   getSupportedImageFileFromTransfer: (dataTransfer) =>
@@ -150,6 +150,7 @@ controlNetActions = createHomeControlNetActions(state, {
 imageActions = createHomeImageActions(state, selection, status, {
   apiJson,
   applySizeValues: aspectActions.applySizeValues,
+  applySourceImageSizeValues,
   clearControlNetGeneratedPreview: controlNetActions.clearControlNetGeneratedPreview,
   generateControlNetPreview: (id, checkpointName) =>
     controlNetActions.generateControlNetPreview(id, checkpointName),
@@ -200,14 +201,29 @@ const previewModalActions = createHomePreviewModalActions({
   statusLine: state.statusLine,
 })
 
+let shouldSkipNextControlNetOutputResolutionSync = false
+function applySourceImageSizeValues(nextWidth: string | number, nextHeight: string | number) {
+  shouldSkipNextControlNetOutputResolutionSync = true
+  aspectActions.applySizeValues(nextWidth, nextHeight)
+  void nextTick(() => {
+    shouldSkipNextControlNetOutputResolutionSync = false
+  })
+}
+
 persistence.restoreFormState()
 let previousControlNetOutputResolution = aspectActions.normalizeControlNetResolutionFromOutputSize()
 
 watch(() => [status.sizeValidation.value.width, status.sizeValidation.value.height] as const, () => {
   const nextResolution = aspectActions.normalizeControlNetResolutionFromOutputSize()
   const previousResolution = previousControlNetOutputResolution
+  const shouldSkipSync = shouldSkipNextControlNetOutputResolutionSync
+  shouldSkipNextControlNetOutputResolutionSync = false
   previousControlNetOutputResolution = nextResolution
   if (nextResolution !== previousResolution) {
+    if (shouldSkipSync) {
+      return
+    }
+
     controlNetActions.syncOutputDerivedControlNetResolutions(previousResolution, nextResolution)
   }
 })

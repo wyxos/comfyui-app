@@ -70,6 +70,7 @@ export const contentTypes = new Map([
 
 export const outputTypes = new Set(['output', 'input', 'temp'])
 export const civitaiModelsUrl = new URL('https://civitai.com/api/v1/models')
+export const civitaiModelVersionsUrl = new URL('https://civitai.com/api/v1/model-versions')
 export const civitaiImagesUrl = new URL('https://civitai.com/api/v1/images')
 export const civitaiModelsQueryParams = new Set([
   'allowCommercialUse',
@@ -82,6 +83,8 @@ export const civitaiModelsQueryParams = new Set([
   'hidden',
   'ids',
   'limit',
+  'modelId',
+  'modelVersionId',
   'nsfw',
   'page',
   'period',

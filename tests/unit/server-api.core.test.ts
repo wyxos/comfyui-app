@@ -121,6 +121,24 @@ describe('companion server API routes', () => {
       expect(civitaiCall?.url.searchParams.get('limit')).toBe('100')
       expect(civitaiCall?.url.searchParams.has('ignored')).toBe(false)
 
+      const civitaiModelById = await server.request('/api/civitai/models?modelId=101&query=ignored')
+      expect(civitaiModelById.payload).toMatchObject({
+        items: [expect.objectContaining({ id: 101 })],
+        metadata: expect.objectContaining({ totalItems: 1, totalPages: 1 }),
+      })
+      expect(server.calls.some((call) => call.url.pathname === '/api/v1/models/101')).toBe(true)
+
+      const civitaiModelByVersionId = await server.request('/api/civitai/models?modelVersionId=201')
+      expect(civitaiModelByVersionId.payload).toMatchObject({
+        items: [
+          expect.objectContaining({
+            id: 101,
+            modelVersions: [expect.objectContaining({ id: 201 })],
+          }),
+        ],
+      })
+      expect(server.calls.some((call) => call.url.pathname === '/api/v1/model-versions/201')).toBe(true)
+
       await expect(server.request('/api/civitai/images?modelId=101&page=2')).resolves.toMatchObject({
         payload: expect.objectContaining({
           items: [expect.objectContaining({ id: 401 })],

@@ -57,6 +57,33 @@ describe('companion app e2e flows', () => {
     })
   })
 
+  it('searches assets by Civitai model and version id', async () => {
+    const lookupModel = createMockModel({ id: 505, name: 'Lookup Detail LoRA' })
+    lookupModel.modelVersions[0].id = 606
+    const byModel = await renderCompanionApp('/assets?modelId=505', { models: [lookupModel] })
+
+    await vi.waitFor(() => {
+      expect(byModel.host.textContent).toContain('Lookup Detail LoRA')
+    })
+    const modelSearchCall = byModel.api.calls.find((call) => call.path === '/api/civitai/models')
+    expect(modelSearchCall?.search.get('modelId')).toBe('505')
+    expect(modelSearchCall?.search.get('query')).toBeNull()
+    expect((byModel.host.querySelector('#asset-model-id') as HTMLInputElement | null)?.value).toBe('505')
+
+    await byModel.cleanup()
+
+    const byVersion = await renderCompanionApp('/assets?modelVersionId=606', { models: [lookupModel] })
+
+    await vi.waitFor(() => {
+      expect(byVersion.host.textContent).toContain('Lookup Detail LoRA')
+    })
+    const versionSearchCall = byVersion.api.calls.find((call) => call.path === '/api/civitai/models')
+    expect(versionSearchCall?.search.get('modelVersionId')).toBe('606')
+    expect(versionSearchCall?.search.get('modelId')).toBeNull()
+    expect((byVersion.host.querySelector('#asset-version-id') as HTMLInputElement | null)?.value).toBe('606')
+    await byVersion.cleanup()
+  })
+
   it('covers asset filters, empty results, route pagination, metadata, and download panel actions', async () => {
     const empty = await renderCompanionApp('/assets?q=missing', { models: [] })
 

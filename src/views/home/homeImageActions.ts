@@ -8,6 +8,7 @@ import { coerceFieldString } from './homeValueHelpers'
 type HomeImageActionDeps = {
   apiJson: <T>(path: string, init?: RequestInit & { timeoutMs?: number }) => Promise<T>
   applySizeValues: (nextWidth: string | number, nextHeight: string | number) => void
+  applySourceImageSizeValues: (nextWidth: string | number, nextHeight: string | number) => void
   clearControlNetGeneratedPreview: (controlNet: ControlNetSelection | null) => void
   generateControlNetPreview: (id: string, checkpointName?: string) => Promise<void>
   getControlNetSelection: (id: string, checkpointName?: string) => ControlNetSelection | null
@@ -39,6 +40,7 @@ void status
 const {
   apiJson,
   applySizeValues,
+  applySourceImageSizeValues,
   clearControlNetGeneratedPreview,
   generateControlNetPreview,
   getControlNetSelection,
@@ -196,7 +198,7 @@ function applySourceImageResolution() {
     return
   }
 
-  applySizeValues(
+  applySourceImageSizeValues(
     selectedImageDimensions.value.width,
     selectedImageDimensions.value.height,
   )

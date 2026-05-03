@@ -21,6 +21,8 @@ const {
   error,
   searched,
   activeQuery,
+  activeModelId,
+  activeModelVersionId,
   activeUsername,
   openDownloadMenuKey,
   queuingDownloadKey,
@@ -106,7 +108,13 @@ const {
       aria-live="polite"
     >
       <div class="rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">
-        <template v-if="activeUsername">
+        <template v-if="activeModelVersionId">
+          No Civitai model found for version #{{ activeModelVersionId }}.
+        </template>
+        <template v-else-if="activeModelId">
+          No Civitai model found for model #{{ activeModelId }}.
+        </template>
+        <template v-else-if="activeUsername">
           No Civitai models found for @{{ activeUsername }}.
         </template>
         <template v-else>

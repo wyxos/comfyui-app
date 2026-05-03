@@ -229,10 +229,18 @@ export function sanitizeSubfolder(value) {
   if (typeof value !== 'string' || value === '') {
     return ''
   }
-  if (value.includes('\\') || value.includes('..') || value.startsWith('/')) {
+  const normalized = value.trim().replace(/\\/g, '/')
+  if (!normalized) {
+    return ''
+  }
+  if (normalized.includes('..') || normalized.startsWith('/')) {
     return null
   }
-  return value
+  const segments = normalized.split('/').filter(Boolean)
+  if (segments.some((segment) => segment === '.' || segment.includes(':'))) {
+    return null
+  }
+  return segments.join('/')
 }
 export function resolveInsideRoot(rootPath, ...segments) {
   const normalizedRoot = normalize(resolve(rootPath))

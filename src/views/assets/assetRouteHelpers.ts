@@ -20,6 +20,8 @@ type AssetSearchRouteQueryOptions = {
   nsfw?: boolean
   defaultNsfw?: boolean
   cursor?: string
+  modelId?: string
+  modelVersionId?: string
   username?: string
   typeFilter?: ModelTypeFilter
   sort?: ModelSort
@@ -43,6 +45,16 @@ export function parseRoutePage(value: unknown) {
 
 export function parseRouteCursor(value: unknown) {
   return queryStringValue(firstQueryValue(value)).trim()
+}
+
+export function parseRouteCivitaiId(value: unknown) {
+  const normalized = queryStringValue(firstQueryValue(value)).trim()
+  if (!/^\d+$/.test(normalized)) {
+    return ''
+  }
+
+  const parsed = Number.parseInt(normalized, 10)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? String(parsed) : ''
 }
 
 export function parseRouteNsfw(value: unknown) {
@@ -125,6 +137,8 @@ export function buildAssetSearchRouteQuery(
     nsfw = false,
     defaultNsfw = false,
     cursor = '',
+    modelId = '',
+    modelVersionId = '',
     username = '',
     typeFilter = '',
     sort = DEFAULT_SORT,
@@ -134,6 +148,8 @@ export function buildAssetSearchRouteQuery(
   }: AssetSearchRouteQueryOptions,
 ): LocationQueryRaw {
   const term = searchTerm.trim()
+  const normalizedModelId = parseRouteCivitaiId(modelId)
+  const normalizedModelVersionId = parseRouteCivitaiId(modelVersionId)
   const normalizedUsername = username.trim()
   const normalizedType = parseRouteType(typeFilter)
   const normalizedSort = parseRouteSort(sort)
@@ -147,6 +163,7 @@ export function buildAssetSearchRouteQuery(
     nsfw !== defaultNsfw ||
     page > 1 ||
     Boolean(cursor) ||
+    Boolean(normalizedModelId || normalizedModelVersionId) ||
     normalizedSort !== DEFAULT_SORT ||
     normalizedPeriod !== DEFAULT_PERIOD ||
     !areSameBaseModels(normalizedBaseModels, DEFAULT_BASE_MODELS) ||
@@ -158,6 +175,9 @@ export function buildAssetSearchRouteQuery(
   delete nextQuery.nsfw
   delete nextQuery.primaryFileOnly
   delete nextQuery.cursor
+  delete nextQuery.modelId
+  delete nextQuery.modelVersionId
+  delete nextQuery.versionId
   delete nextQuery.username
   delete nextQuery.types
   delete nextQuery.sort
@@ -170,6 +190,14 @@ export function buildAssetSearchRouteQuery(
 
   if (term.length >= 2) {
     nextQuery.q = term
+  }
+
+  if (normalizedModelId) {
+    nextQuery.modelId = normalizedModelId
+  }
+
+  if (normalizedModelVersionId) {
+    nextQuery.modelVersionId = normalizedModelVersionId
   }
 
   if (normalizedUsername) {
@@ -235,6 +263,8 @@ export function makeSearchKey(
   sort: ModelSort,
   period: ModelPeriod,
   baseModels: readonly string[] = DEFAULT_BASE_MODELS,
+  modelId = '',
+  modelVersionId = '',
 ) {
   const normalizedBaseModels = Array.isArray(baseModels) ? baseModels : DEFAULT_BASE_MODELS
 
@@ -245,6 +275,8 @@ export function makeSearchKey(
     sort,
     period,
     normalizedBaseModels.join('|'),
+    parseRouteCivitaiId(modelId),
+    parseRouteCivitaiId(modelVersionId),
     cursor,
     nsfw ? 'nsfw' : 'safe',
     primaryFileOnly ? 'primary-file' : 'all-files',

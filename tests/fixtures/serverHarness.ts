@@ -346,6 +346,17 @@ export async function createServerHarness(options: HarnessOptions = {}) {
         return jsonResponse(upstream.civitaiModels)
       }
 
+      const modelMatch = url.pathname.match(/^\/api\/v1\/models\/(\d+)$/)
+      if (modelMatch) {
+        const modelId = Number.parseInt(modelMatch[1], 10)
+        const items = (upstream.civitaiModels as { items?: unknown[] })?.items
+        const model = Array.isArray(items)
+          ? items.find((item) => (item as { id?: number })?.id === modelId)
+          : null
+
+        return model ? jsonResponse(model) : jsonResponse({ error: `No model with id ${modelId}` }, 404)
+      }
+
       if (url.pathname === '/api/v1/images') {
         return jsonResponse(upstream.civitaiImages)
       }

@@ -61,8 +61,12 @@ const loading = ref(false)
 const error = ref('')
 const searched = ref(false)
 const activeQuery = ref('')
+const activeModelId = ref('')
+const activeModelVersionId = ref('')
 const activeUsername = ref('')
 const hasStoredCivitaiApiKey = ref(false)
+const modelIdQuery = ref('')
+const modelVersionIdQuery = ref('')
 const primaryFileOnly = ref(false)
 const currentPage = ref(1)
 const totalItems = ref(0)
@@ -105,8 +109,12 @@ const {
   filterByCreator,
   goToPage,
   mount: mountSearchController,
+  searchByModelId,
+  searchByModelVersionId,
 } = createAssetSearchController({
   activeQuery,
+  activeModelId,
+  activeModelVersionId,
   activeUsername,
   blacklistedModelIdSet,
   currentCursor,
@@ -115,6 +123,8 @@ const {
   hasStoredCivitaiApiKey,
   includeNsfw,
   loading,
+  modelIdQuery,
+  modelVersionIdQuery,
   models,
   nextCursor,
   primaryFileOnly,
@@ -132,7 +142,29 @@ const {
 const visibleModels = computed(() => models.value.filter((model) => !blacklistedModelIdSet.value.has(model.id)))
 const hasRenderableState = computed(() => loading.value || error.value || searched.value || visibleModels.value.length > 0)
 const hasSearchInput = computed(() => {
-  return searched.value || query.value.trim().length >= 2 || Boolean(activeUsername.value || selectedType.value)
+  return (
+    searched.value ||
+    query.value.trim().length >= 2 ||
+    Boolean(
+      modelIdQuery.value ||
+      modelVersionIdQuery.value ||
+      activeModelId.value ||
+      activeModelVersionId.value ||
+      activeUsername.value ||
+      selectedType.value,
+    )
+  )
+})
+const activeLookupLabel = computed(() => {
+  if (activeModelVersionId.value) {
+    return `version #${activeModelVersionId.value}`
+  }
+
+  if (activeModelId.value) {
+    return `model #${activeModelId.value}`
+  }
+
+  return ''
 })
 const creatorFilterLabel = computed(() => {
   return activeUsername.value ? `@${activeUsername.value}` : ''
@@ -157,6 +189,10 @@ const isUsingDefaultBaseModels = computed(() =>
 )
 const resultSummary = computed(() => {
   if (loading.value) {
+    if (activeLookupLabel.value) {
+      return `Loading Civitai ${activeLookupLabel.value}`
+    }
+
     if (activeUsername.value) {
       return `Loading @${activeUsername.value}`
     }
@@ -181,6 +217,10 @@ const resultSummary = computed(() => {
   }
 
   if (searched.value) {
+    if (activeLookupLabel.value) {
+      return `No Civitai ${activeLookupLabel.value}`
+    }
+
     if (activeUsername.value) {
       return `No models by @${activeUsername.value}`
     }
@@ -316,8 +356,12 @@ onBeforeUnmount(() => {
     error,
     searched,
     activeQuery,
+    activeModelId,
+    activeModelVersionId,
     activeUsername,
     hasStoredCivitaiApiKey,
+    modelIdQuery,
+    modelVersionIdQuery,
     primaryFileOnly,
     currentPage,
     activeImageModel,
@@ -370,6 +414,8 @@ onBeforeUnmount(() => {
     filterByCreator,
     clearCreatorFilter,
     goToPage,
+    searchByModelId,
+    searchByModelVersionId,
     openImageModal,
     closeImageModal,
   }

@@ -119,7 +119,24 @@ describe('companion server API routes', () => {
       const view = await server.request('/api/view?filename=mock-output.png&subfolder=&type=output')
       expect(view.response.status).toBe(200)
       expect(view.response.headers.get('content-type')).toBe('image/png')
+      const windowsSubfolderView = await server.request(
+        '/api/view?filename=mock-output.png&subfolder=2026-05-04%5Ctxt2img&type=output',
+      )
+      expect(windowsSubfolderView.response.status).toBe(200)
+      const proxiedWindowsSubfolderView = server.calls.find(
+        (call) =>
+          call.method === 'GET' &&
+          call.url.pathname === '/view' &&
+          call.url.searchParams.get('subfolder') === '2026-05-04/txt2img',
+      )
+      expect(proxiedWindowsSubfolderView).toBeTruthy()
       await expect(server.request('/api/view?filename=..%2Fescape.png&subfolder=&type=output')).resolves.toMatchObject({
+        response: expect.objectContaining({ status: 400 }),
+        payload: expect.objectContaining({ error: 'invalid-image-ref' }),
+      })
+      await expect(
+        server.request('/api/view?filename=mock-output.png&subfolder=C%3A%5Cescape&type=output'),
+      ).resolves.toMatchObject({
         response: expect.objectContaining({ status: 400 }),
         payload: expect.objectContaining({ error: 'invalid-image-ref' }),
       })
