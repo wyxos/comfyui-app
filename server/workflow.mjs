@@ -33,10 +33,13 @@ export function buildModelToken(modelName, fallback = 'model') {
 
   return normalized || fallback
 }
-export function buildFilenamePrefix(basePrefix, checkpoint, variant, variantCount) {
+export function getGenerationOutputCategory(inputImageName) {
+  return inputImageName ? 'img2img' : 'txt2img'
+}
+export function buildFilenamePrefix(outputCategory, checkpoint, variant, variantCount) {
   const checkpointToken = buildModelToken(checkpoint)
   const variantSuffix = variantCount > 1 ? `-${buildModelToken(variant.id, 'variant')}` : ''
-  return `${basePrefix}-${checkpointToken}${variantSuffix}`
+  return `%year%-%month%-%day%/${outputCategory}/${checkpointToken}${variantSuffix}`
 }
 export function applyLorasToModelAndClip({ prompt, nodeLabels, nextNodeId, modelRef, clipRef, loras }) {
   let activeModelRef = modelRef
@@ -219,7 +222,7 @@ export function buildSdxlWorkflow({
       class_type: 'SaveImage',
       inputs: {
         filename_prefix: buildFilenamePrefix(
-          samplerProfile.filenamePrefix,
+          getGenerationOutputCategory(inputImageName),
           checkpoint,
           variant,
           promptVariants.length,
@@ -415,7 +418,7 @@ export function buildAnimaWorkflow({
       class_type: 'SaveImage',
       inputs: {
         filename_prefix: buildFilenamePrefix(
-          samplerProfile.filenamePrefix,
+          getGenerationOutputCategory(inputImageName),
           checkpoint,
           variant,
           promptVariants.length,

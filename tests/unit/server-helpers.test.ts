@@ -443,9 +443,11 @@ describe('server helper exports', () => {
       return node.class_type === 'ImageScale' && node.inputs?.image?.[0] === invertNode?.[0]
     })
     const controlNetApplyNode = sdxlPromptEntries.find(([, node]) => node.class_type === 'ControlNetApplyAdvanced')
+    const sdxlSaveImageNode = sdxlPromptEntries.find(([, node]) => node.class_type === 'SaveImage')
     expect(lineArtNode?.[1].inputs).toMatchObject({ resolution: 768 })
     expect(invertNode?.[1].inputs.image).toEqual([lineArtNode?.[0], 0])
     expect(controlNetApplyNode?.[1].inputs.image).toEqual([scaledControlImage?.[0], 0])
+    expect(sdxlSaveImageNode?.[1].inputs.filename_prefix).toBe('%year%-%month%-%day%/txt2img/ponyxl')
     expect(sdxl.outputNodeOrder).toHaveLength(1)
 
     const anima = buildWorkflow({
@@ -464,6 +466,10 @@ describe('server helper exports', () => {
     expect(anima.family).toBe('anima')
     expect(Object.values(anima.prompt).some((node: any) => node.class_type === 'CLIPLoader')).toBe(true)
     expect(Object.values(anima.prompt).some((node: any) => node.class_type === 'LoadImage')).toBe(true)
+    expect(
+      (Object.values(anima.prompt).find((node: any) => node.class_type === 'SaveImage') as any)?.inputs
+        .filename_prefix,
+    ).toBe('%year%-%month%-%day%/img2img/animapencilxl')
   })
 
   it('routes Anima control images through the LLLite model patch node', () => {
