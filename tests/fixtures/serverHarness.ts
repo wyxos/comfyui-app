@@ -321,6 +321,10 @@ export async function createServerHarness(options: HarnessOptions = {}) {
         return jsonResponse({ ok: true })
       }
 
+      if (url.pathname === '/history' && method === 'POST') {
+        return jsonResponse({})
+      }
+
       if (url.pathname.startsWith('/history/')) {
         const promptId = decodeURIComponent(url.pathname.slice('/history/'.length))
         return jsonResponse(upstream.histories[promptId] ?? {})

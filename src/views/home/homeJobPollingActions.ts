@@ -5,7 +5,7 @@ import type { HomePreviewComputed } from './homePreviewComputed'
 import type { HomeSelectionComputed } from './homeSelectionComputed'
 import type { HomeState } from './homeState'
 import type { HomeStatusComputed } from './homeStatusComputed'
-import type { CancelQueuedJobsResponse, JobListEntry, JobListResponse, JobListTab, JobResponse } from './homeTypes'
+import type { CancelQueuedJobsResponse, DeleteJobResponse, JobListEntry, JobListResponse, JobListTab, JobResponse } from './homeTypes'
 
 type HomeJobPollingDeps = {
   apiJson: <T>(path: string, init?: RequestInit & { timeoutMs?: number }) => Promise<T>
@@ -36,6 +36,7 @@ const {
   errorMessage,
   isSubmittingGenerate,
   isCancellingQueuedJobs,
+  deletingJobEntryKeys,
   jobListTab,
   jobState,
   jobsList,
@@ -240,6 +241,50 @@ async function cancelQueuedJobs() {
   }
 }
 
+function isDeletingJobEntry(entry: JobListEntry) {
+  return deletingJobEntryKeys.value.includes(entry.key)
+}
+
+async function deleteJobEntry(entry: JobListEntry, deleteOutputs = false) {
+  if (isDeletingJobEntry(entry)) {
+    return
+  }
+
+  deletingJobEntryKeys.value = [...deletingJobEntryKeys.value, entry.key]
+  queueActionError.value = ''
+
+  try {
+    await Promise.all(
+      entry.promptIds.map((promptId) => {
+        const params = new URLSearchParams()
+        if (deleteOutputs) {
+          params.set('deleteOutputs', '1')
+        }
+
+        const query = params.toString()
+        return apiJson<DeleteJobResponse>(
+          `/api/jobs/${encodeURIComponent(promptId)}${query ? `?${query}` : ''}`,
+          { method: 'DELETE' },
+        )
+      }),
+    )
+
+    if (entry.promptIds.includes(activePromptId.value)) {
+      activePromptId.value = ''
+      activeBatchId.value = ''
+      activeBatchPromptIds.value = []
+      activeBatchCheckpoints.value = []
+      batchPreviewMode.value = false
+    }
+
+    await refreshJobs()
+  } catch (error) {
+    queueActionError.value = error instanceof Error ? error.message : 'Could not delete the selected job.'
+  } finally {
+    deletingJobEntryKeys.value = deletingJobEntryKeys.value.filter((key) => key !== entry.key)
+  }
+}
+
 async function pollJobs() {
   try {
     await refreshJobs()
@@ -300,6 +345,8 @@ return {
   selectJob,
   selectJobEntry,
   cancelQueuedJobs,
+  deleteJobEntry,
+  isDeletingJobEntry,
 }
 }
 

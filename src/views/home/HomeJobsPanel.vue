@@ -4,7 +4,9 @@ import {
   Check,
   Copy,
   FolderOpen,
+  ImageOff,
   LoaderCircle,
+  Trash2,
   XCircle,
 } from 'lucide-vue-next'
 import { computed } from 'vue'
@@ -39,11 +41,28 @@ const {
   formatElapsed,
   copyOutputPath,
   cancelQueuedJobs,
+  deleteJobEntry,
+  isDeletingJobEntry,
   openOutputParentFolder,
+  openGeneratedOutputContextMenu,
   selectJobEntry,
 } = useProvidedHomeView()
 
 const queuedJobCount = computed(() => jobListTabs.value.find((tab) => tab.value === 'queued')?.count ?? 0)
+
+function confirmDeleteJob(entry: Parameters<typeof deleteJobEntry>[0]) {
+  const label = getJobEntryPrimaryLabel(entry)
+  if (window.confirm(`Delete ${label} from companion and ComfyUI history? Generated files will be kept.`)) {
+    void deleteJobEntry(entry, false)
+  }
+}
+
+function confirmDeleteJobAndOutputs(entry: Parameters<typeof deleteJobEntry>[0]) {
+  const label = getJobEntryPrimaryLabel(entry)
+  if (window.confirm(`Delete ${label} from companion and ComfyUI history, and remove its generated image files? This cannot be undone.`)) {
+    void deleteJobEntry(entry, true)
+  }
+}
 </script>
 
 <template>
@@ -119,70 +138,114 @@ const queuedJobCount = computed(() => jobListTabs.value.find((tab) => tab.value 
                   v-if="visibleJobEntries.length"
                   class="space-y-2"
                 >
-                  <button
+                  <div
                     v-for="entry in visibleJobEntries"
                     :key="entry.key"
-                    type="button"
-                    class="w-full rounded-md border px-3 py-3 text-left transition"
-                    :class="
-                      isJobEntryActive(entry)
-                        ? 'border-secondary bg-secondary/12 text-primary-foreground'
-                        : 'border-primary-foreground/12 bg-primary-foreground/6 text-primary-foreground hover:border-accent hover:text-accent'
-                    "
-                    @click="selectJobEntry(entry)"
+                    class="relative"
                   >
-                    <div class="flex items-start justify-between gap-3">
-                      <span class="min-w-0 truncate text-sm font-semibold">
-                        {{ getJobEntryPrimaryLabel(entry) }}
-                      </span>
-                      <span class="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-foreground/62">
-                        {{ getJobEntryStateLabel(entry) }}
-                      </span>
-                    </div>
-
-                    <p class="mt-1 text-xs text-primary-foreground/62">
-                      {{ getJobEntryVariantSummary(entry) }}
-                    </p>
-
-                    <div class="mt-2 flex items-center justify-between gap-3 text-xs text-primary-foreground/72">
-                      <span class="min-w-0 truncate">{{ getJobEntrySecondaryLabel(entry) }}</span>
-                      <span class="shrink-0">{{ formatElapsed(getJobEntryElapsedMs(entry)) }}</span>
-                    </div>
-
-                    <div class="mt-2 flex items-end justify-between gap-3">
-                      <p class="min-w-0 truncate text-[11px] uppercase tracking-[0.12em] text-primary-foreground/48">
-                        {{ getJobEntryReferenceLabel(entry) }}
-                      </p>
-
-                      <div
-                        v-if="jobListTab === 'history' && getJobEntryPreviewVisibleOutputs(entry).length"
-                        data-testid="job-output-preview-stack"
-                        class="flex shrink-0 items-center -space-x-4"
-                        aria-hidden="true"
-                      >
-                        <span
-                          v-for="(output, index) in getJobEntryPreviewVisibleOutputs(entry)"
-                          :key="getJobEntryPreviewOutputKey(output, index)"
-                          class="relative h-[100px] w-[100px] overflow-hidden rounded-md border border-primary-foreground/14 bg-primary-foreground/8 ring-2 ring-primary"
-                          :style="{ zIndex: getJobEntryPreviewVisibleOutputs(entry).length - index }"
-                        >
-                          <img
-                            data-testid="job-output-preview"
-                            :src="output.url"
-                            alt=""
-                            class="h-full w-full object-cover"
-                          />
+                    <button
+                      type="button"
+                      class="w-full rounded-md border px-3 py-3 text-left transition"
+                      :class="
+                        isJobEntryActive(entry)
+                          ? 'border-secondary bg-secondary/12 text-primary-foreground'
+                          : 'border-primary-foreground/12 bg-primary-foreground/6 text-primary-foreground hover:border-accent hover:text-accent'
+                      "
+                      @click="selectJobEntry(entry)"
+                    >
+                      <div class="flex items-start justify-between gap-3">
+                        <span class="min-w-0 truncate text-sm font-semibold">
+                          {{ getJobEntryPrimaryLabel(entry) }}
                         </span>
-
                         <span
-                          v-if="getJobEntryPreviewHiddenOutputCount(entry)"
-                          class="relative z-10 inline-flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-md border border-secondary/40 bg-secondary/14 text-sm font-semibold text-secondary ring-2 ring-primary"
+                          class="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-foreground/62"
+                          :class="jobListTab === 'history' ? 'mr-20' : ''"
                         >
-                          +{{ getJobEntryPreviewHiddenOutputCount(entry) }}
+                          {{ getJobEntryStateLabel(entry) }}
                         </span>
                       </div>
+
+                      <p class="mt-1 text-xs text-primary-foreground/62">
+                        {{ getJobEntryVariantSummary(entry) }}
+                      </p>
+
+                      <div class="mt-2 flex items-center justify-between gap-3 text-xs text-primary-foreground/72">
+                        <span class="min-w-0 truncate">{{ getJobEntrySecondaryLabel(entry) }}</span>
+                        <span class="shrink-0">{{ formatElapsed(getJobEntryElapsedMs(entry)) }}</span>
+                      </div>
+
+                      <div class="mt-2 flex items-end justify-between gap-3">
+                        <p class="min-w-0 truncate text-[11px] uppercase tracking-[0.12em] text-primary-foreground/48">
+                          {{ getJobEntryReferenceLabel(entry) }}
+                        </p>
+
+                        <div
+                          v-if="jobListTab === 'history' && getJobEntryPreviewVisibleOutputs(entry).length"
+                          data-testid="job-output-preview-stack"
+                          class="flex shrink-0 items-center -space-x-4"
+                          aria-hidden="true"
+                        >
+                          <span
+                            v-for="(output, index) in getJobEntryPreviewVisibleOutputs(entry)"
+                            :key="getJobEntryPreviewOutputKey(output, index)"
+                            class="relative h-[100px] w-[100px] overflow-hidden rounded-md border border-primary-foreground/14 bg-primary-foreground/8 ring-2 ring-primary"
+                            :style="{ zIndex: getJobEntryPreviewVisibleOutputs(entry).length - index }"
+                            @contextmenu="openGeneratedOutputContextMenu($event, output, null)"
+                          >
+                            <img
+                              data-testid="job-output-preview"
+                              :src="output.url"
+                              alt=""
+                              class="h-full w-full object-cover"
+                            />
+                          </span>
+
+                          <span
+                            v-if="getJobEntryPreviewHiddenOutputCount(entry)"
+                            class="relative z-10 inline-flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-md border border-secondary/40 bg-secondary/14 text-sm font-semibold text-secondary ring-2 ring-primary"
+                          >
+                            +{{ getJobEntryPreviewHiddenOutputCount(entry) }}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+
+                    <div
+                      v-if="jobListTab === 'history'"
+                      class="absolute right-2 top-2 flex items-center gap-1"
+                    >
+                      <UiTooltip content="Delete job from companion and ComfyUI history">
+                        <button
+                          type="button"
+                          class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-destructive/40 bg-primary text-destructive shadow-sm transition hover:bg-destructive hover:text-destructive-foreground disabled:cursor-wait disabled:opacity-60"
+                          :aria-label="`Delete ${getJobEntryPrimaryLabel(entry)} from companion and ComfyUI history`"
+                          :disabled="isDeletingJobEntry(entry)"
+                          @click.stop="confirmDeleteJob(entry)"
+                        >
+                          <LoaderCircle
+                            v-if="isDeletingJobEntry(entry)"
+                            class="h-4 w-4 animate-spin"
+                          />
+                          <Trash2
+                            v-else
+                            class="h-4 w-4"
+                          />
+                        </button>
+                      </UiTooltip>
+
+                      <UiTooltip content="Delete job from history and remove generated files">
+                        <button
+                          type="button"
+                          class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-destructive/40 bg-primary text-destructive shadow-sm transition hover:bg-destructive hover:text-destructive-foreground disabled:cursor-wait disabled:opacity-60"
+                          :aria-label="`Delete ${getJobEntryPrimaryLabel(entry)} from history and remove generated files`"
+                          :disabled="isDeletingJobEntry(entry)"
+                          @click.stop="confirmDeleteJobAndOutputs(entry)"
+                        >
+                          <ImageOff class="h-4 w-4" />
+                        </button>
+                      </UiTooltip>
                     </div>
-                  </button>
+                  </div>
                 </div>
 
                 <p

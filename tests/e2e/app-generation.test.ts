@@ -3,6 +3,7 @@ import {
   createHistoryJob,
   createImageFile,
   createSizedImageFile,
+  createTransparentImageFile,
   createJobOutput,
   dropFile,
   mockClipboardReadImages,
@@ -14,6 +15,19 @@ import { FORM_STATE_STORAGE_KEY } from '../../src/views/home/homeConstants'
 import { checkpointName, loraName, sameArchitectureLoraName } from '../fixtures/mockApiData'
 
 describe('companion app e2e flows', () => {
+  function readFirstImagePixel(image: HTMLImageElement) {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1
+    canvas.height = 1
+    const context = canvas.getContext('2d')
+    if (!context) {
+      throw new Error('Could not read image pixel.')
+    }
+
+    context.drawImage(image, 0, 0, 1, 1)
+    return Array.from(context.getImageData(0, 0, 1, 1).data)
+  }
+
   it('loads mocked generation dependencies, improves a prompt, and submits generation', async () => {
       const { api, screen } = await renderCompanionApp()
 
@@ -272,7 +286,7 @@ describe('companion app e2e flows', () => {
       const outputs = Array.from({ length: 5 }, (_, index) =>
         createJobOutput(`history-output-${index + 1}.png`, index + 1),
       )
-      const { screen } = await renderCompanionApp('/', {
+      const { api, screen } = await renderCompanionApp('/', {
         jobs: [createHistoryJob(outputs)],
       })
 
@@ -291,6 +305,77 @@ describe('companion app e2e flows', () => {
         '/api/view?filename=history-output-2.png&subfolder=&type=output',
         '/api/view?filename=history-output-3.png&subfolder=&type=output',
       ])
+
+      vi.spyOn(window, 'confirm').mockReturnValue(true)
+      await screen.getByRole('button', { name: /Delete historyCheckpoint\.safetensors from history and remove generated files/ }).click()
+      await vi.waitFor(() => {
+        const deleteCall = api.calls.find((call) => call.method === 'DELETE' && call.path === '/api/jobs/history-prompt-1')
+        expect(deleteCall?.search.get('deleteOutputs')).toBe('1')
+      })
+      await expect.element(screen.getByText('No jobs submitted yet.')).toBeVisible()
+    })
+
+  it('uses generated output context menu actions as image and ControlNet inputs', async () => {
+      const { api, screen } = await renderCompanionApp('/', {
+        jobs: [createHistoryJob([createJobOutput('context-output.png', 1)])],
+        uploadInputImageNames: ['context-image-input.png', 'context-control-input.png'],
+      })
+
+      const generatedImage = () =>
+        document.querySelector<HTMLImageElement>('img[src*="context-output.png"]')
+
+      await vi.waitFor(() => {
+        expect(generatedImage()).not.toBeNull()
+      })
+
+      generatedImage()?.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 48,
+          clientY: 48,
+          button: 2,
+        }),
+      )
+      await vi.waitFor(() => {
+        expect(document.querySelector('[role="menuitem"]')).not.toBeNull()
+      })
+      ;(Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+        .find((button) => button.textContent?.includes('Use as image input')) as HTMLButtonElement).click()
+
+      await vi.waitFor(() => {
+        expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(1)
+      })
+      await expect.element(
+        screen.getByLabelText('Choose or paste input image').getByText('context-output.png'),
+      ).toBeVisible()
+
+      generatedImage()?.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 56,
+          clientY: 56,
+          button: 2,
+        }),
+      )
+      await vi.waitFor(() => {
+        expect(
+          Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).some((button) =>
+            button.textContent?.includes('Use as ControlNet input'),
+          ),
+        ).toBe(true)
+      })
+      ;(Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+        .find((button) => button.textContent?.includes('Use as ControlNet input')) as HTMLButtonElement).click()
+
+      await vi.waitFor(() => {
+        expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(2)
+      })
+      await expect.element(
+        screen.getByLabelText('Choose or paste ControlNet image').getByText('context-output.png'),
+      ).toBeVisible()
+      await expect.element(screen.getByText('mock-controlnet-preview.png')).toBeVisible()
     })
 
   it('keeps the preview input image tied to the submitted generation', async () => {
@@ -375,6 +460,39 @@ describe('companion app e2e flows', () => {
       await screen.getByRole('button', { name: /Size, seed, and CFG/ }).click()
       await expect.element(screen.getByRole('spinbutton', { name: 'Width' })).toHaveValue(777)
       await expect.element(screen.getByRole('spinbutton', { name: 'Height' })).toHaveValue(913)
+    })
+
+  it('flattens transparent input images onto the selected background color', async () => {
+      const { api, screen } = await renderCompanionApp('/', {
+        uploadInputImageNames: ['transparent-input.png'],
+      })
+
+      await screen.getByRole('button', { name: /Image.*Input image and denoise/ }).click()
+      await screen.getByRole('switch', { name: 'Flatten transparent input background' }).click()
+      const backgroundColorInput = document.querySelector<HTMLInputElement>(
+        'input[aria-label="Input image alpha background color"]',
+      )
+      expect(backgroundColorInput).not.toBeNull()
+      ;(backgroundColorInput as HTMLInputElement).value = '#00ff00'
+      backgroundColorInput?.dispatchEvent(new Event('input', { bubbles: true }))
+
+      const inputImageDropzone = document.querySelector<HTMLElement>(
+        '[aria-label="Choose or paste input image"]',
+      )
+      expect(inputImageDropzone).not.toBeNull()
+      dropFile(inputImageDropzone as HTMLElement, await createTransparentImageFile('transparent-source.png'))
+
+      await expect.element(screen.getByText('transparent-source.png')).toBeVisible()
+      await vi.waitFor(() => {
+        expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(1)
+      })
+
+      const inputPreview = document.querySelector<HTMLImageElement>('img[alt="Selected input preview"]')
+      await vi.waitFor(() => {
+        expect(inputPreview?.complete).toBe(true)
+        expect(inputPreview?.naturalWidth).toBeGreaterThan(0)
+      })
+      expect(readFirstImagePixel(inputPreview as HTMLImageElement)).toEqual([0, 255, 0, 255])
     })
 
   it('pastes clipboard images into image dropzones', async () => {

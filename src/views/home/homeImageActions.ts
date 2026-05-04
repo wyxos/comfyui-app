@@ -22,7 +22,9 @@ export function createHomeImageActions(
   deps: HomeImageActionDeps,
 ) {
 const {
+  flattenInputImageBackground,
   height,
+  inputImageBackgroundColor,
   inputImageField,
   inputImageUploadError,
   isDraggingImage,
@@ -31,6 +33,7 @@ const {
   selectedImageDisplayName,
   selectedImageFile,
   selectedImagePreviewUrl,
+  selectedImageSourceFile,
   uploadedInputImageName,
   useInputImage,
   width,
@@ -116,6 +119,92 @@ function loadImageElementDimensions(file: File) {
   })
 }
 
+function normalizeBackgroundColor(value: string) {
+  const trimmedValue = value.trim()
+  return /^#[0-9a-fA-F]{6}$/.test(trimmedValue) ? trimmedValue : '#ffffff'
+}
+
+function buildFlattenedImageName(file: File) {
+  const baseName = file.name.replace(/\.[^.]+$/, '') || 'input-image'
+  return `${baseName}-bg.png`
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob)
+      } else {
+        reject(new Error('Could not flatten the input image.'))
+      }
+    }, 'image/png')
+  })
+}
+
+function loadImageElement(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file)
+    const image = new Image()
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      resolve(image)
+    }
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('Could not read the selected image.'))
+    }
+
+    image.src = objectUrl
+  })
+}
+
+async function drawImageFileToCanvas(file: File, backgroundColor: string) {
+  const canvas = document.createElement('canvas')
+  const context = canvas.getContext('2d')
+  if (!context) {
+    throw new Error('Could not flatten the input image.')
+  }
+
+  if (typeof createImageBitmap === 'function') {
+    const bitmap = await createImageBitmap(file)
+    try {
+      canvas.width = bitmap.width
+      canvas.height = bitmap.height
+      context.fillStyle = backgroundColor
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      context.drawImage(bitmap, 0, 0)
+    } finally {
+      bitmap.close()
+    }
+  } else {
+    const image = await loadImageElement(file)
+    canvas.width = image.naturalWidth
+    canvas.height = image.naturalHeight
+    context.fillStyle = backgroundColor
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.drawImage(image, 0, 0)
+  }
+
+  return canvas
+}
+
+async function flattenImageBackground(file: File) {
+  const backgroundColor = normalizeBackgroundColor(inputImageBackgroundColor.value)
+  const canvas = await drawImageFileToCanvas(file, backgroundColor)
+  const blob = await canvasToBlob(canvas)
+
+  return new File([blob], buildFlattenedImageName(file), {
+    type: 'image/png',
+    lastModified: file.lastModified || Date.now(),
+  })
+}
+
+async function prepareSelectedImageFile(file: File) {
+  return flattenInputImageBackground.value ? flattenImageBackground(file) : file
+}
+
 async function uploadInputImage(file: File) {
   const formData = new FormData()
   formData.set('image', file)
@@ -136,7 +225,8 @@ async function uploadInputImage(file: File) {
 async function setSelectedImage(file: File | null) {
   const loadId = ++selectedImageLoadId
   revokeSelectedImagePreview()
-  selectedImageFile.value = file
+  selectedImageSourceFile.value = file
+  selectedImageFile.value = null
   selectedImageDisplayName.value = file?.name ?? null
   selectedImageDimensions.value = null
   uploadedInputImageName.value = null
@@ -145,17 +235,34 @@ async function setSelectedImage(file: File | null) {
   isUploadingInputImage.value = false
 
   if (file) {
-    selectedImagePreviewUrl.value = URL.createObjectURL(file)
+    let preparedFile: File
+    try {
+      preparedFile = await prepareSelectedImageFile(file)
+      if (loadId !== selectedImageLoadId || selectedImageSourceFile.value !== file) {
+        return
+      }
+    } catch (error) {
+      if (loadId !== selectedImageLoadId || selectedImageSourceFile.value !== file) {
+        return
+      }
+
+      inputImageUploadError.value =
+        error instanceof Error ? error.message : 'Could not prepare the selected image.'
+      return
+    }
+
+    selectedImageFile.value = preparedFile
+    selectedImagePreviewUrl.value = URL.createObjectURL(preparedFile)
 
     try {
-      const dimensions = await loadImageDimensions(file)
-      if (loadId !== selectedImageLoadId || selectedImageFile.value !== file) {
+      const dimensions = await loadImageDimensions(preparedFile)
+      if (loadId !== selectedImageLoadId || selectedImageFile.value !== preparedFile) {
         return
       }
 
       selectedImageDimensions.value = dimensions
     } catch {
-      if (loadId !== selectedImageLoadId || selectedImageFile.value !== file) {
+      if (loadId !== selectedImageLoadId || selectedImageFile.value !== preparedFile) {
         return
       }
 
@@ -165,14 +272,14 @@ async function setSelectedImage(file: File | null) {
 
     try {
       isUploadingInputImage.value = true
-      const inputImageName = await uploadInputImage(file)
-      if (loadId !== selectedImageLoadId || selectedImageFile.value !== file) {
+      const inputImageName = await uploadInputImage(preparedFile)
+      if (loadId !== selectedImageLoadId || selectedImageFile.value !== preparedFile) {
         return
       }
 
       uploadedInputImageName.value = inputImageName
     } catch (error) {
-      if (loadId !== selectedImageLoadId || selectedImageFile.value !== file) {
+      if (loadId !== selectedImageLoadId || selectedImageFile.value !== preparedFile) {
         return
       }
 
@@ -180,11 +287,20 @@ async function setSelectedImage(file: File | null) {
       inputImageUploadError.value =
         error instanceof Error ? error.message : 'Could not upload the input image.'
     } finally {
-      if (loadId === selectedImageLoadId && selectedImageFile.value === file) {
+      if (loadId === selectedImageLoadId && selectedImageFile.value === preparedFile) {
         isUploadingInputImage.value = false
       }
     }
   }
+}
+
+async function reprocessSelectedImageBackground() {
+  const sourceFile = selectedImageSourceFile.value
+  if (!sourceFile) {
+    return
+  }
+
+  await setSelectedImage(sourceFile)
 }
 
 function swapSizeValues() {
@@ -363,6 +479,7 @@ return {
   loadImageDimensions,
   uploadInputImage,
   setSelectedImage,
+  reprocessSelectedImageBackground,
   swapSizeValues,
   applySourceImageResolution,
   applyControlNetOutputResolution,

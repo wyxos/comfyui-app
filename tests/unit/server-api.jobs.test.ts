@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { writeFile } from 'node:fs/promises'
+import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { describe, expect, it, vi } from 'vitest'
 import { useServerHarness } from './serverApiTestUtils'
 
@@ -211,6 +211,30 @@ describe('companion server API routes', () => {
         }),
       })
 
+      const generatedOutputDir = join(server.outputDir, '2026-05-04', 'txt2img')
+      const generatedOutputPath = join(generatedOutputDir, 'mock-output.png')
+      await mkdir(generatedOutputDir, { recursive: true })
+      await writeFile(generatedOutputPath, 'generated output image', 'utf8')
+      await expect(
+        server.request('/api/jobs/prompt-3?deleteOutputs=1', { method: 'DELETE' }),
+      ).resolves.toMatchObject({
+        payload: expect.objectContaining({
+          ok: true,
+          promptId: 'prompt-3',
+          comfyHistoryDeleted: true,
+          deletedOutputs: expect.objectContaining({
+            requested: 1,
+            deleted: [generatedOutputPath],
+          }),
+        }),
+      })
+      expect(
+        server.calls.find((call) => call.method === 'POST' && call.url.pathname === '/history')?.body,
+      ).toEqual({ delete: ['prompt-3'] })
+      await expect(stat(generatedOutputPath)).rejects.toMatchObject({ code: 'ENOENT' })
+      const jobsAfterDelete = await server.request('/api/jobs')
+      expect((jobsAfterDelete.payload.jobs as Array<{ promptId: string }>).some((job) => job.promptId === 'prompt-3')).toBe(false)
+
       const failedGenerate = await server.json('POST', '/api/generate', {
         prompt: 'failed portrait',
         checkpoint: 'waiIllustriousSDXL_v160.safetensors',
@@ -235,6 +259,53 @@ describe('companion server API routes', () => {
           queue: expect.objectContaining({ externalPending: 1 }),
         }),
       })
+    })
+
+  it('keeps local history and outputs when ComfyUI history deletion fails', async () => {
+      const server = await setupHarness({
+        upstream: {
+          failures: {
+            'POST /history': { status: 500, payload: { error: 'history unavailable' } },
+          },
+        },
+      })
+
+      await server.json('POST', '/api/generate', {
+        prompt: 'complete portrait',
+        checkpoint: 'waiIllustriousSDXL_v160.safetensors',
+      })
+      server.upstream.histories['prompt-1'] = {
+        'prompt-1': {
+          status: { status_str: 'success' },
+          outputs: {
+            9: {
+              images: [{ filename: 'mock-output.png', subfolder: '2026-05-04/txt2img', type: 'output' }],
+            },
+          },
+        },
+      }
+
+      await expect(server.request('/api/jobs/prompt-1')).resolves.toMatchObject({
+        payload: expect.objectContaining({ ok: true, state: 'complete' }),
+      })
+
+      const generatedOutputDir = join(server.outputDir, '2026-05-04', 'txt2img')
+      const generatedOutputPath = join(generatedOutputDir, 'mock-output.png')
+      await mkdir(generatedOutputDir, { recursive: true })
+      await writeFile(generatedOutputPath, 'generated output image', 'utf8')
+
+      await expect(
+        server.request('/api/jobs/prompt-1?deleteOutputs=1', { method: 'DELETE' }),
+      ).resolves.toMatchObject({
+        response: expect.objectContaining({ status: 502 }),
+        payload: expect.objectContaining({ error: 'comfyui-history-delete-failed' }),
+      })
+      await expect(stat(generatedOutputPath)).resolves.toBeDefined()
+
+      const jobsAfterFailedDelete = await server.request('/api/jobs')
+      expect(
+        (jobsAfterFailedDelete.payload.jobs as Array<{ promptId: string }>).some((job) => job.promptId === 'prompt-1'),
+      ).toBe(true)
     })
 
   it('does not turn LoRA trigger words into an improved prompt variant', async () => {

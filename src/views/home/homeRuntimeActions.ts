@@ -55,10 +55,12 @@ const {
   defaultOllamaModel,
   detailLine,
   errorMessage,
+  flattenInputImageBackground,
   formTab,
   height,
   imageDenoise,
   improvedPrompt,
+  inputImageBackgroundColor,
   inputImageUploadError,
   isImprovingPrompt,
   isResetDialogOpen,
@@ -215,6 +217,8 @@ function resetForm() {
   submissionError.value = ''
   inputImageUploadError.value = ''
   useInputImage.value = false
+  flattenInputImageBackground.value = false
+  inputImageBackgroundColor.value = '#ffffff'
   formTab.value = 'assets'
   clearSelectedImage()
   clearControlNetInstances()

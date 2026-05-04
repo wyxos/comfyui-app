@@ -206,6 +206,13 @@ export type JobOutput = {
   isImproved: boolean
 }
 
+export type GeneratedOutputContextMenu = {
+  x: number
+  y: number
+  output: JobOutput
+  checkpointName: string | null
+}
+
 export type InputImageSnapshot = {
   name: string
   url: string
@@ -310,6 +317,19 @@ export type CancelQueuedJobsResponse = {
   message?: string
 }
 
+export type DeleteJobResponse = {
+  ok: boolean
+  promptId?: string
+  comfyHistoryDeleted?: boolean
+  deletedOutputs?: {
+    requested: number
+    deleted: string[]
+    missing: string[]
+    failed: Array<{ path: string; message: string }>
+  } | null
+  message?: string
+}
+
 export type JobListTab = 'running' | 'queued' | 'history'
 export type FormTab = 'assets' | 'prompt' | 'config' | 'image'
 export type PromptField = 'prompt' | 'negativePrompt'
@@ -385,6 +405,8 @@ export type PersistedFormState = {
   maintainAspectRatio?: boolean
   llmInstruction: string
   useInputImage: boolean
+  flattenInputImageBackground?: boolean
+  inputImageBackgroundColor?: string
   inputImageName: string
   inputImageDisplayName: string
   inputImageWidth: number | null

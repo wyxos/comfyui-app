@@ -1,9 +1,10 @@
+import { unlink } from 'node:fs/promises'
 import { jobs, outputTypes, runtimeAdapters } from '../config.mjs'
 import { readFormDataBody, readJsonBody, sendError, sendJson } from '../http.mjs'
 import { comfyFetchBinary, comfyFetchJson, comfyPost } from '../comfy-client.mjs'
 import { buildOutputFileMeta, getComfyOutputDir, isFileLike, sanitizeFilename, sanitizeSubfolder, storeInputImageFile } from '../model-paths.mjs'
 import { isJobTerminalState, markJob, serializeJob } from '../job-state.mjs'
-import { ensureJobsLoaded } from '../job-store.mjs'
+import { deletePersistedJob, ensureJobsLoaded } from '../job-store.mjs'
 import { buildQueueSummary, compareJobsForResponse, getQueueSnapshot, syncAllJobs, syncJob } from '../queue-state.mjs'
 
 export async function handleJobsList(response) {
@@ -217,6 +218,95 @@ export async function handleCancelQueuedJobs(response) {
       error.payload ?? error.message,
     )
   }
+}
+
+async function deleteGeneratedOutputFiles(job) {
+  const outputPaths = new Map()
+  for (const image of Array.isArray(job.outputs) ? job.outputs : []) {
+    if (image?.type !== 'output' || !image.filename) {
+      continue
+    }
+
+    try {
+      const fileMeta = await buildOutputFileMeta(image)
+      outputPaths.set(fileMeta.fullPath, fileMeta.fullPath)
+    } catch {}
+  }
+
+  const deleted = []
+  const missing = []
+  const failed = []
+  for (const fullPath of outputPaths.values()) {
+    try {
+      await unlink(fullPath)
+      deleted.push(fullPath)
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        missing.push(fullPath)
+      } else {
+        failed.push({
+          path: fullPath,
+          message: error instanceof Error ? error.message : 'Could not delete generated output.',
+        })
+      }
+    }
+  }
+
+  return {
+    requested: outputPaths.size,
+    deleted,
+    missing,
+    failed,
+  }
+}
+
+export async function handleDeleteJob(promptId, url, response) {
+  const normalizedPromptId = typeof promptId === 'string' ? decodeURIComponent(promptId) : ''
+  if (!normalizedPromptId) {
+    return sendError(response, 400, 'missing-job-id', 'Prompt id is required.')
+  }
+
+  ensureJobsLoaded()
+  const job = jobs.get(normalizedPromptId)
+  if (!job) {
+    return sendError(response, 404, 'unknown-job-id', 'The selected job is not known to the companion app.')
+  }
+
+  if (!isJobTerminalState(job.state)) {
+    return sendError(
+      response,
+      409,
+      'job-not-in-history',
+      'Only completed, failed, or cancelled history jobs can be deleted.',
+    )
+  }
+
+  const shouldDeleteOutputs = ['1', 'true', 'yes'].includes(
+    (url.searchParams.get('deleteOutputs') ?? '').toLowerCase(),
+  )
+
+  try {
+    await comfyPost('/history', { delete: [normalizedPromptId] })
+  } catch (error) {
+    return sendError(
+      response,
+      502,
+      'comfyui-history-delete-failed',
+      'Could not delete the job from ComfyUI history.',
+      error.payload ?? error.message,
+    )
+  }
+
+  const outputs = shouldDeleteOutputs ? await deleteGeneratedOutputFiles(job) : null
+  jobs.delete(normalizedPromptId)
+  deletePersistedJob(normalizedPromptId)
+
+  return sendJson(response, 200, {
+    ok: true,
+    promptId: normalizedPromptId,
+    comfyHistoryDeleted: true,
+    deletedOutputs: outputs,
+  })
 }
 
 export async function handleOpenParentFolder(request, response) {

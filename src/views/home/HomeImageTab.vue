@@ -15,6 +15,8 @@ const {
   selectedImagePreviewUrl,
   selectedImageDimensions,
   useInputImage,
+  flattenInputImageBackground,
+  inputImageBackgroundColor,
   isDraggingImage,
   isUploadingInputImage,
   inputImageUploadError,
@@ -63,6 +65,34 @@ onBeforeUnmount(() => {
               <div class="flex items-center justify-between gap-3">
                 <span class="field-label">Input image</span>
                 <div class="flex items-center gap-2">
+                  <span class="text-xs font-medium text-muted-foreground">
+                    Alpha bg
+                  </span>
+                  <input
+                    v-model="inputImageBackgroundColor"
+                    type="color"
+                    aria-label="Input image alpha background color"
+                    class="h-8 w-8 cursor-pointer rounded-md border border-primary-foreground/12 bg-primary p-1 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="!flattenInputImageBackground"
+                  />
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-label="Flatten transparent input background"
+                    :aria-checked="flattenInputImageBackground"
+                    class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-ring/25"
+                    :class="
+                      flattenInputImageBackground
+                        ? 'border-secondary bg-secondary'
+                        : 'border-primary-foreground/12 bg-primary-foreground/8 hover:border-accent'
+                    "
+                    @click="flattenInputImageBackground = !flattenInputImageBackground"
+                  >
+                    <span
+                      class="inline-block h-4 w-4 rounded-full bg-primary-foreground shadow-sm transition-transform"
+                      :class="flattenInputImageBackground ? 'translate-x-5' : 'translate-x-1'"
+                    />
+                  </button>
                   <span
                     class="text-xs font-medium"
                     :class="shouldUseInputImage ? 'text-secondary' : 'text-muted-foreground'"
@@ -133,7 +163,6 @@ onBeforeUnmount(() => {
                   </div>
 
                   <div
-                    v-if="hasInputImage"
                     class="absolute right-3 top-3 z-10 flex items-center gap-2"
                   >
                     <UiTooltip content="Paste image from clipboard">
@@ -149,7 +178,7 @@ onBeforeUnmount(() => {
                     </UiTooltip>
 
                     <UiTooltip
-                      v-if="selectedImageDimensions"
+                      v-if="hasInputImage && selectedImageDimensions"
                       :content="sourceImageDimensionLabel"
                     >
                       <button
@@ -162,7 +191,10 @@ onBeforeUnmount(() => {
                       </button>
                     </UiTooltip>
 
-                    <UiTooltip content="Clear image">
+                    <UiTooltip
+                      v-if="hasInputImage"
+                      content="Clear image"
+                    >
                       <button
                         type="button"
                         aria-label="Clear image"
@@ -175,7 +207,7 @@ onBeforeUnmount(() => {
                   </div>
 
                   <div
-                    v-else
+                    v-if="!hasInputImage"
                     class="flex h-full w-full flex-col items-center justify-center gap-5 px-6 text-center text-card-foreground"
                   >
                     <div class="rounded-md border border-primary-foreground/12 bg-primary px-3 py-3 text-primary-foreground/82">
@@ -189,7 +221,7 @@ onBeforeUnmount(() => {
                       <button
                         type="button"
                         class="mx-auto inline-flex h-9 items-center gap-2 rounded-md border border-secondary/35 bg-secondary px-3 text-xs font-semibold uppercase tracking-[0.1em] text-secondary-foreground shadow-sm transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60"
-                        aria-label="Paste input image from clipboard"
+                        aria-label="Paste empty input image from clipboard"
                         :disabled="isUploadingInputImage"
                         @click.stop="pasteImageFromClipboard"
                       >

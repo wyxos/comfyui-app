@@ -6,6 +6,7 @@ import type {
   ControlNetOption,
   ControlNetPreprocessorOption,
   FormTab,
+  GeneratedOutputContextMenu,
   InputImageSnapshot,
   JobOutput,
   JobListTab,
@@ -62,11 +63,14 @@ const promptImprovementNotice = ref('')
 const imageDenoise = ref('')
 const inputImageField = ref<HTMLInputElement | null>(null)
 const selectedImageFile = ref<File | null>(null)
+const selectedImageSourceFile = ref<File | null>(null)
 const selectedImageDisplayName = ref<string | null>(null)
 const selectedImagePreviewUrl = ref<string | null>(null)
 const selectedImageDimensions = ref<{ width: number; height: number } | null>(null)
 const uploadedInputImageName = ref<string | null>(null)
 const useInputImage = ref(false)
+const flattenInputImageBackground = ref(false)
+const inputImageBackgroundColor = ref('#ffffff')
 const isDraggingImage = ref(false)
 const isUploadingInputImage = ref(false)
 const inputImageUploadError = ref('')
@@ -123,6 +127,10 @@ const previewModalViewport = ref<HTMLElement | null>(null)
 const previewModalPanField = ref<HTMLElement | null>(null)
 const promptImprovementStartedAt = ref<number | null>(null)
 const promptImprovementElapsedMs = ref(0)
+const generatedOutputContextMenu = ref<GeneratedOutputContextMenu | null>(null)
+const generatedOutputActionError = ref('')
+const isApplyingGeneratedOutput = ref(false)
+const deletingJobEntryKeys = ref<string[]>([])
 
 const controlNetDragDepths = new Map<string, number>()
 const controlNetImageLoadIds = new Map<string, string>()
@@ -162,11 +170,14 @@ return {
   imageDenoise,
   inputImageField,
   selectedImageFile,
+  selectedImageSourceFile,
   selectedImageDisplayName,
   selectedImagePreviewUrl,
   selectedImageDimensions,
   uploadedInputImageName,
   useInputImage,
+  flattenInputImageBackground,
+  inputImageBackgroundColor,
   isDraggingImage,
   isUploadingInputImage,
   inputImageUploadError,
@@ -221,6 +232,10 @@ return {
   previewModalPanField,
   promptImprovementStartedAt,
   promptImprovementElapsedMs,
+  generatedOutputContextMenu,
+  generatedOutputActionError,
+  isApplyingGeneratedOutput,
+  deletingJobEntryKeys,
   controlNetDragDepths,
   controlNetImageLoadIds,
 }

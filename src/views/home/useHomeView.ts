@@ -41,7 +41,7 @@ import { createHomeRuntimeActions } from './homeRuntimeActions'
 import { createHomeSelectionComputed } from './homeSelectionComputed'
 import { createHomeState } from './homeState'
 import { createHomeStatusComputed } from './homeStatusComputed'
-import type { FormTab } from './homeTypes'
+import type { FormTab, JobOutput } from './homeTypes'
 import { isVideoPreview } from './homeValueHelpers'
 
 export type { HomeCheckpointEntry, HomeLoraSelection } from './homeTypes'
@@ -201,6 +201,89 @@ const previewModalActions = createHomePreviewModalActions({
   statusLine: state.statusLine,
 })
 
+function openGeneratedOutputContextMenu(event: MouseEvent, output: JobOutput, checkpointName: string | null = null) {
+  if (!output?.url) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  state.generatedOutputActionError.value = ''
+  const menuWidth = 240
+  const menuHeight = 120
+  state.generatedOutputContextMenu.value = {
+    x: Math.min(event.clientX, Math.max(0, window.innerWidth - menuWidth - 8)),
+    y: Math.min(event.clientY, Math.max(0, window.innerHeight - menuHeight - 8)),
+    output,
+    checkpointName,
+  }
+}
+
+function closeGeneratedOutputContextMenu(force = false) {
+  if (state.isApplyingGeneratedOutput.value && !force) {
+    return
+  }
+
+  state.generatedOutputContextMenu.value = null
+  state.generatedOutputActionError.value = ''
+}
+
+async function fetchGeneratedOutputFile(output: JobOutput) {
+  const response = await fetch(output.url)
+  if (!response.ok) {
+    throw new Error('Could not load the generated image.')
+  }
+
+  const blob = await response.blob()
+  const mimeType = blob.type || 'image/png'
+  return new File([blob], output.filename || 'generated-output.png', {
+    type: mimeType,
+    lastModified: Date.now(),
+  })
+}
+
+async function useGeneratedOutputAsImageInput() {
+  const menu = state.generatedOutputContextMenu.value
+  if (!menu || state.isApplyingGeneratedOutput.value) {
+    return
+  }
+
+  state.generatedOutputActionError.value = ''
+  state.isApplyingGeneratedOutput.value = true
+  try {
+    const file = await fetchGeneratedOutputFile(menu.output)
+    state.formTab.value = 'image'
+    await imageActions.setSelectedImage(file)
+    closeGeneratedOutputContextMenu(true)
+  } catch (error) {
+    state.generatedOutputActionError.value =
+      error instanceof Error ? error.message : 'Could not use the generated image as image input.'
+  } finally {
+    state.isApplyingGeneratedOutput.value = false
+  }
+}
+
+async function useGeneratedOutputAsControlNet() {
+  const menu = state.generatedOutputContextMenu.value
+  if (!menu || state.isApplyingGeneratedOutput.value) {
+    return
+  }
+
+  state.generatedOutputActionError.value = ''
+  state.isApplyingGeneratedOutput.value = true
+  try {
+    const file = await fetchGeneratedOutputFile(menu.output)
+    state.formTab.value = 'assets'
+    await controlNetActions.addControlNetImageFromFile(file, menu.checkpointName ?? '')
+    closeGeneratedOutputContextMenu(true)
+  } catch (error) {
+    state.generatedOutputActionError.value =
+      error instanceof Error ? error.message : 'Could not use the generated image as ControlNet input.'
+  } finally {
+    state.isApplyingGeneratedOutput.value = false
+  }
+}
+
 let shouldSkipNextControlNetOutputResolutionSync = false
 function applySourceImageSizeValues(nextWidth: string | number, nextHeight: string | number) {
   shouldSkipNextControlNetOutputResolutionSync = true
@@ -230,8 +313,10 @@ watch(() => [status.sizeValidation.value.width, status.sizeValidation.value.heig
 
 watch(() => ({
   cfg: state.cfg.value,
+  flattenInputImageBackground: state.flattenInputImageBackground.value,
   height: state.height.value,
   imageDenoise: state.imageDenoise.value,
+  inputImageBackgroundColor: state.inputImageBackgroundColor.value,
   inputImage: state.uploadedInputImageName.value,
   llmInstruction: state.llmInstruction.value,
   negativePrompt: selection.compiledNegativePrompt.value,
@@ -244,6 +329,13 @@ watch(() => ({
   useInputImage: state.useInputImage.value,
   width: state.width.value,
 }), persistence.persistFormState, { deep: true })
+
+watch(() => [
+  state.flattenInputImageBackground.value,
+  state.inputImageBackgroundColor.value,
+] as const, () => {
+  void imageActions.reprocessSelectedImageBackground()
+})
 
 watch(() => ({
   checkpointName: selection.promptImproverCheckpointName.value,
@@ -352,6 +444,10 @@ return {
   ...pollingActions,
   ...generationActions,
   ...previewModalActions,
+  openGeneratedOutputContextMenu,
+  closeGeneratedOutputContextMenu,
+  useGeneratedOutputAsImageInput,
+  useGeneratedOutputAsControlNet,
   formTabs: FORM_TABS,
   promptSectionDefinitions: PROMPT_SECTION_DEFINITIONS,
   getJobEntryElapsedMs,

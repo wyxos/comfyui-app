@@ -33,6 +33,7 @@ const {
   handlePreviewModalPointerDown,
   handlePreviewModalPointerMove,
   stopPreviewModalPointerTracking,
+  openGeneratedOutputContextMenu,
 } = useProvidedHomeView()
 
 void [previewModalViewport, previewModalPanField]
@@ -159,6 +160,7 @@ void [previewModalViewport, previewModalPanField]
               class="block max-h-[100vh] max-w-[100vw] select-none object-contain transition-transform duration-150 ease-out"
               :style="previewModalImageStyle"
               draggable="false"
+              @contextmenu="openGeneratedOutputContextMenu($event, selectedPreviewOutput, selectedPreviewItem?.checkpointName ?? null)"
             />
           </div>
         </div>
@@ -188,6 +190,7 @@ void [previewModalViewport, previewModalPanField]
                   :alt="entry.item.variantLabel ?? `Preview ${entry.index + 1}`"
                   class="h-full w-full object-cover"
                   draggable="false"
+                  @contextmenu="openGeneratedOutputContextMenu($event, entry.item.output, entry.item.checkpointName)"
                 />
               </div>
 

@@ -30,6 +30,7 @@ import { handleControlNetPreview, handleGenerate, handleImprovePrompt, handleMod
 import {
   handleCancelJob,
   handleCancelQueuedJobs,
+  handleDeleteJob,
   handleInputImageUpload,
   handleJobStatus,
   handleJobsList,
@@ -183,6 +184,11 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
   if (url.pathname.startsWith('/api/jobs/') && url.pathname.endsWith('/cancel') && request.method === 'POST') {
     const promptId = url.pathname.slice('/api/jobs/'.length, -'/cancel'.length)
     return handleCancelJob(promptId, response)
+  }
+
+  if (url.pathname.startsWith('/api/jobs/') && request.method === 'DELETE') {
+    const promptId = url.pathname.slice('/api/jobs/'.length)
+    return handleDeleteJob(promptId, url, response)
   }
 
   if (url.pathname.startsWith('/api/jobs/') && request.method === 'GET') {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import HomeGenerationForm from './home/HomeGenerationForm.vue'
+import HomeGeneratedOutputContextMenu from './home/HomeGeneratedOutputContextMenu.vue'
 import HomeJobsPanel from './home/HomeJobsPanel.vue'
 import HomePreviewModal from './home/HomePreviewModal.vue'
 import HomePreviewPanel from './home/HomePreviewPanel.vue'
@@ -21,6 +22,7 @@ provideHomeView(view)
 
     <HomeResetDialog />
     <HomePreviewModal />
+    <HomeGeneratedOutputContextMenu />
   </main>
 </template>
 

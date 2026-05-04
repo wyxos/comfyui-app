@@ -191,6 +191,29 @@ function addControlNetInstance(checkpointName = '', model = '') {
   setControlNetCollection([...getControlNetCollection(checkpointName), nextSelection], checkpointName)
 }
 
+async function addControlNetImageFromFile(file: File, checkpointName = '') {
+  const targetCheckpoint =
+    getCheckpointSelection(checkpointName) ?? selectedCheckpoints.value[0] ?? null
+  if (!targetCheckpoint) {
+    throw new Error('Select a checkpoint before using an output as ControlNet input.')
+  }
+
+  const selectedModels = new Set(
+    getControlNetCollection(targetCheckpoint.name)
+      .map((controlNet) => controlNet.model)
+      .filter(Boolean),
+  )
+  const model = controlNets.value.find((controlNet) => !selectedModels.has(controlNet.name))?.name ?? ''
+  const nextSelection = buildControlNetSelection({ model })
+  targetCheckpoint.enabled = true
+  setControlNetCollection(
+    [...getControlNetCollection(targetCheckpoint.name), nextSelection],
+    targetCheckpoint.name,
+  )
+  await setControlNetImage(nextSelection.id, file, targetCheckpoint.name)
+  return nextSelection
+}
+
 function removeControlNetInstance(id: string, checkpointName = '') {
   revokeControlNetPreview(getControlNetSelection(id, checkpointName))
   const scopedId = controlNetScopeKey(id, checkpointName)
@@ -731,6 +754,7 @@ return {
   clearControlNetPreviewCopyTimers,
   syncOutputDerivedControlNetResolutions,
   addControlNetInstance,
+  addControlNetImageFromFile,
   removeControlNetInstance,
   setControlNetEnabled,
   setControlNetModel,

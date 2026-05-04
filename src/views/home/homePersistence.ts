@@ -60,9 +60,11 @@ const {
   aspectRatioScale,
   cfg,
   defaultLoraStrength,
+  flattenInputImageBackground,
   height,
   imageDenoise,
   improvedPrompt,
+  inputImageBackgroundColor,
   llmInstruction,
   maintainAspectRatio,
   negativePrompt,
@@ -159,6 +161,12 @@ function normalizePersistedPromptSections(value: unknown) {
   return sections
 }
 
+function normalizePersistedHexColor(value: unknown) {
+  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value.trim())
+    ? value.trim().toLowerCase()
+    : '#ffffff'
+}
+
 function readPersistedFormState(): Partial<PersistedFormState> {
   if (typeof window === 'undefined') {
     return {}
@@ -230,6 +238,10 @@ function readPersistedFormState(): Partial<PersistedFormState> {
       maintainAspectRatio:
         typeof parsed.maintainAspectRatio === 'boolean' ? parsed.maintainAspectRatio : false,
       llmInstruction: typeof parsed.llmInstruction === 'string' ? parsed.llmInstruction : '',
+      flattenInputImageBackground: typeof parsed.flattenInputImageBackground === 'boolean'
+        ? parsed.flattenInputImageBackground
+        : false,
+      inputImageBackgroundColor: normalizePersistedHexColor(parsed.inputImageBackgroundColor),
       useInputImage:
         typeof parsed.useInputImage === 'boolean'
           ? parsed.useInputImage
@@ -292,6 +304,8 @@ function persistFormState() {
     usePromptImprover: usePromptImprover.value,
     maintainAspectRatio: maintainAspectRatio.value,
     llmInstruction: llmInstruction.value,
+    flattenInputImageBackground: flattenInputImageBackground.value,
+    inputImageBackgroundColor: normalizePersistedHexColor(inputImageBackgroundColor.value),
     useInputImage: useInputImage.value,
     inputImageName: uploadedInputImageName.value ?? '',
     inputImageDisplayName: selectedImageDisplayName.value ?? '',
@@ -352,6 +366,8 @@ function restoreFormState() {
     captureLockedAspectRatioFromCurrentSize()
   }
   llmInstruction.value = persisted.llmInstruction ?? ''
+  flattenInputImageBackground.value = Boolean(persisted.flattenInputImageBackground)
+  inputImageBackgroundColor.value = normalizePersistedHexColor(persisted.inputImageBackgroundColor)
   uploadedInputImageName.value = persisted.inputImageName ? persisted.inputImageName : null
   useInputImage.value =
     typeof persisted.useInputImage === 'boolean'

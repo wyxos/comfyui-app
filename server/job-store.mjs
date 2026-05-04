@@ -102,6 +102,15 @@ export function persistJob(job) {
   )
 }
 
+export function deletePersistedJob(promptId) {
+  if (!promptId) {
+    return
+  }
+
+  const db = openJobDatabase()
+  db.prepare('DELETE FROM jobs WHERE prompt_id = ?').run(promptId)
+}
+
 export function resetJobStoreRuntimeState({ clearMemory = true } = {}) {
   if (jobDatabase) {
     jobDatabase.close()

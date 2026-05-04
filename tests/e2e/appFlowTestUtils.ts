@@ -87,6 +87,24 @@ export async function createSizedImageFile(name: string, width: number, height: 
   return new File([blob], name, { type: 'image/png' })
 }
 
+export async function createTransparentImageFile(name: string) {
+  const canvas = document.createElement('canvas')
+  canvas.width = 1
+  canvas.height = 1
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((nextBlob) => {
+      if (nextBlob) {
+        resolve(nextBlob)
+      } else {
+        reject(new Error('Could not create transparent test image.'))
+      }
+    }, 'image/png')
+  })
+
+  return new File([blob], name, { type: 'image/png' })
+}
+
 export function uploadFile(input: HTMLInputElement, file: File) {
   const dataTransfer = new DataTransfer()
   dataTransfer.items.add(file)

@@ -28,6 +28,8 @@ const {
   imageDenoise,
   improvedPrompt,
   inputImageUploadError,
+  flattenInputImageBackground,
+  inputImageBackgroundColor,
   jobsList,
   loras,
   loadingCheckpoints,
@@ -254,6 +256,8 @@ const canResetForm = computed(() => {
       maintainAspectRatio.value ||
       llmInstruction.value ||
       useInputImage.value ||
+      flattenInputImageBackground.value ||
+      inputImageBackgroundColor.value !== '#ffffff' ||
       selectedImageFile.value ||
       selectedImageDisplayName.value ||
       uploadedInputImageName.value ||

@@ -27,6 +27,7 @@ const {
   shouldShowPreviewPlaceholderIndeterminate,
   getPreviewPlaceholderBarClass,
   openPreviewModal,
+  openGeneratedOutputContextMenu,
 } = useProvidedHomeView()
 </script>
 
@@ -48,6 +49,7 @@ const {
                       type="button"
                       class="flex h-full w-full cursor-zoom-in items-center justify-center"
                       @click="openPreviewModal(index)"
+                      @contextmenu="openGeneratedOutputContextMenu($event, item.output, item.checkpointName)"
                     >
                       <img
                         :src="item.output.url"
@@ -72,6 +74,7 @@ const {
                   type="button"
                   class="flex h-full w-full cursor-zoom-in items-center justify-center"
                   @click="openPreviewModal()"
+                  @contextmenu="openGeneratedOutputContextMenu($event, selectedPreviewOutput, selectedPreviewItem?.checkpointName ?? null)"
                 >
                   <img
                     :src="imageUrl ?? ''"
@@ -243,6 +246,7 @@ const {
                       : 'border-primary-foreground/12 hover:border-accent hover:text-accent'
                   "
                   @click="activePreviewIndex = index"
+                  @contextmenu="item.output && openGeneratedOutputContextMenu($event, item.output, item.checkpointName)"
                 >
                   <div
                     v-if="item.output"

@@ -16,6 +16,17 @@ import type { FetchCall, MockApiOptions, MockDownload, MockJob, MockModel } from
 
 export { createMockDownload, createMockJob, createMockModel } from './mockApiData'
 
+const onePixelPng =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lp2wngAAAABJRU5ErkJggg=='
+
+function mockImageResponse() {
+  const bytes = Uint8Array.from(atob(onePixelPng), (char) => char.charCodeAt(0))
+  return new Response(bytes, {
+    status: 200,
+    headers: { 'Content-Type': 'image/png' },
+  })
+}
+
 export function installMockApi(options: MockApiOptions = {}) {
   let civitaiConfigured = options.civitaiConfigured ?? false
   let includeNsfwDefault = options.includeNsfwDefault ?? false
@@ -132,6 +143,27 @@ export function installMockApi(options: MockApiOptions = {}) {
     if (jobStatusMatch && method === 'GET') {
       const job = jobs.find((item) => item.promptId === decodeURIComponent(jobStatusMatch[1]))
       return job ? jsonResponse(job) : jsonResponse({ ok: false, message: 'Unknown job.' }, 404)
+    }
+
+    if (jobStatusMatch && method === 'DELETE') {
+      const promptId = decodeURIComponent(jobStatusMatch[1])
+      const job = jobs.find((item) => item.promptId === promptId)
+      jobs = jobs.filter((item) => item.promptId !== promptId)
+      return job
+        ? jsonResponse({
+            ok: true,
+            promptId,
+            comfyHistoryDeleted: true,
+            deletedOutputs: url.searchParams.get('deleteOutputs')
+              ? {
+                  requested: job.outputs.length,
+                  deleted: job.outputs.map((output) => output.fullPath).filter(Boolean),
+                  missing: [],
+                  failed: [],
+                }
+              : null,
+          })
+        : jsonResponse({ ok: false, message: 'Unknown job.' }, 404)
     }
 
     const cancelJobMatch = url.pathname.match(/^\/api\/jobs\/([^/]+)\/cancel$/)
@@ -319,10 +351,7 @@ export function installMockApi(options: MockApiOptions = {}) {
     }
 
     if (url.pathname === '/api/view' && method === 'GET') {
-      return new Response('', {
-        status: 200,
-        headers: { 'Content-Type': 'image/png' },
-      })
+      return mockImageResponse()
     }
 
     return jsonResponse({ ok: false, message: `Unhandled mock endpoint: ${method} ${url.pathname}` }, 500)

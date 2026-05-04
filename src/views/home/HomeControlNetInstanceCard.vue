@@ -319,7 +319,6 @@ onBeforeUnmount(() => {
         />
 
         <div
-          v-if="controlNet.inputImagePreviewUrl"
           class="absolute right-3 top-3 z-10 flex items-center gap-2"
         >
           <UiTooltip content="Paste control image from clipboard">
@@ -335,7 +334,7 @@ onBeforeUnmount(() => {
           </UiTooltip>
 
           <UiTooltip
-            v-if="dimensionLabel"
+            v-if="controlNet.inputImagePreviewUrl && dimensionLabel"
             :content="`Use source image resolution (${dimensionLabel})`"
           >
             <button
@@ -348,7 +347,10 @@ onBeforeUnmount(() => {
             </button>
           </UiTooltip>
 
-          <UiTooltip :content="`Set Control res from output size (${controlNetOutputResolutionLabel})`">
+          <UiTooltip
+            v-if="controlNet.inputImagePreviewUrl"
+            :content="`Set Control res from output size (${controlNetOutputResolutionLabel})`"
+          >
             <button
               type="button"
               aria-label="Use output size for ControlNet resolution"
@@ -359,7 +361,10 @@ onBeforeUnmount(() => {
             </button>
           </UiTooltip>
 
-          <UiTooltip content="Clear ControlNet image">
+          <UiTooltip
+            v-if="controlNet.inputImagePreviewUrl"
+            content="Clear ControlNet image"
+          >
             <button
               type="button"
               aria-label="Clear ControlNet image"
@@ -372,7 +377,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div
-          v-else
+          v-if="!controlNet.inputImagePreviewUrl"
           class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center text-card-foreground"
         >
           <div class="rounded-md border border-primary-foreground/12 bg-primary px-3 py-3 text-primary-foreground/82">
@@ -383,7 +388,7 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="mx-auto inline-flex h-9 items-center gap-2 rounded-md border border-secondary/35 bg-secondary px-3 text-xs font-semibold uppercase tracking-[0.1em] text-secondary-foreground shadow-sm transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60"
-              aria-label="Paste ControlNet image from clipboard"
+              aria-label="Paste empty ControlNet image from clipboard"
               :disabled="controlNet.isUploading"
               @click.stop="pasteControlNetImageFromClipboard(controlNet.id, checkpointName)"
             >
