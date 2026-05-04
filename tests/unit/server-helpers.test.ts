@@ -29,6 +29,7 @@ import {
   normalizeModelCompatibilityMetadata,
   normalizeQueueEntries,
   normalizeSeed,
+  normalizeSteps,
   sanitizeFilename,
   sanitizeSubfolder,
   serializeCivitaiSettings,
@@ -67,6 +68,8 @@ describe('server helper exports', () => {
     expect(normalizeDimension('1025', 512)).toBe(1024)
     expect(normalizeDimension('16', 512)).toBe(64)
     expect(normalizeCfg('35.125', 5)).toBe(30)
+    expect(normalizeSteps('0', 20)).toBe(1)
+    expect(normalizeSteps('200', 20)).toBe(150)
     expect(normalizeDenoise('0.754', 0.5)).toBe(0.75)
     expect(normalizeSeed(9999999999)).toBe(2147483647)
 
@@ -416,6 +419,7 @@ describe('server helper exports', () => {
       loras: [{ name: 'detail.safetensors', strength: 0.7 }],
       width: 1000,
       height: 1000,
+      steps: 34,
       cfg: 5.555,
       denoise: 0.8,
       seed: 42,
@@ -436,6 +440,7 @@ describe('server helper exports', () => {
 
     expect(sdxl.family).toBe('sdxl')
     expect(sdxl.width).toBe(992)
+    expect(sdxl.steps).toBe(34)
     expect(sdxl.cfg).toBe(5.56)
     expect(Object.values(sdxl.prompt).some((node: any) => node.class_type === 'LoraLoader')).toBe(true)
     expect(Object.values(sdxl.prompt).some((node: any) => node.class_type === 'ControlNetLoader')).toBe(true)
@@ -447,10 +452,12 @@ describe('server helper exports', () => {
       return node.class_type === 'ImageScale' && node.inputs?.image?.[0] === invertNode?.[0]
     })
     const controlNetApplyNode = sdxlPromptEntries.find(([, node]) => node.class_type === 'ControlNetApplyAdvanced')
+    const sdxlSamplerNode = sdxlPromptEntries.find(([, node]) => node.class_type === 'KSampler')
     const sdxlSaveImageNode = sdxlPromptEntries.find(([, node]) => node.class_type === 'SaveImage')
     expect(lineArtNode?.[1].inputs).toMatchObject({ resolution: 768 })
     expect(invertNode?.[1].inputs.image).toEqual([lineArtNode?.[0], 0])
     expect(controlNetApplyNode?.[1].inputs.image).toEqual([scaledControlImage?.[0], 0])
+    expect(sdxlSamplerNode?.[1].inputs.steps).toBe(34)
     expect(sdxlSaveImageNode?.[1].inputs.filename_prefix).toBe('%year%-%month%-%day%/txt2img/ponyxl')
     expect(sdxl.outputNodeOrder).toHaveLength(1)
 
@@ -461,6 +468,7 @@ describe('server helper exports', () => {
       loras: [],
       width: 1024,
       height: 1024,
+      steps: 48,
       cfg: 4,
       denoise: 0.75,
       seed: 1,
@@ -468,8 +476,10 @@ describe('server helper exports', () => {
     })
 
     expect(anima.family).toBe('anima')
+    expect(anima.steps).toBe(48)
     expect(Object.values(anima.prompt).some((node: any) => node.class_type === 'CLIPLoader')).toBe(true)
     expect(Object.values(anima.prompt).some((node: any) => node.class_type === 'LoadImage')).toBe(true)
+    expect((Object.values(anima.prompt).find((node: any) => node.class_type === 'KSampler') as any)?.inputs.steps).toBe(48)
     expect(
       (Object.values(anima.prompt).find((node: any) => node.class_type === 'SaveImage') as any)?.inputs
         .filename_prefix,

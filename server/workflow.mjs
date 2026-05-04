@@ -1,6 +1,6 @@
 import { animaAssets, samplerProfiles } from './config.mjs'
 import { safeTrim } from './shared.mjs'
-import { normalizeCfg, normalizeDenoise, normalizeDimension, normalizeSeed } from './model-paths.mjs'
+import { normalizeCfg, normalizeDenoise, normalizeDimension, normalizeSeed, normalizeSteps } from './model-paths.mjs'
 import {
   applyAnimaLLLiteSourcesToModel,
   applyControlNetSourcesToConditioning,
@@ -74,6 +74,7 @@ export function buildSdxlWorkflow({
   loras = [],
   width,
   height,
+  steps,
   cfg,
   denoise,
   seed,
@@ -200,7 +201,7 @@ export function buildSdxlWorkflow({
       class_type: 'KSampler',
       inputs: {
         seed,
-        steps: samplerProfile.steps,
+        steps,
         cfg,
         sampler_name: samplerProfile.samplerName,
         scheduler: samplerProfile.scheduler,
@@ -251,6 +252,7 @@ export function buildAnimaWorkflow({
   loras = [],
   width,
   height,
+  steps,
   cfg,
   denoise,
   seed,
@@ -396,7 +398,7 @@ export function buildAnimaWorkflow({
       class_type: 'KSampler',
       inputs: {
         seed,
-        steps: samplerProfile.steps,
+        steps,
         cfg,
         sampler_name: samplerProfile.samplerName,
         scheduler: samplerProfile.scheduler,
@@ -447,6 +449,7 @@ export function buildWorkflow({
   loras,
   width,
   height,
+  steps,
   cfg,
   denoise,
   seed,
@@ -457,6 +460,7 @@ export function buildWorkflow({
   const samplerProfile = samplerProfiles[family] ?? samplerProfiles.sdxl
   const normalizedWidth = normalizeDimension(width, samplerProfile.width)
   const normalizedHeight = normalizeDimension(height, samplerProfile.height)
+  const normalizedSteps = normalizeSteps(steps, samplerProfile.steps)
   const normalizedCfg = normalizeCfg(cfg, samplerProfile.cfg)
   const normalizedDenoise = normalizeDenoise(denoise, samplerProfile.img2imgDenoise)
   const normalizedSeed = normalizeSeed(seed)
@@ -467,6 +471,7 @@ export function buildWorkflow({
     loras,
     width: normalizedWidth,
     height: normalizedHeight,
+    steps: normalizedSteps,
     cfg: normalizedCfg,
     denoise: normalizedDenoise,
     seed: normalizedSeed,
@@ -480,6 +485,7 @@ export function buildWorkflow({
     family,
     width: normalizedWidth,
     height: normalizedHeight,
+    steps: normalizedSteps,
     cfg: normalizedCfg,
     denoise: normalizedDenoise,
     seed: normalizedSeed,

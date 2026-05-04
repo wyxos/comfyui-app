@@ -164,6 +164,7 @@ export type GenerateResponse = {
   batchId?: string | null
   state?: JobState
   seed?: number | null
+  steps?: number | null
   promptVariants?: PromptVariant[]
   improvedPrompt?: string | null
   promptImprovementError?: string | null
@@ -276,6 +277,7 @@ export type JobResponse = {
   family?: CheckpointFamily | string | null
   width?: number | null
   height?: number | null
+  steps?: number | null
   cfg?: number | null
   denoise?: number | null
   loras?: Array<{ name: string; strength: number }>
@@ -399,6 +401,7 @@ export type PersistedFormState = {
   width: string
   height: string
   seed: string
+  steps: string
   cfg: string
   imageDenoise: string
   usePromptImprover: boolean

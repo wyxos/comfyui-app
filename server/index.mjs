@@ -26,6 +26,7 @@ export {
   normalizeDenoise,
   normalizeDimension,
   normalizeSeed,
+  normalizeSteps,
   sanitizeFilename,
   sanitizeSubfolder,
 } from './model-paths.mjs'

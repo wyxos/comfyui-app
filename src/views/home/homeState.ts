@@ -51,6 +51,7 @@ const defaultOllamaModel = ref('')
 const width = ref('1024')
 const height = ref('1024')
 const seed = ref('')
+const steps = ref('')
 const cfg = ref('')
 const usePromptImprover = ref(false)
 const maintainAspectRatio = ref(false)
@@ -158,6 +159,7 @@ return {
   width,
   height,
   seed,
+  steps,
   cfg,
   usePromptImprover,
   maintainAspectRatio,

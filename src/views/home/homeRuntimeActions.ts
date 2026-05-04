@@ -90,6 +90,7 @@ const {
   promptSectionDrafts,
   promptSections,
   seed,
+  steps,
   selectedCheckpointPicker,
   selectedCheckpoints,
   selectedOllamaModel,
@@ -204,6 +205,7 @@ function resetForm() {
   width.value = '1024'
   height.value = '1024'
   seed.value = ''
+  steps.value = ''
   cfg.value = ''
   imageDenoise.value = ''
   usePromptImprover.value = false

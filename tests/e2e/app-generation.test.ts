@@ -95,13 +95,15 @@ describe('companion app e2e flows', () => {
       await vi.waitFor(() => {
         expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/controlnet-preview').length).toBeGreaterThan(restoredPreviewCallCount)
       })
-      await screen.getByRole('button', { name: /Size, seed, and CFG/ }).click()
+      await screen.getByRole('button', { name: /Size, steps, seed, and CFG/ }).click()
       const widthInput = screen.getByRole('spinbutton', { name: 'Width' })
       const heightInput = screen.getByRole('spinbutton', { name: 'Height' })
+      const stepsInput = screen.getByRole('spinbutton', { name: 'Steps' })
       await expect.element(widthInput).toHaveValue(1024)
       await expect.element(heightInput).toHaveValue(1024)
       await widthInput.fill('1920')
       await heightInput.fill('1080')
+      await stepsInput.fill('28')
       const ratioField = document.querySelector<HTMLInputElement>('input[aria-label="Aspect ratio scale"]')
       const ratioSlider = document.querySelector<HTMLElement>('[role="slider"][aria-label="Aspect ratio scale"]')
       expect(ratioField?.min).toBe('-10')
@@ -165,6 +167,7 @@ describe('companion app e2e flows', () => {
       expect(generateCall?.body).toMatchObject({
         prompt: '(sunlit cyberpunk portrait:1.5)',
         improvedPrompt: 'cinematic portrait, refined lighting, detailed composition',
+        steps: 28,
         checkpoints: [
           {
             name: 'waiIllustriousSDXL_v160.safetensors',
@@ -432,7 +435,7 @@ describe('companion app e2e flows', () => {
       await expect.element(screen.getByText('Source image detected at 1501 x 1620.')).toBeVisible()
       await screen.getByRole('button', { name: 'Use source image resolution' }).click()
 
-      await screen.getByRole('button', { name: /Size, seed, and CFG/ }).click()
+      await screen.getByRole('button', { name: /Size, steps, seed, and CFG/ }).click()
       await expect.element(screen.getByRole('spinbutton', { name: 'Width' })).toHaveValue(1501)
       await expect.element(screen.getByRole('spinbutton', { name: 'Height' })).toHaveValue(1620)
 
@@ -457,7 +460,7 @@ describe('companion app e2e flows', () => {
       )
       await expect.element(screen.getByText('mock-controlnet-preview.png')).toBeVisible()
 
-      await screen.getByRole('button', { name: /Size, seed, and CFG/ }).click()
+      await screen.getByRole('button', { name: /Size, steps, seed, and CFG/ }).click()
       await expect.element(screen.getByRole('spinbutton', { name: 'Width' })).toHaveValue(777)
       await expect.element(screen.getByRole('spinbutton', { name: 'Height' })).toHaveValue(913)
     })

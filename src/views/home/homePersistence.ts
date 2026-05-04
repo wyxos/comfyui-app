@@ -79,6 +79,7 @@ const {
   selectedImagePreviewUrl,
   selectedOllamaModel,
   seed,
+  steps,
   uploadedInputImageName,
   useImprovedPrompt,
   useInputImage,
@@ -232,6 +233,7 @@ function readPersistedFormState(): Partial<PersistedFormState> {
       width: typeof parsed.width === 'string' ? parsed.width : '1024',
       height: typeof parsed.height === 'string' ? parsed.height : '1024',
       seed: typeof parsed.seed === 'string' ? parsed.seed : '',
+      steps: typeof parsed.steps === 'string' ? parsed.steps : '',
       cfg: typeof parsed.cfg === 'string' ? parsed.cfg : '',
       imageDenoise: typeof parsed.imageDenoise === 'string' ? parsed.imageDenoise : '',
       usePromptImprover: Boolean(parsed.usePromptImprover),
@@ -299,6 +301,7 @@ function persistFormState() {
     width: coerceFieldString(width.value),
     height: coerceFieldString(height.value),
     seed: coerceFieldString(seed.value),
+    steps: coerceFieldString(steps.value),
     cfg: coerceFieldString(cfg.value),
     imageDenoise: coerceFieldString(imageDenoise.value),
     usePromptImprover: usePromptImprover.value,
@@ -354,6 +357,7 @@ function restoreFormState() {
   width.value = persisted.width ?? '1024'
   height.value = persisted.height ?? '1024'
   seed.value = persisted.seed ?? ''
+  steps.value = persisted.steps ?? ''
   cfg.value = persisted.cfg ?? ''
   imageDenoise.value = persisted.imageDenoise ?? ''
   usePromptImprover.value = Boolean(persisted.usePromptImprover)

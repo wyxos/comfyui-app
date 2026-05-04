@@ -45,6 +45,7 @@ const {
   promptSectionDrafts,
   promptSections,
   seed,
+  steps,
   selectedCheckpoints,
   selectedImageDimensions,
   selectedImageDisplayName,
@@ -195,6 +196,9 @@ const ollamaModelOptions = computed(() => {
 const cfgPlaceholder = computed(() => {
   return primarySelectedCheckpointMeta.value?.family === 'anima' ? '4.0' : '5.5'
 })
+const stepsPlaceholder = computed(() => {
+  return '20'
+})
 const imageDenoisePlaceholder = computed(() => {
   return primarySelectedCheckpointMeta.value?.family === 'anima' ? '0.75' : '0.75'
 })
@@ -250,6 +254,7 @@ const canResetForm = computed(() => {
       width.value !== '1024' ||
       height.value !== '1024' ||
       seed.value ||
+      steps.value ||
       cfg.value ||
       imageDenoise.value ||
       usePromptImprover.value ||
@@ -311,6 +316,7 @@ return {
   controlNetSummary,
   ollamaModelOptions,
   cfgPlaceholder,
+  stepsPlaceholder,
   imageDenoisePlaceholder,
   selectedCheckpointSummary,
   checkpointPickerPlaceholder,

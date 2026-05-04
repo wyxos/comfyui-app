@@ -8,7 +8,7 @@ export const FORM_TAB_IDS: FormTab[] = ['assets', 'prompt', 'config', 'image']
 export const FORM_TABS: Array<{ id: FormTab; label: string; hint: string }> = [
   { id: 'assets', label: 'Assets', hint: 'Checkpoints and LoRAs' },
   { id: 'prompt', label: 'Prompt', hint: 'Prompt text and improver' },
-  { id: 'config', label: 'Config', hint: 'Size, seed, and CFG' },
+  { id: 'config', label: 'Config', hint: 'Size, steps, seed, and CFG' },
   { id: 'image', label: 'Image', hint: 'Input image and denoise' },
 ]
 export const JOB_ENTRY_PREVIEW_OUTPUT_LIMIT = 3

@@ -102,6 +102,7 @@ describe('companion server API routes', () => {
         ],
         width: 1024,
         height: 1024,
+        steps: 28,
         cfg: 7,
         seed: 123,
       })
@@ -120,6 +121,8 @@ describe('companion server API routes', () => {
       const firstLoraNames = firstPromptNodes.map((node) => node.inputs?.lora_name).filter(Boolean)
       const secondLoraNames = secondPromptNodes.map((node) => node.inputs?.lora_name).filter(Boolean)
       const controlNetNodes = firstPromptNodes.filter((node) => node.class_type === 'ControlNetApplyAdvanced')
+      const firstSamplerNode = firstPromptNodes.find((node) => node.class_type === 'KSampler')
+      const secondSamplerNode = secondPromptNodes.find((node) => node.class_type === 'KSampler')
 
       expect(firstPromptText).toContain('(detail boost:1.2)')
       expect(firstPromptText).not.toContain('anima sketch')
@@ -127,6 +130,8 @@ describe('companion server API routes', () => {
       expect(secondPromptText).not.toContain('detail boost')
       expect(firstLoraNames).toContain('detailBoost.safetensors')
       expect(secondLoraNames).toContain('animaSketch.safetensors')
+      expect(firstSamplerNode?.inputs.steps).toBe(28)
+      expect(secondSamplerNode?.inputs.steps).toBe(28)
       expect(firstPromptNodes.some((node) => node.inputs?.control_net_name === 'mistoLine_rank256.safetensors')).toBe(true)
       expect(controlNetNodes[0].inputs).toMatchObject({
         strength: 0.8,
@@ -145,6 +150,7 @@ describe('companion server API routes', () => {
               state: 'queued',
               width: 1024,
               height: 1024,
+              steps: 28,
               cfg: 7,
               seed: 123,
               loras: [expect.objectContaining({ name: 'detailBoost.safetensors', strength: 0.7 })],

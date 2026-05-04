@@ -169,6 +169,7 @@ export async function serializeJob(job) {
     family: typeof job.family === 'string' ? job.family : null,
     width: typeof job.width === 'number' ? job.width : null,
     height: typeof job.height === 'number' ? job.height : null,
+    steps: typeof job.steps === 'number' ? job.steps : null,
     cfg: typeof job.cfg === 'number' ? job.cfg : null,
     denoise: typeof job.denoise === 'number' ? job.denoise : null,
     seed: typeof job.seed === 'number' ? job.seed : null,

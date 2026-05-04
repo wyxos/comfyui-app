@@ -325,6 +325,7 @@ watch(() => ({
   selectedImageDimensions: state.selectedImageDimensions.value,
   selectedOllamaModel: state.selectedOllamaModel.value,
   seed: state.seed.value,
+  steps: state.steps.value,
   toggles: [state.useOriginalPrompt.value, state.useImprovedPrompt.value, state.usePromptImprover.value],
   useInputImage: state.useInputImage.value,
   width: state.width.value,

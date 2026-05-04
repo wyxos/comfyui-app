@@ -198,6 +198,13 @@ export function normalizeCfg(value, fallback) {
   }
   return Math.round(clamp(parsed, 0, 30) * 100) / 100
 }
+export function normalizeSteps(value, fallback) {
+  const parsed = parseInteger(value)
+  if (parsed === null) {
+    return fallback
+  }
+  return clamp(parsed, 1, 150)
+}
 export function normalizeDenoise(value, fallback) {
   const parsed = parseFloatValue(value)
   if (parsed === null) {

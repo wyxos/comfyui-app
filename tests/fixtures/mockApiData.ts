@@ -104,6 +104,7 @@ export function createMockJob(body: Record<string, unknown> = {}, state = 'compl
     promptImprovementError: null,
     checkpoint,
     inputImageName,
+    steps: typeof body.steps === 'number' ? body.steps : null,
     seed: 12345,
     createdAt: Date.now() - 1200,
     updatedAt: Date.now(),

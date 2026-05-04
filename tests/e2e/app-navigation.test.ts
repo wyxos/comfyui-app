@@ -53,7 +53,7 @@ describe('companion app e2e flows', () => {
     await expect.element(screen.getByText('Prompt sections')).toBeVisible()
     expect(router.currentRoute.value.query.tab).toBe('prompt')
 
-    await screen.getByRole('button', { name: /Config.*Size, seed, and CFG/ }).click()
+    await screen.getByRole('button', { name: /Config.*Size, steps, seed, and CFG/ }).click()
     await vi.waitFor(() => {
       expect(router.currentRoute.value.query.tab).toBe('config')
     })

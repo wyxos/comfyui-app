@@ -57,6 +57,7 @@ const {
   promptImprovementNotice,
   previewOutputs,
   seed,
+  steps,
   selectedOllamaModel,
   submissionError,
   uploadedInputImageName,
@@ -254,6 +255,11 @@ async function generate() {
     const trimmedSeed = coerceTrimmedFieldString(seed.value)
     if (trimmedSeed) {
       payloadBody.seed = Number.parseInt(trimmedSeed, 10)
+    }
+
+    const trimmedSteps = coerceTrimmedFieldString(steps.value)
+    if (trimmedSteps) {
+      payloadBody.steps = Number.parseInt(trimmedSteps, 10)
     }
 
     const trimmedCfg = coerceTrimmedFieldString(cfg.value)

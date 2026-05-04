@@ -15,12 +15,14 @@ const {
   width,
   height,
   seed,
+  steps,
   cfg,
   maintainAspectRatio,
   aspectRatioSliderValue,
   aspectRatioLabel,
   formTab,
   lastGeneratedSeed,
+  stepsPlaceholder,
   cfgPlaceholder,
   lastGeneratedSeedTooltip,
   sizeValidation,
@@ -187,7 +189,7 @@ function handleAspectRatioInput(event: Event) {
       </p>
     </div>
 
-    <div class="grid gap-4 sm:grid-cols-2">
+    <div class="grid gap-4 sm:grid-cols-3">
       <label class="flex flex-col gap-2">
         <span class="field-label">Seed</span>
         <div class="relative">
@@ -214,6 +216,19 @@ function handleAspectRatioInput(event: Event) {
             </button>
           </UiTooltip>
         </div>
+      </label>
+
+      <label class="flex flex-col gap-2">
+        <span class="field-label">Steps</span>
+        <input
+          v-model="steps"
+          type="number"
+          min="1"
+          max="150"
+          step="1"
+          class="h-11 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-card-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-ring/25"
+          :placeholder="stepsPlaceholder"
+        />
       </label>
 
       <label class="flex flex-col gap-2">

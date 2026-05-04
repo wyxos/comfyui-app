@@ -212,6 +212,7 @@ export async function handleGenerate(request, response) {
   const checkpointJobs = extractRequestedCheckpointJobs(body)
   const width = body instanceof FormData ? body.get('width') : body.width
   const height = body instanceof FormData ? body.get('height') : body.height
+  const steps = body instanceof FormData ? body.get('steps') : body.steps
   const seed = body instanceof FormData ? body.get('seed') : body.seed
   const cfg = body instanceof FormData ? body.get('cfg') : body.cfg
   const imageDenoise = body instanceof FormData ? body.get('imageDenoise') : body.imageDenoise
@@ -415,6 +416,7 @@ export async function handleGenerate(request, response) {
         family,
         width: normalizedWidth,
         height: normalizedHeight,
+        steps: normalizedSteps,
         cfg: normalizedCfg,
         denoise: normalizedDenoise,
         seed: normalizedSeed,
@@ -425,6 +427,7 @@ export async function handleGenerate(request, response) {
         loras,
         width,
         height,
+        steps,
         cfg,
         denoise: imageDenoise,
         seed,
@@ -476,6 +479,7 @@ export async function handleGenerate(request, response) {
         family,
         width: normalizedWidth,
         height: normalizedHeight,
+        steps: normalizedSteps,
         cfg: normalizedCfg,
         denoise: normalizedDenoise,
         seed: normalizedSeed,
