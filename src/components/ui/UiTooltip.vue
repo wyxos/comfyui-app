@@ -3,7 +3,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 withDefaults(
   defineProps<{
-    content: string
+    content?: string
   }>(),
   {
     content: '',

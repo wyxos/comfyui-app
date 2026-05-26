@@ -1,9 +1,6 @@
-import { nextTick, watch, type ComputedRef, type Ref } from 'vue'
-import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
+import { nextTick, watch } from 'vue'
 import { fetchAppSettings } from '../../composables/useAppSettings'
-import { safeCreatorUsername } from './assetModelHelpers'
 import {
-  buildAssetSearchRouteQuery,
   firstQueryValue,
   makeSearchKey,
   parseRouteCivitaiId,
@@ -16,48 +13,14 @@ import {
   parseRouteSort,
   parseRouteType,
   queryStringValue,
-  scrollAssetsResultsToTop,
 } from './assetRouteHelpers'
+import { createAssetSearchActions } from './assetSearchActions'
+import { createAssetSearchNavigation } from './assetSearchNavigation'
+import type { AssetSearchState } from './assetSearchControllerTypes'
 import {
-  DEFAULT_BASE_MODELS,
   PAGE_SIZE,
-  type AssetSearchPreset,
-  type BaseModelFilter,
-  type CivitaiModel,
   type CivitaiModelsResponse,
-  type ModelPeriod,
-  type ModelSort,
-  type ModelTypeFilter,
 } from './assetViewTypes'
-
-type AssetSearchState = {
-  activeQuery: Ref<string>
-  activeModelId: Ref<string>
-  activeModelVersionId: Ref<string>
-  activeUsername: Ref<string>
-  blacklistedModelIdSet: ComputedRef<Set<number>>
-  currentCursor: Ref<string>
-  currentPage: Ref<number>
-  error: Ref<string>
-  hasStoredCivitaiApiKey: Ref<boolean>
-  includeNsfw: Ref<boolean>
-  loading: Ref<boolean>
-  modelIdQuery: Ref<string>
-  modelVersionIdQuery: Ref<string>
-  models: Ref<CivitaiModel[]>
-  nextCursor: Ref<string>
-  primaryFileOnly: Ref<boolean>
-  query: Ref<string>
-  route: RouteLocationNormalizedLoaded
-  router: Router
-  searched: Ref<boolean>
-  selectedBaseModels: Ref<BaseModelFilter[]>
-  selectedPeriod: Ref<ModelPeriod>
-  selectedSort: Ref<ModelSort>
-  selectedType: Ref<ModelTypeFilter>
-  totalItems: Ref<number>
-  totalPages: Ref<number>
-}
 
 export function createAssetSearchController(state: AssetSearchState) {
   let debounceId: number | undefined
@@ -67,6 +30,16 @@ export function createAssetSearchController(state: AssetSearchState) {
   let routeSyncVersion = 0
   let defaultIncludeNsfw = false
   const cursorHistory: string[] = []
+  const { replaceSearchUrl, searchRouteHref } = createAssetSearchNavigation(
+    state,
+    () => defaultIncludeNsfw,
+  )
+  const actions = createAssetSearchActions(state, {
+    clearDebounce: () => window.clearTimeout(debounceId),
+    cursorHistory,
+    replaceSearchUrl,
+    searchRouteHref,
+  })
 
   async function syncCivitaiSettingsStatus() {
     try {
@@ -94,103 +67,6 @@ export function createAssetSearchController(state: AssetSearchState) {
     } catch {
       defaultIncludeNsfw = false
     }
-  }
-
-  function buildSearchRouteQuery(
-    searchTerm: string,
-    page = 1,
-    nsfw = state.includeNsfw.value,
-    cursor = '',
-    username = state.activeUsername.value,
-    typeFilter = state.selectedType.value,
-    sort = state.selectedSort.value,
-    period = state.selectedPeriod.value,
-    baseModels = state.selectedBaseModels.value,
-    primaryFileOnly = state.primaryFileOnly.value,
-    modelId = state.modelIdQuery.value,
-    modelVersionId = state.modelVersionIdQuery.value,
-  ) {
-    return buildAssetSearchRouteQuery(state.route.query, {
-      searchTerm,
-      page,
-      nsfw,
-      defaultNsfw: defaultIncludeNsfw,
-      cursor,
-      modelId,
-      modelVersionId,
-      username,
-      typeFilter,
-      sort,
-      period,
-      baseModels,
-      primaryFileOnly,
-    })
-  }
-
-  async function replaceSearchUrl(
-    searchTerm: string,
-    page = 1,
-    nsfw = state.includeNsfw.value,
-    cursor = '',
-    mode: 'push' | 'replace' = 'replace',
-    username = state.activeUsername.value,
-    typeFilter = state.selectedType.value,
-    sort = state.selectedSort.value,
-    period = state.selectedPeriod.value,
-    baseModels = state.selectedBaseModels.value,
-    primaryFileOnly = state.primaryFileOnly.value,
-    modelId = state.modelIdQuery.value,
-    modelVersionId = state.modelVersionIdQuery.value,
-  ) {
-    await state.router[mode]({
-      query: buildSearchRouteQuery(
-        searchTerm,
-        page,
-        nsfw,
-        cursor,
-        username,
-        typeFilter,
-        sort,
-        period,
-        baseModels,
-        primaryFileOnly,
-        modelId,
-        modelVersionId,
-      ),
-    })
-  }
-
-  function searchRouteHref(
-    searchTerm: string,
-    page = 1,
-    nsfw = state.includeNsfw.value,
-    cursor = '',
-    username = state.activeUsername.value,
-    typeFilter = state.selectedType.value,
-    sort = state.selectedSort.value,
-    period = state.selectedPeriod.value,
-    baseModels = state.selectedBaseModels.value,
-    primaryFileOnly = state.primaryFileOnly.value,
-    modelId = state.modelIdQuery.value,
-    modelVersionId = state.modelVersionIdQuery.value,
-  ) {
-    return state.router.resolve({
-      path: '/assets',
-      query: buildSearchRouteQuery(
-        searchTerm,
-        page,
-        nsfw,
-        cursor,
-        username,
-        typeFilter,
-        sort,
-        period,
-        baseModels,
-        primaryFileOnly,
-        modelId,
-        modelVersionId,
-      ),
-    }).href
   }
 
   async function searchModels(searchTerm: string, page = 1, nsfw = state.includeNsfw.value, cursor = '') {
@@ -485,166 +361,6 @@ export function createAssetSearchController(state: AssetSearchState) {
     )
   }
 
-  function filterByCreator(username: string | null | undefined) {
-    const nextUsername = safeCreatorUsername(username)
-    if (nextUsername) {
-      cursorHistory.length = 0
-      void replaceSearchUrl(
-        '',
-        1,
-        state.includeNsfw.value,
-        '',
-        'push',
-        nextUsername,
-        state.selectedType.value,
-        state.selectedSort.value,
-        state.selectedPeriod.value,
-        state.selectedBaseModels.value,
-        state.primaryFileOnly.value,
-        '',
-        '',
-      )
-    }
-  }
-
-  function creatorFilterHref(username: string | null | undefined) {
-    const nextUsername = safeCreatorUsername(username)
-    return nextUsername
-      ? searchRouteHref(
-          '',
-          1,
-          state.includeNsfw.value,
-          '',
-          nextUsername,
-          state.selectedType.value,
-          state.selectedSort.value,
-          state.selectedPeriod.value,
-          state.selectedBaseModels.value,
-          state.primaryFileOnly.value,
-          '',
-          '',
-        )
-      : ''
-  }
-
-  function clearCreatorFilter() {
-    void replaceSearchUrl(
-      state.query.value,
-      1,
-      state.includeNsfw.value,
-      '',
-      'push',
-      '',
-      state.selectedType.value,
-      state.selectedSort.value,
-      state.selectedPeriod.value,
-      state.selectedBaseModels.value,
-      state.primaryFileOnly.value,
-      '',
-      '',
-    )
-  }
-
-  function searchByModelId() {
-    window.clearTimeout(debounceId)
-    cursorHistory.length = 0
-    void replaceSearchUrl(
-      '',
-      1,
-      state.includeNsfw.value,
-      '',
-      'push',
-      '',
-      state.selectedType.value,
-      state.selectedSort.value,
-      state.selectedPeriod.value,
-      state.selectedBaseModels.value,
-      state.primaryFileOnly.value,
-      state.modelIdQuery.value,
-      '',
-    )
-  }
-
-  function searchByModelVersionId() {
-    window.clearTimeout(debounceId)
-    cursorHistory.length = 0
-    void replaceSearchUrl(
-      '',
-      1,
-      state.includeNsfw.value,
-      '',
-      'push',
-      '',
-      state.selectedType.value,
-      state.selectedSort.value,
-      state.selectedPeriod.value,
-      state.selectedBaseModels.value,
-      state.primaryFileOnly.value,
-      '',
-      state.modelVersionIdQuery.value,
-    )
-  }
-
-  function applySearchPreset(preset: AssetSearchPreset) {
-    cursorHistory.length = 0
-    void replaceSearchUrl(
-      '',
-      1,
-      preset.nsfw ?? state.includeNsfw.value,
-      '',
-      'push',
-      '',
-      preset.type,
-      preset.sort,
-      preset.period,
-      [...DEFAULT_BASE_MODELS],
-      preset.primaryFileOnly,
-      '',
-      '',
-    )
-  }
-
-  function goToPage(page: number) {
-    if (page < 1 || state.loading.value || page === state.currentPage.value) {
-      return
-    }
-
-    if (state.totalPages.value > 0 && page > state.totalPages.value) {
-      return
-    }
-
-    if (page > state.currentPage.value) {
-      if (state.currentCursor.value) {
-        cursorHistory[state.currentPage.value - 1] = state.currentCursor.value
-      }
-      scrollAssetsResultsToTop()
-      void replaceSearchUrl(
-        state.activeQuery.value || state.query.value,
-        page,
-        state.includeNsfw.value,
-        page === state.currentPage.value + 1 ? state.nextCursor.value : '',
-        'push',
-      )
-      return
-    }
-
-    if (page <= 1) {
-      scrollAssetsResultsToTop()
-      void replaceSearchUrl(state.activeQuery.value || state.query.value, 1, state.includeNsfw.value, '', 'push')
-      return
-    }
-
-    const previousCursor = cursorHistory[page - 1]
-    scrollAssetsResultsToTop()
-    void replaceSearchUrl(
-      state.activeQuery.value || state.query.value,
-      page,
-      state.includeNsfw.value,
-      previousCursor ?? '',
-      'push',
-    )
-  }
-
   function mount() {
     void syncCivitaiSettingsStatus()
     void syncAppSettingsDefaults().then(syncFromRoute)
@@ -658,14 +374,8 @@ export function createAssetSearchController(state: AssetSearchState) {
   setupWatchers()
 
   return {
-    applySearchPreset,
     cleanup,
-    clearCreatorFilter,
-    creatorFilterHref,
-    filterByCreator,
-    goToPage,
     mount,
-    searchByModelId,
-    searchByModelVersionId,
+    ...actions,
   }
 }

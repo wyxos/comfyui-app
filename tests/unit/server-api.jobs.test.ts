@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { describe, expect, it, vi } from 'vitest'
 import { useServerHarness } from './serverApiTestUtils'
+import { workflowNodesFromBody } from './workflowTestUtils'
 
 const { setupHarness } = useServerHarness()
 
@@ -114,8 +115,8 @@ describe('companion server API routes', () => {
       })
 
       const promptCalls = server.calls.filter((call) => call.method === 'POST' && call.url.pathname === '/prompt')
-      const firstPromptNodes = Object.values((promptCalls[0].body as any).prompt) as any[]
-      const secondPromptNodes = Object.values((promptCalls[1].body as any).prompt) as any[]
+      const firstPromptNodes = workflowNodesFromBody(promptCalls[0].body)
+      const secondPromptNodes = workflowNodesFromBody(promptCalls[1].body)
       const firstPromptText = firstPromptNodes.map((node) => node.inputs?.text).filter(Boolean).join('\n')
       const secondPromptText = secondPromptNodes.map((node) => node.inputs?.text).filter(Boolean).join('\n')
       const firstLoraNames = firstPromptNodes.map((node) => node.inputs?.lora_name).filter(Boolean)
@@ -355,7 +356,7 @@ describe('companion server API routes', () => {
 
       const promptCalls = server.calls.filter((call) => call.method === 'POST' && call.url.pathname === '/prompt')
       expect(promptCalls).toHaveLength(1)
-      const workflowNodes = Object.values((promptCalls[0].body as any).prompt) as any[]
+      const workflowNodes = workflowNodesFromBody(promptCalls[0].body)
       expect(workflowNodes.filter((node) => node.class_type === 'SaveImage')).toHaveLength(1)
       const promptText = workflowNodes.map((node) => node.inputs?.text).filter(Boolean).join('\n')
       expect(promptText).toContain('portrait, (detail boost:1.2)')

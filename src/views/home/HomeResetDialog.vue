@@ -17,7 +17,9 @@ const {
     >
       <div class="w-full max-w-md rounded-xl border border-primary-foreground/12 bg-card p-6 text-card-foreground shadow-[0_30px_90px_rgba(0,0,0,0.35)]">
         <div class="space-y-2">
-          <p class="text-lg font-semibold text-card-foreground">Reset form?</p>
+          <p class="text-lg font-semibold text-card-foreground">
+            Reset form?
+          </p>
           <p class="text-sm leading-6 text-muted-foreground">
             This clears checkpoints, LoRAs, prompt text, config values, and the input image. Running or queued jobs stay untouched.
           </p>

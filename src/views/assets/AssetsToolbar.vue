@@ -34,9 +34,9 @@ const {
 </script>
 
 <template>
-    <section class="shrink-0 border-b border-border bg-card/78 px-4 py-4 sm:px-6">
-      <div class="flex flex-col gap-3">
-        <div class="flex flex-col gap-3 xl:flex-row xl:items-center">
+  <section class="shrink-0 border-b border-border bg-card/78 px-4 py-4 sm:px-6">
+    <div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-3 xl:flex-row xl:items-center">
         <label
           class="sr-only"
           for="asset-search"
@@ -53,7 +53,7 @@ const {
             placeholder="Search Civitai models, LoRAs, ControlNets..."
             type="search"
             autocomplete="off"
-          />
+          >
         </div>
 
         <div class="grid shrink-0 grid-cols-2 gap-2 sm:flex">
@@ -74,7 +74,7 @@ const {
               inputmode="numeric"
               autocomplete="off"
               @keydown.enter.prevent="searchByModelId"
-            />
+            >
           </div>
 
           <label
@@ -94,7 +94,7 @@ const {
               inputmode="numeric"
               autocomplete="off"
               @keydown.enter.prevent="searchByModelVersionId"
-            />
+            >
           </div>
         </div>
 
@@ -118,7 +118,7 @@ const {
               v-model="includeNsfw"
               class="h-4 w-4 accent-secondary"
               type="checkbox"
-            />
+            >
             NSFW
           </label>
           <UiSelect
@@ -152,67 +152,67 @@ const {
             {{ downloadActionError }}
           </span>
         </div>
-        </div>
+      </div>
 
-        <div class="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background/70 px-2 py-2 text-xs font-semibold normal-case tracking-normal">
-          <span class="shrink-0 px-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-            Presets
-          </span>
-          <div class="flex min-w-0 flex-wrap items-center gap-2">
-            <button
-              v-for="preset in ASSET_SEARCH_PRESETS"
-              :key="preset.label"
-              type="button"
-              class="inline-flex h-7 shrink-0 items-center rounded-sm border border-secondary/40 bg-secondary/10 px-2 text-xs font-semibold text-secondary transition hover:border-secondary hover:bg-secondary hover:text-secondary-foreground"
-              @click="applySearchPreset(preset)"
-            >
-              {{ preset.label }}
-            </button>
-          </div>
-        </div>
-
-        <div class="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background/70 px-2 py-2 text-xs font-semibold normal-case tracking-normal">
-          <span class="shrink-0 px-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-            Base
-          </span>
-          <div class="min-w-0 flex-1 overflow-x-auto">
-            <div class="flex w-max items-center gap-2 pr-2">
-              <button
-                v-for="option in BASE_MODEL_OPTIONS"
-                :key="option.value"
-                type="button"
-                class="inline-flex h-7 shrink-0 items-center whitespace-nowrap rounded-sm border px-2 text-xs font-semibold transition"
-                :class="
-                  selectedBaseModelSet.has(option.value)
-                    ? 'border-secondary bg-secondary/16 text-secondary'
-                    : 'border-border bg-card text-muted-foreground hover:border-accent hover:text-accent'
-                "
-                @click="toggleBaseModelFilter(option.value)"
-              >
-                {{ option.label }}
-              </button>
-            </div>
-          </div>
-          <span class="hidden min-w-0 max-w-72 shrink truncate px-1 text-xs text-muted-foreground lg:block">
-            {{ selectedBaseModelLabel }}
-          </span>
+      <div class="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background/70 px-2 py-2 text-xs font-semibold normal-case tracking-normal">
+        <span class="shrink-0 px-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          Presets
+        </span>
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
           <button
+            v-for="preset in ASSET_SEARCH_PRESETS"
+            :key="preset.label"
             type="button"
-            class="inline-flex h-7 shrink-0 items-center rounded-sm border border-border px-2 text-xs font-semibold text-muted-foreground transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
-            :disabled="isUsingDefaultBaseModels"
-            @click="resetDefaultBaseModels"
+            class="inline-flex h-7 shrink-0 items-center rounded-sm border border-secondary/40 bg-secondary/10 px-2 text-xs font-semibold text-secondary transition hover:border-secondary hover:bg-secondary hover:text-secondary-foreground"
+            @click="applySearchPreset(preset)"
           >
-            Default
-          </button>
-          <button
-            type="button"
-            class="inline-flex h-7 shrink-0 items-center rounded-sm border border-border px-2 text-xs font-semibold text-muted-foreground transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
-            :disabled="selectedBaseModels.length === 0"
-            @click="clearBaseModelFilters"
-          >
-            All
+            {{ preset.label }}
           </button>
         </div>
       </div>
-    </section>
+
+      <div class="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background/70 px-2 py-2 text-xs font-semibold normal-case tracking-normal">
+        <span class="shrink-0 px-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          Base
+        </span>
+        <div class="min-w-0 flex-1 overflow-x-auto">
+          <div class="flex w-max items-center gap-2 pr-2">
+            <button
+              v-for="option in BASE_MODEL_OPTIONS"
+              :key="option.value"
+              type="button"
+              class="inline-flex h-7 shrink-0 items-center whitespace-nowrap rounded-sm border px-2 text-xs font-semibold transition"
+              :class="
+                selectedBaseModelSet.has(option.value)
+                  ? 'border-secondary bg-secondary/16 text-secondary'
+                  : 'border-border bg-card text-muted-foreground hover:border-accent hover:text-accent'
+              "
+              @click="toggleBaseModelFilter(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+        </div>
+        <span class="hidden min-w-0 max-w-72 shrink truncate px-1 text-xs text-muted-foreground lg:block">
+          {{ selectedBaseModelLabel }}
+        </span>
+        <button
+          type="button"
+          class="inline-flex h-7 shrink-0 items-center rounded-sm border border-border px-2 text-xs font-semibold text-muted-foreground transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
+          :disabled="isUsingDefaultBaseModels"
+          @click="resetDefaultBaseModels"
+        >
+          Default
+        </button>
+        <button
+          type="button"
+          class="inline-flex h-7 shrink-0 items-center rounded-sm border border-border px-2 text-xs font-semibold text-muted-foreground transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
+          :disabled="selectedBaseModels.length === 0"
+          @click="clearBaseModelFilters"
+        >
+          All
+        </button>
+      </div>
+    </div>
+  </section>
 </template>

@@ -3,7 +3,8 @@ import { civitaiDownloads, supportedPreviewExtensions, supportedVideoExtensions 
 import { normalizeOptionalBoolean, safeTrim } from './shared.mjs'
 import { statFileIfExists } from './downloads/metadata.mjs'
 import { downloadsLoaded, readDownloadsState } from './downloads/state.mjs'
-import { getComfyCheckpointDir, getComfyControlNetDir, getComfyLoraDir, readJsonFileIfExists, resolveModelPath } from './model-paths.mjs'
+import { getComfyCheckpointDir, getComfyControlNetDir, getComfyLoraDir, resolveModelPath } from './model-paths.mjs'
+import { readJsonFileIfExists } from './model-trigger-words.mjs'
 import { getModelCompatibilityMetadata, normalizeModelCompatibilityMetadata } from './model-metadata.mjs'
 
 export async function readModelSidecar(rootPath, modelName) {

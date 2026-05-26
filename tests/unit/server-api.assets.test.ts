@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { useServerHarness } from './serverApiTestUtils'
+import { workflowNodesFromBody } from './workflowTestUtils'
 
 const { setupHarness, downloadItem } = useServerHarness()
 
@@ -55,7 +56,7 @@ describe('companion server API routes', () => {
         }),
       })
       const previewPrompt = server.calls.find((call) => call.method === 'POST' && call.url.pathname === '/prompt')
-      expect(Object.values((previewPrompt?.body as any).prompt).some((node: any) => node.class_type === 'LineArtPreprocessor')).toBe(true)
+      expect(workflowNodesFromBody(previewPrompt?.body).some((node) => node.class_type === 'LineArtPreprocessor')).toBe(true)
 
       const inputGeneration = await server.json('POST', '/api/generate', {
         prompt: 'img2img portrait',

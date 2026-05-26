@@ -24,6 +24,7 @@ const props = withDefaults(
   {
     canGoPrevious: null,
     canGoNext: null,
+    pageText: '',
     previousLabel: 'Previous page',
     nextLabel: 'Next page',
     contentClass: 'min-h-0 flex-1 overflow-auto px-4 py-4 sm:px-6',

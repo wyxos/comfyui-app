@@ -3,7 +3,8 @@ import { createReadStream } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { configDir } from './config.mjs'
-import { readJsonFileIfExists, resolveModelPath } from './model-paths.mjs'
+import { resolveModelPath } from './model-paths.mjs'
+import { readJsonFileIfExists } from './model-trigger-words.mjs'
 import { normalizeOptionalBoolean, safeTrim } from './shared.mjs'
 
 const pendingEnrichment = new Set()

@@ -1,0 +1,38 @@
+import type { ComputedRef, Ref } from 'vue'
+import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
+import type {
+  BaseModelFilter,
+  CivitaiModel,
+  ModelPeriod,
+  ModelSort,
+  ModelTypeFilter,
+} from './assetViewTypes'
+
+export type AssetSearchState = {
+  activeQuery: Ref<string>
+  activeModelId: Ref<string>
+  activeModelVersionId: Ref<string>
+  activeUsername: Ref<string>
+  blacklistedModelIdSet: ComputedRef<Set<number>>
+  currentCursor: Ref<string>
+  currentPage: Ref<number>
+  error: Ref<string>
+  hasStoredCivitaiApiKey: Ref<boolean>
+  includeNsfw: Ref<boolean>
+  loading: Ref<boolean>
+  modelIdQuery: Ref<string>
+  modelVersionIdQuery: Ref<string>
+  models: Ref<CivitaiModel[]>
+  nextCursor: Ref<string>
+  primaryFileOnly: Ref<boolean>
+  query: Ref<string>
+  route: RouteLocationNormalizedLoaded
+  router: Router
+  searched: Ref<boolean>
+  selectedBaseModels: Ref<BaseModelFilter[]>
+  selectedPeriod: Ref<ModelPeriod>
+  selectedSort: Ref<ModelSort>
+  selectedType: Ref<ModelTypeFilter>
+  totalItems: Ref<number>
+  totalPages: Ref<number>
+}

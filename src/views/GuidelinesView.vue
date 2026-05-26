@@ -96,20 +96,36 @@ const componentNotes = [
             class="grid gap-3 rounded-md border border-primary-foreground/15 bg-primary-foreground/6 p-2 text-sm sm:grid-cols-2"
           >
             <div>
-              <p class="text-xs uppercase tracking-[0.24em] text-primary-foreground/60">Primary</p>
-              <p class="font-medium text-secondary">#001B2E</p>
+              <p class="text-xs uppercase tracking-[0.24em] text-primary-foreground/60">
+                Primary
+              </p>
+              <p class="font-medium text-secondary">
+                #001B2E
+              </p>
             </div>
             <div>
-              <p class="text-xs uppercase tracking-[0.24em] text-primary-foreground/60">Secondary</p>
-              <p class="font-medium text-secondary">#FFC300</p>
+              <p class="text-xs uppercase tracking-[0.24em] text-primary-foreground/60">
+                Secondary
+              </p>
+              <p class="font-medium text-secondary">
+                #FFC300
+              </p>
             </div>
             <div>
-              <p class="text-xs uppercase tracking-[0.24em] text-primary-foreground/60">Roundness</p>
-              <p class="font-medium">small or medium</p>
+              <p class="text-xs uppercase tracking-[0.24em] text-primary-foreground/60">
+                Roundness
+              </p>
+              <p class="font-medium">
+                small or medium
+              </p>
             </div>
             <div>
-              <p class="text-xs uppercase tracking-[0.24em] text-primary-foreground/60">Component style</p>
-              <p class="font-medium">shadcn-vue conventions</p>
+              <p class="text-xs uppercase tracking-[0.24em] text-primary-foreground/60">
+                Component style
+              </p>
+              <p class="font-medium">
+                shadcn-vue conventions
+              </p>
             </div>
           </div>
         </div>
@@ -118,7 +134,9 @@ const componentNotes = [
       <section class="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
         <article class="rounded-md border border-border bg-card p-4 shadow-sm">
           <div class="mb-5 space-y-2">
-            <h2 class="text-xl font-semibold tracking-tight text-card-foreground">Palette</h2>
+            <h2 class="text-xl font-semibold tracking-tight text-card-foreground">
+              Palette
+            </h2>
             <p class="max-w-2xl text-sm leading-7 text-muted-foreground">
               `#001B2E` is the anchor color. `#FFC300` is the supporting emphasis color.
               The rest of the palette exists to support legibility and workflow feedback.
@@ -136,13 +154,17 @@ const componentNotes = [
                 :class="swatch.textClass"
                 :style="{ backgroundColor: swatch.hex }"
               >
-                <p class="text-sm font-semibold">{{ swatch.name }}</p>
+                <p class="text-sm font-semibold">
+                  {{ swatch.name }}
+                </p>
                 <p class="text-xs font-medium uppercase tracking-[0.2em]">
                   {{ swatch.hex }}
                 </p>
               </div>
               <div class="space-y-2 px-2 py-2">
-                <p class="text-xs uppercase tracking-[0.24em] text-muted-foreground">Usage</p>
+                <p class="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                  Usage
+                </p>
                 <p class="text-sm leading-6 text-card-foreground">
                   {{ swatch.role }}
                 </p>
@@ -153,7 +175,9 @@ const componentNotes = [
 
         <aside class="space-y-8">
           <section class="rounded-md border border-border bg-card p-4 shadow-sm">
-            <h2 class="text-xl font-semibold tracking-tight text-card-foreground">Core rules</h2>
+            <h2 class="text-xl font-semibold tracking-tight text-card-foreground">
+              Core rules
+            </h2>
             <ul class="mt-4 space-y-3">
               <li
                 v-for="principle in principles"
@@ -166,27 +190,41 @@ const componentNotes = [
           </section>
 
           <section class="rounded-md border border-border bg-card p-4 shadow-sm">
-            <h2 class="text-xl font-semibold tracking-tight text-card-foreground">Radius scale</h2>
+            <h2 class="text-xl font-semibold tracking-tight text-card-foreground">
+              Radius scale
+            </h2>
             <div class="mt-5 grid gap-4 sm:grid-cols-3">
               <div class="space-y-3">
-                <div class="h-20 rounded-sm border border-border bg-primary/95"></div>
+                <div class="h-20 rounded-sm border border-border bg-primary/95" />
                 <div>
-                  <p class="text-sm font-medium text-card-foreground">rounded-sm</p>
-                  <p class="text-xs text-muted-foreground">micro chips only</p>
+                  <p class="text-sm font-medium text-card-foreground">
+                    rounded-sm
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    micro chips only
+                  </p>
                 </div>
               </div>
               <div class="space-y-3">
-                <div class="h-20 rounded-md border border-border bg-accent"></div>
+                <div class="h-20 rounded-md border border-border bg-accent" />
                 <div>
-                  <p class="text-sm font-medium text-card-foreground">rounded-md</p>
-                  <p class="text-xs text-muted-foreground">main system radius</p>
+                  <p class="text-sm font-medium text-card-foreground">
+                    rounded-md
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    main system radius
+                  </p>
                 </div>
               </div>
               <div class="space-y-3">
-                <div class="h-20 rounded-md border border-border bg-secondary"></div>
+                <div class="h-20 rounded-md border border-border bg-secondary" />
                 <div>
-                  <p class="text-sm font-medium text-card-foreground">rounded-md</p>
-                  <p class="text-xs text-muted-foreground">panels stay in the same radius family</p>
+                  <p class="text-sm font-medium text-card-foreground">
+                    rounded-md
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    panels stay in the same radius family
+                  </p>
                 </div>
               </div>
             </div>
@@ -196,7 +234,9 @@ const componentNotes = [
 
       <section class="rounded-md border border-border bg-card p-4 shadow-sm">
         <div class="mb-6 flex flex-col gap-2">
-          <h2 class="text-xl font-semibold tracking-tight text-card-foreground">Component direction</h2>
+          <h2 class="text-xl font-semibold tracking-tight text-card-foreground">
+            Component direction
+          </h2>
           <p class="max-w-3xl text-sm leading-7 text-muted-foreground">
             These examples are not production components yet. They are visual targets for future
             shadcn-vue components and wrappers.
@@ -252,14 +292,14 @@ const componentNotes = [
                   <input
                     class="rounded-md border border-input bg-card px-1 py-0 text-sm text-card-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-ring/25"
                     value="1024"
-                  />
+                  >
                 </label>
                 <label class="grid gap-2 text-sm">
                   <span class="font-medium text-card-foreground">Height</span>
                   <input
                     class="rounded-md border border-input bg-card px-1 py-0 text-sm text-card-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-ring/25"
                     value="1024"
-                  />
+                  >
                 </label>
               </div>
             </div>
@@ -291,13 +331,17 @@ const componentNotes = [
             </p>
             <div class="space-y-4">
               <div class="rounded-md border border-secondary/40 bg-secondary/12 px-2 py-1">
-                <p class="text-sm font-medium text-card-foreground">Use yellow for attention, not panic.</p>
+                <p class="text-sm font-medium text-card-foreground">
+                  Use yellow for attention, not panic.
+                </p>
                 <p class="mt-1 text-sm text-muted-foreground">
                   Good for warnings, incomplete setup, or “review before run.”
                 </p>
               </div>
               <div class="rounded-md border border-destructive/25 bg-destructive/10 px-2 py-1">
-                <p class="text-sm font-medium text-card-foreground">Reserve red for real failure.</p>
+                <p class="text-sm font-medium text-card-foreground">
+                  Reserve red for real failure.
+                </p>
                 <p class="mt-1 text-sm text-muted-foreground">
                   Good for model load errors, destructive confirmations, or broken workflow execution.
                 </p>
@@ -309,14 +353,18 @@ const componentNotes = [
 
       <section class="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
         <article class="rounded-md border border-border bg-card p-4 shadow-sm">
-          <h2 class="text-xl font-semibold tracking-tight text-card-foreground">Usage notes</h2>
+          <h2 class="text-xl font-semibold tracking-tight text-card-foreground">
+            Usage notes
+          </h2>
           <div class="mt-5 space-y-4">
             <article
               v-for="item in componentNotes"
               :key="item.title"
               class="rounded-md border border-border bg-muted px-2 py-2"
             >
-              <h3 class="text-sm font-semibold text-card-foreground">{{ item.title }}</h3>
+              <h3 class="text-sm font-semibold text-card-foreground">
+                {{ item.title }}
+              </h3>
               <p class="mt-1 text-sm leading-6 text-muted-foreground">
                 {{ item.note }}
               </p>
@@ -329,7 +377,9 @@ const componentNotes = [
             <p class="text-xs font-semibold uppercase tracking-[0.3em] text-secondary">
               Reference summary
             </p>
-            <h2 class="text-xl font-semibold tracking-tight">Do this consistently</h2>
+            <h2 class="text-xl font-semibold tracking-tight">
+              Do this consistently
+            </h2>
             <ul class="space-y-3 text-sm leading-6 text-primary-foreground/80">
               <li>Use navy-first layouts with off-white surfaces nested inside.</li>
               <li>Use yellow to highlight what matters, not to carry whole sections.</li>

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Check, ClipboardPaste, Copy, RefreshCw, Ruler, SlidersHorizontal, Trash2, Upload, X } from 'lucide-vue-next'
 import UiSelect from '../../components/ui/UiSelect.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
+import HomeControlNetNumberInput from './HomeControlNetNumberInput.vue'
 import { useProvidedHomeView } from './homeViewContext'
 import type { HomeCheckpointEntry } from './useHomeView'
 import type { ControlNetSelection } from './homeTypes'
@@ -13,7 +14,6 @@ const props = defineProps<{
   checkpointName: string
   compatibilityLabel?: string
 }>()
-
 const {
   controlNetPreprocessorOptions,
   controlNetOutputResolutionLabel,
@@ -78,16 +78,6 @@ function openImagePicker() {
 function handleWindowPaste(event: ClipboardEvent) {
   if (acceptsClipboardPaste.value) {
     handleControlNetImagePaste(props.controlNet.id, event, props.checkpointName)
-  }
-}
-
-function handleNumericInput(
-  field: 'strength' | 'startPercent' | 'endPercent' | 'previewResolution',
-  event: Event,
-) {
-  const target = event.target
-  if (target instanceof HTMLInputElement) {
-    setControlNetField(props.controlNet.id, field, target.value, props.checkpointName)
   }
 }
 
@@ -171,42 +161,30 @@ onBeforeUnmount(() => {
       </label>
 
       <div class="grid grid-cols-3 gap-2">
-        <label class="flex min-w-0 flex-col gap-2">
-          <span class="field-label text-card-foreground/70">Strength</span>
-          <input
-            :value="controlNet.strength"
-            type="number"
-            min="0"
-            max="10"
-            step="0.05"
-            class="h-12 min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25"
-            @input="handleNumericInput('strength', $event)"
-          />
-        </label>
-        <label class="flex min-w-0 flex-col gap-2">
-          <span class="field-label text-card-foreground/70">Start</span>
-          <input
-            :value="controlNet.startPercent"
-            type="number"
-            min="0"
-            max="1"
-            step="0.01"
-            class="h-12 min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25"
-            @input="handleNumericInput('startPercent', $event)"
-          />
-        </label>
-        <label class="flex min-w-0 flex-col gap-2">
-          <span class="field-label text-card-foreground/70">End</span>
-          <input
-            :value="controlNet.endPercent"
-            type="number"
-            min="0"
-            max="1"
-            step="0.01"
-            class="h-12 min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25"
-            @input="handleNumericInput('endPercent', $event)"
-          />
-        </label>
+        <HomeControlNetNumberInput
+          label="Strength"
+          :model-value="controlNet.strength"
+          min="0"
+          max="10"
+          step="0.05"
+          @update:model-value="setControlNetField(controlNet.id, 'strength', $event, checkpointName)"
+        />
+        <HomeControlNetNumberInput
+          label="Start"
+          :model-value="controlNet.startPercent"
+          min="0"
+          max="1"
+          step="0.01"
+          @update:model-value="setControlNetField(controlNet.id, 'startPercent', $event, checkpointName)"
+        />
+        <HomeControlNetNumberInput
+          label="End"
+          :model-value="controlNet.endPercent"
+          min="0"
+          max="1"
+          step="0.01"
+          @update:model-value="setControlNetField(controlNet.id, 'endPercent', $event, checkpointName)"
+        />
       </div>
     </div>
 
@@ -221,18 +199,14 @@ onBeforeUnmount(() => {
           :disabled="!controlNetPreprocessorOptions.length"
         />
       </label>
-      <label class="flex min-w-0 flex-col gap-2">
-        <span class="field-label text-card-foreground/70">Control res</span>
-        <input
-          :value="controlNet.previewResolution"
-          type="number"
-          min="64"
-          max="16384"
-          step="64"
-          class="h-12 min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25"
-          @input="handleNumericInput('previewResolution', $event)"
-        />
-      </label>
+      <HomeControlNetNumberInput
+        label="Control res"
+        :model-value="controlNet.previewResolution"
+        min="64"
+        max="16384"
+        step="64"
+        @update:model-value="setControlNetField(controlNet.id, 'previewResolution', $event, checkpointName)"
+      />
     </div>
 
     <div

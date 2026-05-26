@@ -7,7 +7,7 @@ export type FetchCall = {
 
 export type MockJob = Record<string, unknown>
 export type MockDownload = Record<string, unknown>
-export type MockModel = Record<string, any>
+export type MockModel = Record<string, unknown>
 
 export type MockFailure = {
   status?: number

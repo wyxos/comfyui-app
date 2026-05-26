@@ -161,7 +161,7 @@ void [previewModalViewport, previewModalPanField]
               :style="previewModalImageStyle"
               draggable="false"
               @contextmenu="openGeneratedOutputContextMenu($event, selectedPreviewOutput, selectedPreviewItem?.checkpointName ?? null)"
-            />
+            >
           </div>
         </div>
 
@@ -191,7 +191,7 @@ void [previewModalViewport, previewModalPanField]
                   class="h-full w-full object-cover"
                   draggable="false"
                   @contextmenu="openGeneratedOutputContextMenu($event, entry.item.output, entry.item.checkpointName)"
-                />
+                >
               </div>
 
               <p class="mt-2 truncate text-[11px] font-semibold text-primary-foreground">

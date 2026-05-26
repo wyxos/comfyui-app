@@ -30,6 +30,14 @@ export {
   sanitizeFilename,
   sanitizeSubfolder,
 } from './model-paths.mjs'
+export {
+  dedupeTriggerWords,
+  extractTriggerWordsFromPayload,
+  normalizeTriggerWords,
+  readJsonFileIfExists,
+  readLoraTriggerWords,
+  readSafetensorsMetadata,
+} from './model-trigger-words.mjs'
 export { mergeJobOutputs } from './job-state.mjs'
 export { ensureJobsLoaded, resetJobStoreRuntimeState } from './job-store.mjs'
 

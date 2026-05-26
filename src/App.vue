@@ -59,8 +59,8 @@ const navGroups = [
           <router-link
             v-for="group in navGroups"
             :key="group.to"
-            :to="group.to"
             v-slot="{ href, navigate, isExactActive }"
+            :to="group.to"
             custom
           >
             <a
@@ -97,8 +97,8 @@ const navGroups = [
           </button>
 
           <router-link
-            to="/guidelines"
             v-slot="{ href, navigate, isExactActive }"
+            to="/guidelines"
             custom
           >
             <a

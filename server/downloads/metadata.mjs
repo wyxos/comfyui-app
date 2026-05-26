@@ -8,7 +8,8 @@ import { normalizeOptionalBoolean, normalizePlainObject, safeTrim } from '../sha
 import { getStoredCivitaiApiKey } from '../settings.mjs'
 import { scheduleDownloadsPersist } from './state.mjs'
 import { verifyCivitaiDownloadHash } from './transfer.mjs'
-import { getComfyCheckpointDir, getComfyControlNetDir, getComfyLoraDir, normalizeNumericField, readJsonFileIfExists } from '../model-paths.mjs'
+import { getComfyCheckpointDir, getComfyControlNetDir, getComfyLoraDir, normalizeNumericField } from '../model-paths.mjs'
+import { readJsonFileIfExists } from '../model-trigger-words.mjs'
 import { fetchCivitaiVersionMetadata } from '../model-metadata.mjs'
 
 const pendingModelMetadataRefreshes = new Set()

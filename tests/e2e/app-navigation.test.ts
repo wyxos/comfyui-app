@@ -264,17 +264,17 @@ describe('companion app e2e flows', () => {
     document.querySelector<HTMLButtonElement>('[aria-label="Next library page"]')?.click()
 
     await vi.waitFor(() => {
-      expect(document.body.textContent).toContain('41-45 of 45')
+      expect(document.body.textContent).toContain('41-47 of 47')
       expect(document.body.textContent).not.toContain('Library model 46')
     })
 
     document.querySelector<HTMLInputElement>('input[aria-label="Include NSFW library models"]')?.click()
     await vi.waitFor(() => {
-      expect(document.body.textContent).toContain('1-40 of 46')
+      expect(document.body.textContent).toContain('1-40 of 48')
     })
     document.querySelector<HTMLButtonElement>('[aria-label="Next library page"]')?.click()
     await vi.waitFor(() => {
-      expect(document.body.textContent).toContain('41-46 of 46')
+      expect(document.body.textContent).toContain('41-48 of 48')
       expect(document.body.textContent).toContain('Library model 46')
       expect(document.body.textContent).toContain('NSFW')
     })

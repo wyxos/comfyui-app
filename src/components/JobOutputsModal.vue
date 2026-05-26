@@ -11,8 +11,8 @@ import type { JobOutput, JobResponse } from '../views/home/homeTypes'
 
 const props = withDefaults(
   defineProps<{
-    open: boolean
-    job: JobResponse | null
+    open?: boolean
+    job?: JobResponse | null
   }>(),
   {
     open: false,

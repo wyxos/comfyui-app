@@ -17,6 +17,7 @@ const props = withDefaults(
   {
     canGoPrevious: null,
     canGoNext: null,
+    pageText: '',
     previousLabel: 'Previous page',
     nextLabel: 'Next page',
     footerClass: '',

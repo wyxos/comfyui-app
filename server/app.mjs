@@ -7,18 +7,20 @@ import {
   handleCheckpointList,
   handleCivitaiImagesProxy,
   handleCivitaiModelsProxy,
-  handleClearDownloads,
   handleControlNetList,
+  handleLoraList,
+  handleOllamaModels,
+  handlePutModelMetadata,
+} from './handlers/core.mjs'
+import {
+  handleClearDownloads,
   handleDownloadAction,
   handleDownloadGalleryPreview,
   handleDownloadPreview,
   handleDownloadsList,
-  handleLoraList,
-  handleOllamaModels,
   handlePostDownload,
-  handlePutModelMetadata,
   handleRepairDownloadPreviews,
-} from './handlers/core.mjs'
+} from './handlers/downloads.mjs'
 import {
   handleDeleteCivitaiSettings,
   handleGetAppSettings,
@@ -26,7 +28,8 @@ import {
   handlePutAppSettings,
   handlePutCivitaiSettings,
 } from './handlers/settings.mjs'
-import { handleControlNetPreview, handleGenerate, handleImprovePrompt, handleModelPreview } from './handlers/generate.mjs'
+import { handleGenerate } from './handlers/generate.mjs'
+import { handleControlNetPreview, handleImprovePrompt, handleModelPreview } from './handlers/previews-prompts.mjs'
 import {
   handleCancelJob,
   handleCancelQueuedJobs,
