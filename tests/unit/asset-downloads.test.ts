@@ -364,7 +364,7 @@ describe('LibraryView', () => {
     vi.resetModules()
   })
 
-  it('paginates downloaded checkpoints and LoRAs forty cards at a time', async () => {
+  it('paginates local checkpoints and LoRAs forty cards at a time', async () => {
     const now = Date.now()
     const downloads = ref(
       Array.from({ length: 46 }, (_, index) => {
@@ -415,7 +415,7 @@ describe('LibraryView', () => {
     const wrapper = mount(LibraryView)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('46 downloaded models, 23 checkpoints, 23 LoRAs')
+    expect(wrapper.text()).toContain('46 local models, 23 checkpoints, 23 LoRAs')
     expect(wrapper.text()).toContain('1-40 of 45')
     expect(wrapper.text()).toContain('Library model 01')
     expect(wrapper.text()).not.toContain('library_model_01.safetensors')

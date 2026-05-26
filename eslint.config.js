@@ -8,6 +8,7 @@ export default [
     ignores: [
       'coverage/**',
       'dist/**',
+      'extension/dist/**',
       'node_modules/**',
       '.playwright-cli/**',
       '.vitest-attachments/**',

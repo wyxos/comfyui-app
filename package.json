@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 3210",
     "build": "vue-tsc -b && vite build",
+    "extension:typecheck": "tsc -p extension/tsconfig.json",
+    "extension:build": "npm run extension:typecheck && vite build --config extension/vite.config.ts",
+    "extension:dev": "vite build --config extension/vite.config.ts --watch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "vite preview --host 127.0.0.1 --port 3210",

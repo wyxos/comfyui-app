@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "ComfyUI Companion Extension",
+  "description": "Queue Civitai model downloads in the local ComfyUI Companion app.",
+  "version": "0.1.0",
+  "host_permissions": [
+    "https://civitai.com/*",
+    "https://*.civitai.com/*",
+    "https://civitai.red/*",
+    "https://*.civitai.red/*",
+    "http://127.0.0.1:3210/*",
+    "http://localhost:3210/*"
+  ],
+  "action": {
+    "default_title": "ComfyUI Companion"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://civitai.com/*",
+        "https://*.civitai.com/*",
+        "https://civitai.red/*",
+        "https://*.civitai.red/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
