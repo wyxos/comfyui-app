@@ -2,7 +2,6 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { civitaiDownloads, configDir, downloadsPath, downloadsPersistRenameAttempts, downloadsPersistRenameDelayMs } from '../config.mjs'
 import { delay, safeTrim } from '../shared.mjs'
 import { safeUnlink } from './metadata.mjs'
-import { processDownloadQueue } from './queue.mjs'
 
 let downloadsPersistPromise = null
 let downloadsPersistPending = false
@@ -116,7 +115,7 @@ export async function writeDownloadsStateNow() {
   return downloadsPersistPromise
 }
 
-export function scheduleDownloadsPersist(immediate = false) {
+export function scheduleDownloadsPersist(immediate = false, delayMs = 750) {
   if (!downloadsLoaded) {
     return
   }
@@ -138,7 +137,7 @@ export function scheduleDownloadsPersist(immediate = false) {
   downloadsPersistTimer = setTimeout(() => {
     downloadsPersistTimer = null
     void writeDownloadsStateNow()
-  }, 750)
+  }, delayMs)
 }
 
 export async function ensureDownloadsLoaded() {
@@ -158,8 +157,8 @@ export async function ensureDownloadsLoaded() {
         abortController: null,
       }
 
-      if (normalizedDownload.state === 'downloading') {
-        normalizedDownload.state = 'queued'
+      if (normalizedDownload.state === 'downloading' || normalizedDownload.state === 'queued') {
+        normalizedDownload.state = 'paused'
       }
 
       civitaiDownloads.set(normalizedDownload.id, normalizedDownload)
@@ -170,7 +169,6 @@ export async function ensureDownloadsLoaded() {
     downloadsLoaded = true
   }
 
-  void processDownloadQueue()
 }
 
 export function serializeDownload(download) {
@@ -211,28 +209,55 @@ export function serializeDownloadPreview(image) {
   }
 }
 
+function compareSerializedDownloads(left, right) {
+  const stateRank = {
+    downloading: 0,
+    queued: 1,
+    paused: 2,
+    error: 3,
+    complete: 4,
+    deleted: 5,
+    cancelled: 6,
+  }
+
+  const leftRank = stateRank[left.state] ?? 99
+  const rightRank = stateRank[right.state] ?? 99
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank
+  }
+
+  return (right.updatedAt ?? 0) - (left.updatedAt ?? 0)
+}
+
+export function serializeDownloadPanelItem(download) {
+  return {
+    id: download.id,
+    state: download.state,
+    modelId: download.modelId,
+    modelName: download.modelName,
+    modelType: download.modelType,
+    versionId: download.versionId,
+    versionName: download.versionName,
+    baseModel: download.baseModel ?? null,
+    fileName: download.fileName,
+    fileSizeKb: download.fileSizeKb ?? null,
+    bytesDownloaded: download.bytesDownloaded ?? 0,
+    totalBytes: download.totalBytes ?? null,
+    progressPercent: download.progressPercent ?? null,
+    dismissedAt: download.dismissedAt ?? null,
+    deletedAt: download.deletedAt ?? null,
+    createdAt: download.createdAt ?? null,
+    startedAt: download.startedAt ?? null,
+    finishedAt: download.finishedAt ?? null,
+    error: download.error ?? null,
+    updatedAt: download.updatedAt ?? 0,
+  }
+}
+
 export function createDownloadsResponse(downloads) {
   const items = [...downloads]
     .map((download) => serializeDownload(download))
-    .sort((left, right) => {
-      const stateRank = {
-        downloading: 0,
-        queued: 1,
-        paused: 2,
-        error: 3,
-        complete: 4,
-        deleted: 5,
-        cancelled: 6,
-      }
-
-      const leftRank = stateRank[left.state] ?? 99
-      const rightRank = stateRank[right.state] ?? 99
-      if (leftRank !== rightRank) {
-        return leftRank - rightRank
-      }
-
-      return (right.updatedAt ?? 0) - (left.updatedAt ?? 0)
-    })
+    .sort(compareSerializedDownloads)
 
   return {
     ok: true,
@@ -245,6 +270,57 @@ export function createDownloadsResponse(downloads) {
       error: items.filter((item) => item.state === 'error').length,
       deleted: items.filter((item) => item.state === 'deleted').length,
     },
+  }
+}
+
+export function createDownloadsPanelResponse(downloads) {
+  const sourceItems = [...downloads]
+  const items = sourceItems
+    .map((download) => serializeDownloadPanelItem(download))
+    .sort(compareSerializedDownloads)
+
+  return {
+    ok: true,
+    items,
+    counts: createDownloadsSummaryResponse(sourceItems).counts,
+  }
+}
+
+export function createDownloadsSummaryResponse(downloads) {
+  const counts = {
+    queued: 0,
+    downloading: 0,
+    paused: 0,
+    complete: 0,
+    error: 0,
+    cancelled: 0,
+    deleted: 0,
+    active: 0,
+    attention: 0,
+    visibleComplete: 0,
+  }
+
+  for (const item of downloads) {
+    if (Object.prototype.hasOwnProperty.call(counts, item.state)) {
+      counts[item.state] += 1
+    }
+
+    if (item.state === 'queued' || item.state === 'downloading' || item.state === 'paused') {
+      counts.active += 1
+    }
+
+    if ((item.state === 'error' || item.state === 'cancelled') && !item.dismissedAt) {
+      counts.attention += 1
+    }
+
+    if (item.state === 'complete' && !item.dismissedAt) {
+      counts.visibleComplete += 1
+    }
+  }
+
+  return {
+    ok: true,
+    counts,
   }
 }
 

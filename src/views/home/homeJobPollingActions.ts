@@ -37,6 +37,8 @@ const {
   isSubmittingGenerate,
   isCancellingQueuedJobs,
   deletingJobEntryKeys,
+  jobCounts,
+  jobHistory,
   jobListTab,
   jobState,
   jobsList,
@@ -174,7 +176,11 @@ function applySelectedJobState(job: JobResponse | null) {
 }
 
 async function refreshJobs() {
-  const payload = await apiJson<JobListResponse>('/api/jobs', {
+  const params = new URLSearchParams({
+    historyPage: String(jobHistory.value.page),
+    historyLimit: String(jobHistory.value.pageSize),
+  })
+  const payload = await apiJson<JobListResponse>(`/api/jobs?${params.toString()}`, {
     method: 'GET',
   })
 
@@ -182,6 +188,17 @@ async function refreshJobs() {
   const previousJobsByPromptId = new Map(jobsList.value.map((job) => [job.promptId, job]))
   let forcedJobListTab: JobListTab | null = null
   jobsList.value = Array.isArray(payload.jobs) ? payload.jobs : []
+  jobCounts.value = {
+    running: payload.counts?.running ?? jobList.runningJobEntries.value.length,
+    queued: payload.counts?.queued ?? jobList.queuedJobEntries.value.length,
+    history: payload.counts?.history ?? jobList.historyJobEntries.value.length,
+  }
+  jobHistory.value = {
+    page: payload.history?.page ?? jobHistory.value.page,
+    pageSize: payload.history?.pageSize ?? jobHistory.value.pageSize,
+    totalItems: payload.history?.totalItems ?? jobCounts.value.history,
+    totalPages: payload.history?.totalPages ?? Math.max(1, Math.ceil(jobCounts.value.history / jobHistory.value.pageSize)),
+  }
   queueSummary.value = payload.queue ?? createEmptyQueueSummary()
 
   const promotedRunningJob =
@@ -336,6 +353,19 @@ function selectJobEntry(entry: JobListEntry) {
   selectJob(promptId)
 }
 
+function goToHistoryPage(page: number) {
+  const nextPage = Math.max(1, Math.min(page, jobHistory.value.totalPages))
+  if (nextPage === jobHistory.value.page) {
+    return
+  }
+
+  jobHistory.value = {
+    ...jobHistory.value,
+    page: nextPage,
+  }
+  void refreshJobs()
+}
+
 return {
   clearPolling,
   applySelectedJobState,
@@ -344,6 +374,7 @@ return {
   startPolling,
   selectJob,
   selectJobEntry,
+  goToHistoryPage,
   cancelQueuedJobs,
   deleteJobEntry,
   isDeletingJobEntry,

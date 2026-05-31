@@ -18,6 +18,8 @@ export function createHomeJobListComputed(
   const {
     isImprovingPrompt,
     isUploadingInputImage,
+    jobCounts,
+    jobHistory,
     jobListTab,
     jobsList,
     loadingCheckpoints,
@@ -48,20 +50,31 @@ export function createHomeJobListComputed(
       {
         value: 'running' as const,
         label: 'Running',
-        count: runningJobEntries.value.length,
+        count: jobCounts.value.running,
       },
       {
         value: 'queued' as const,
         label: 'Queued',
-        count: queuedJobEntries.value.length,
+        count: jobCounts.value.queued,
       },
       {
         value: 'history' as const,
         label: 'History',
-        count: historyJobEntries.value.length,
+        count: jobCounts.value.history,
       },
     ]
   })
+  const historyPageRangeLabel = computed(() => {
+    if (!jobHistory.value.totalItems) {
+      return '0 of 0'
+    }
+
+    const pageStart = (jobHistory.value.page - 1) * jobHistory.value.pageSize + 1
+    const pageEnd = Math.min(jobHistory.value.page * jobHistory.value.pageSize, jobHistory.value.totalItems)
+    return `${pageStart}-${pageEnd} of ${jobHistory.value.totalItems}`
+  })
+  const canGoPreviousHistoryPage = computed(() => jobHistory.value.page > 1)
+  const canGoNextHistoryPage = computed(() => jobHistory.value.page < jobHistory.value.totalPages)
   const visibleJobEntries = computed(() => {
     if (jobListTab.value === 'queued') {
       return queuedJobEntries.value
@@ -83,7 +96,9 @@ export function createHomeJobListComputed(
     }
 
     if (jobListTab.value === 'history') {
-      return 'Completed, failed, and cancelled workflows appear here.'
+      return jobCounts.value.history
+        ? 'No workflows found on this history page.'
+        : 'Completed, failed, and cancelled workflows appear here.'
     }
 
     return 'No workflows are currently running.'
@@ -136,6 +151,9 @@ export function createHomeJobListComputed(
     queuedJobEntries,
     historyJobEntries,
     jobListTabs,
+    historyPageRangeLabel,
+    canGoPreviousHistoryPage,
+    canGoNextHistoryPage,
     visibleJobEntries,
     visibleJobsEmptyState,
     canImprovePrompt,

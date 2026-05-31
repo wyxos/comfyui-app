@@ -1,22 +1,15 @@
 <script setup lang="ts">
 import {
-  Check,
   ChevronLeft,
   ChevronRight,
-  Clock,
-  Download,
   ExternalLink,
   LoaderCircle,
   X,
 } from 'lucide-vue-next'
-import {
-  formatNumber,
-  imagesForVersion,
-  modelVersionLabel,
-  primaryFileForVersion,
-} from './assetPreviewHelpers'
+import { formatNumber } from './assetPreviewHelpers'
 import AssetPreviewCompatibilityEditor from './AssetPreviewCompatibilityEditor.vue'
 import AssetPreviewFileDetails from './AssetPreviewFileDetails.vue'
+import AssetPreviewVersionList from './AssetPreviewVersionList.vue'
 import type { AssetPreviewModalProps } from './assetPreviewTypes'
 import { useAssetPreviewModal } from './useAssetPreviewModal'
 
@@ -44,6 +37,7 @@ const props = withDefaults(
     downloadForVersion: undefined,
     downloadStatusLabel: undefined,
     queueAssetDownload: undefined,
+    deleteAssetDownload: undefined,
     modelDownloadKey: undefined,
   },
 )
@@ -75,7 +69,6 @@ const {
   normalizedImageMetaRows,
   activeTriggerWords,
   activePrimaryFile,
-  activeDownload,
   modalTitle,
   modalSubtitle,
   modelTypeLabel,
@@ -94,8 +87,10 @@ const {
   downloadStatusLabel,
   modelDownloadKey,
   canQueueVersion,
+  canDeleteVersionDownload,
   versionDownloadButtonLabel,
   queueVersionDownload,
+  deleteVersionDownload,
   imageDimensions,
   imageNsfwLabel,
   isImageNsfw,
@@ -279,92 +274,23 @@ const {
             @save="emit('save-compatibility', $event)"
           />
 
-          <section
+          <AssetPreviewVersionList
             v-if="modelVersions.length"
-            class="space-y-3 border-t border-border pt-5"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">Model versions</p>
-                <p
-                  v-if="hasDownloadActions && activeDownload"
-                  class="mt-1 inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-semibold"
-                  :class="activeDownload.state === 'complete' ? 'border-secondary/40 bg-secondary/10 text-secondary' : 'border-accent/35 bg-accent/10 text-accent'"
-                >
-                  <Check
-                    v-if="activeDownload.state === 'complete'"
-                    class="h-3.5 w-3.5"
-                  />
-                  <LoaderCircle
-                    v-else-if="activeDownload.state === 'downloading'"
-                    class="h-3.5 w-3.5 animate-spin"
-                  />
-                  <Clock
-                    v-else
-                    class="h-3.5 w-3.5"
-                  />
-                  {{ downloadStatusLabel(activeDownload) }}
-                </p>
-              </div>
-            </div>
-
-            <ul class="grid max-h-64 gap-2 overflow-auto pr-1 text-xs">
-              <li
-                v-for="version in modelVersions"
-                :key="version.id"
-                class="grid items-stretch overflow-hidden rounded-sm border bg-card/40"
-                :class="[
-                  hasDownloadActions ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1',
-                  version.id === selectedVersion?.id
-                    ? 'border-accent/55'
-                    : downloadForVersion(version)?.state === 'complete'
-                      ? 'border-secondary/40'
-                      : downloadForVersion(version)
-                        ? 'border-accent/35'
-                        : 'border-border/80',
-                ]"
-              >
-                <button
-                  class="min-w-0 px-2 py-2 text-left text-card-foreground transition hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-45"
-                  type="button"
-                  :disabled="!imagesForVersion(version).length"
-                  @click="selectVersion(version)"
-                >
-                  <span class="block truncate font-semibold">
-                    {{ modelVersionLabel(version) }}
-                  </span>
-                  <span class="mt-1 block truncate text-muted-foreground">
-                    {{ primaryFileForVersion(version)?.name ?? 'No model file' }}
-                  </span>
-                </button>
-                <button
-                  v-if="hasDownloadActions && civitaiModel"
-                  class="inline-flex min-w-[6.5rem] items-center justify-center gap-1 border-l border-border/70 px-2 py-2 font-semibold text-muted-foreground transition hover:bg-secondary hover:text-secondary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                  type="button"
-                  :disabled="!canQueueVersion(version) || props.queuingDownloadKey === modelDownloadKey(civitaiModel, version)"
-                  @click.stop="queueVersionDownload(version)"
-                >
-                  <Check
-                    v-if="downloadForVersion(version)?.state === 'complete'"
-                    class="h-3.5 w-3.5 text-secondary"
-                  />
-                  <LoaderCircle
-                    v-else-if="downloadForVersion(version)?.state === 'downloading' || props.queuingDownloadKey === modelDownloadKey(civitaiModel, version)"
-                    class="h-3.5 w-3.5 animate-spin text-accent"
-                  />
-                  <Clock
-                    v-else-if="downloadForVersion(version)"
-                    class="h-3.5 w-3.5 text-accent"
-                  />
-                  <Download
-                    v-else
-                    class="h-3.5 w-3.5"
-                  />
-                  {{ versionDownloadButtonLabel(version) }}
-                </button>
-              </li>
-            </ul>
-          </section>
+            :model-versions="modelVersions"
+            :selected-version="selectedVersion"
+            :has-download-actions="hasDownloadActions"
+            :civitai-model="civitaiModel"
+            :queuing-download-key="props.queuingDownloadKey"
+            :download-for-version="downloadForVersion"
+            :download-status-label="downloadStatusLabel"
+            :model-download-key="modelDownloadKey"
+            :can-queue-version="canQueueVersion"
+            :can-delete-version-download="canDeleteVersionDownload"
+            :version-download-button-label="versionDownloadButtonLabel"
+            @select="selectVersion"
+            @queue-download="queueVersionDownload"
+            @delete-download="deleteVersionDownload"
+          />
 
           <section
             v-if="activeTriggerWords.length"

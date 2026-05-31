@@ -7,6 +7,7 @@ import {
 import { computed, onMounted, ref, watch } from 'vue'
 import AssetPreviewModal from '../components/asset-preview/AssetPreviewModal.vue'
 import { isVideoUrl } from '../components/asset-preview/assetPreviewHelpers'
+import { useAssetPreviewDownloadActions } from '../components/asset-preview/useAssetPreviewDownloadActions'
 import UiPaginatedCardGrid from '../components/ui/UiPaginatedCardGrid.vue'
 import UiPreviewCard from '../components/ui/UiPreviewCard.vue'
 import { fetchAppSettings } from '../composables/useAppSettings'
@@ -62,6 +63,14 @@ const {
   error,
   refreshDownloads,
 } = useAssetDownloads()
+const {
+  queuingDownloadKey,
+  downloadForVersion,
+  downloadStatusLabel,
+  queueAssetDownload,
+  deleteAssetDownload,
+  modelDownloadKey,
+} = useAssetPreviewDownloadActions()
 
 const query = ref('')
 const includeNsfw = ref(false)
@@ -473,10 +482,17 @@ onMounted(() => {
       :model-type="selectedModel?.modelType ?? null"
       :base-model="selectedModel?.baseModel ?? null"
       :file-name="selectedModel?.fileName ?? null"
+      :queuing-download-key="queuingDownloadKey"
+      :download-for-version="downloadForVersion"
+      :download-status-label="downloadStatusLabel"
+      :queue-asset-download="queueAssetDownload"
+      :delete-asset-download="deleteAssetDownload"
+      :model-download-key="modelDownloadKey"
       :compatibility="selectedModel?.compatibility ?? null"
       :editable-compatibility="selectedModel?.itemKind === 'controlnet'"
       :saving-compatibility="savingCompatibility"
       :compatibility-error="compatibilitySaveError"
+      show-download-actions
       @close="closeModelPreview"
       @save-compatibility="saveControlNetCompatibility"
     />

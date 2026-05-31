@@ -2,9 +2,12 @@ import { civitaiDownloads } from '../config.mjs'
 import { readJsonBody, sendError, sendJson, streamFile } from '../http.mjs'
 import {
   clearDismissibleDownloads,
+  createDownloadsPanelResponse,
+  createDownloadsSummaryResponse,
   ensureDownloadsLoaded,
   scheduleDownloadsPersist,
   serializeDownload,
+  serializeDownloadPanelItem,
   serializeDownloadsResponse,
 } from '../downloads/state.mjs'
 import {
@@ -22,6 +25,16 @@ export async function handleDownloadsList(response) {
   await ensureDownloadsLoaded()
   refreshMissingDownloadModelMetadataInBackground(civitaiDownloads.values())
   return sendJson(response, 200, serializeDownloadsResponse())
+}
+
+export async function handleDownloadsSummary(response) {
+  await ensureDownloadsLoaded()
+  return sendJson(response, 200, createDownloadsSummaryResponse(civitaiDownloads.values()))
+}
+
+export async function handleDownloadsPanel(response) {
+  await ensureDownloadsLoaded()
+  return sendJson(response, 200, createDownloadsPanelResponse(civitaiDownloads.values()))
 }
 
 export async function handlePostDownload(request, response) {
@@ -52,12 +65,12 @@ export async function handlePostDownload(request, response) {
   }
 }
 
-export async function handleClearDownloads(response) {
+export async function handleClearDownloads(response, { compact = false } = {}) {
   const cleared = await clearDismissibleDownloads()
   return sendJson(response, 200, {
     ok: true,
     cleared,
-    ...serializeDownloadsResponse(),
+    ...(compact ? createDownloadsPanelResponse(civitaiDownloads.values()) : serializeDownloadsResponse()),
   })
 }
 
@@ -99,7 +112,7 @@ function markDownloadReadyForRedownload(download) {
   download.updatedAt = Date.now()
 }
 
-export async function handleDownloadAction(downloadId, action, response) {
+export async function handleDownloadAction(downloadId, action, response, { compact = false } = {}) {
   await ensureDownloadsLoaded()
   const download = civitaiDownloads.get(downloadId)
   if (!download) {
@@ -170,7 +183,7 @@ export async function handleDownloadAction(downloadId, action, response) {
   scheduleDownloadsPersist(true)
   return sendJson(response, 200, {
     ok: true,
-    item: serializeDownload(download),
+    item: compact ? serializeDownloadPanelItem(download) : serializeDownload(download),
   })
 }
 

@@ -15,6 +15,7 @@ const {
   downloadForVersion,
   downloadStatusLabel,
   queueAssetDownload,
+  deleteAssetDownload,
   closeImageModal,
   modelDownloadKey,
 } = view
@@ -37,6 +38,7 @@ function assetPreviewDownloadStatusLabel(download: AssetPreviewDownload | null) 
     :download-for-version="downloadForVersion"
     :download-status-label="assetPreviewDownloadStatusLabel"
     :queue-asset-download="queueAssetDownload"
+    :delete-asset-download="deleteAssetDownload"
     :model-download-key="modelDownloadKey"
     show-download-actions
     kind-label="Model"

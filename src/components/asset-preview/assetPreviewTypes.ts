@@ -79,8 +79,10 @@ export type CivitaiImagesResponse = {
 }
 
 export type AssetPreviewDownload = {
+  id?: string
   state?: string
   progressPercent?: number | null
+  fileName?: string | null
 }
 
 export type PreviewSlide = {
@@ -125,5 +127,6 @@ export type AssetPreviewModalProps = {
   downloadForVersion?: (version: CivitaiModelVersion | null | undefined) => AssetPreviewDownload | null
   downloadStatusLabel?: (download: AssetPreviewDownload | null) => string
   queueAssetDownload?: (model: CivitaiModel, version: CivitaiModelVersion) => void | Promise<void>
+  deleteAssetDownload?: (download: AssetPreviewDownload, version: CivitaiModelVersion) => void | Promise<void>
   modelDownloadKey?: (model: CivitaiModel, version: CivitaiModelVersion) => string
 }

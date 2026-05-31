@@ -304,9 +304,24 @@ export type QueueSummary = {
   error: string | null
 }
 
+export type JobCounts = {
+  running: number
+  queued: number
+  history: number
+}
+
+export type JobHistoryPagination = {
+  page: number
+  pageSize: number
+  totalItems: number
+  totalPages: number
+}
+
 export type JobListResponse = {
   ok: boolean
   jobs?: JobResponse[]
+  counts?: JobCounts
+  history?: JobHistoryPagination
   queue?: QueueSummary
   message?: string
 }

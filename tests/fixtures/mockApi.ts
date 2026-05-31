@@ -38,6 +38,23 @@ export function installMockApi(options: MockApiOptions = {}) {
   const waits = options.waits ?? {}
   const calls: FetchCall[] = []
 
+  function downloadCounts() {
+    return {
+      queued: downloads.filter((download) => download.state === 'queued').length,
+      downloading: downloads.filter((download) => download.state === 'downloading').length,
+      paused: downloads.filter((download) => download.state === 'paused').length,
+      complete: downloads.filter((download) => download.state === 'complete').length,
+      error: downloads.filter((download) => download.state === 'error').length,
+      cancelled: downloads.filter((download) => download.state === 'cancelled').length,
+      deleted: downloads.filter((download) => download.state === 'deleted').length,
+      active: downloads.filter((download) => ['queued', 'downloading', 'paused'].includes(download.state)).length,
+      attention: downloads.filter((download) =>
+        ['error', 'cancelled'].includes(download.state) && !download.dismissedAt,
+      ).length,
+      visibleComplete: downloads.filter((download) => download.state === 'complete' && !download.dismissedAt).length,
+    }
+  }
+
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), 'http://companion.test')
     const method = init?.method?.toUpperCase() ?? 'GET'
@@ -102,9 +119,33 @@ export function installMockApi(options: MockApiOptions = {}) {
     }
 
     if (url.pathname === '/api/jobs' && method === 'GET') {
+      const runningJobs = jobs.filter((job) => job.state === 'running' || job.state === 'cancelling')
+      const queuedJobs = jobs.filter((job) => job.state === 'queued')
+      const historyJobs = jobs.filter((job) => !runningJobs.includes(job) && !queuedJobs.includes(job))
+      const shouldPageHistory = url.searchParams.has('historyPage') || url.searchParams.has('historyLimit')
+      const historyLimit = shouldPageHistory
+        ? Number.parseInt(url.searchParams.get('historyLimit') ?? '10', 10) || 10
+        : Math.max(1, historyJobs.length)
+      const historyPage = Number.parseInt(url.searchParams.get('historyPage') ?? '1', 10) || 1
+      const historyStart = Math.max(0, historyPage - 1) * historyLimit
+      const pagedHistoryJobs = shouldPageHistory
+        ? historyJobs.slice(historyStart, historyStart + historyLimit)
+        : historyJobs
+
       return jsonResponse({
         ok: true,
-        jobs,
+        jobs: [...runningJobs, ...queuedJobs, ...pagedHistoryJobs],
+        counts: {
+          running: runningJobs.length,
+          queued: queuedJobs.length,
+          history: historyJobs.length,
+        },
+        history: {
+          page: historyPage,
+          pageSize: historyLimit,
+          totalItems: historyJobs.length,
+          totalPages: Math.max(1, Math.ceil(historyJobs.length / historyLimit)),
+        },
         queue: {
           running: jobs.filter((job) => job.state === 'running').length,
           pending: jobs.filter((job) => job.state === 'queued').length,
@@ -299,18 +340,47 @@ export function installMockApi(options: MockApiOptions = {}) {
       })
     }
 
+    if (url.pathname === '/api/civitai/downloads/summary' && method === 'GET') {
+      return jsonResponse({
+        ok: true,
+        counts: downloadCounts(),
+      })
+    }
+
+    if (url.pathname === '/api/civitai/downloads/panel' && method === 'GET') {
+      return jsonResponse({
+        ok: true,
+        items: downloads.map((download) => ({
+          id: download.id,
+          state: download.state,
+          modelId: download.modelId,
+          modelName: download.modelName,
+          modelType: download.modelType,
+          versionId: download.versionId,
+          versionName: download.versionName,
+          baseModel: download.baseModel,
+          fileName: download.fileName,
+          fileSizeKb: download.fileSizeKb,
+          bytesDownloaded: download.bytesDownloaded,
+          totalBytes: download.totalBytes,
+          progressPercent: download.progressPercent,
+          dismissedAt: download.dismissedAt,
+          deletedAt: download.deletedAt,
+          createdAt: download.createdAt,
+          startedAt: download.startedAt,
+          finishedAt: download.finishedAt,
+          error: download.error,
+          updatedAt: download.updatedAt,
+        })),
+        counts: downloadCounts(),
+      })
+    }
+
     if (url.pathname === '/api/civitai/downloads' && method === 'GET') {
       return jsonResponse({
         ok: true,
         items: downloads,
-        counts: {
-          queued: downloads.filter((download) => download.state === 'queued').length,
-          downloading: downloads.filter((download) => download.state === 'downloading').length,
-          paused: downloads.filter((download) => download.state === 'paused').length,
-          complete: downloads.filter((download) => download.state === 'complete').length,
-          error: downloads.filter((download) => download.state === 'error').length,
-          deleted: downloads.filter((download) => download.state === 'deleted').length,
-        },
+        counts: downloadCounts(),
       })
     }
 

@@ -2,25 +2,13 @@
 import { Download } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import AssetDownloadsPanel from './components/AssetDownloadsPanel.vue'
-import { useAssetDownloads } from './composables/useAssetDownloads'
+import { useAssetDownloadSummary } from './composables/useAssetDownloads'
 
 const downloadsSheetOpen = ref(false)
 
-const {
-  activeDownloads,
-  completedDownloads,
-  downloads,
-} = useAssetDownloads()
-
-const failedDownloads = computed(() => {
-  return downloads.value.filter((item) => {
-    return (item.state === 'error' || item.state === 'cancelled') && !item.dismissedAt
-  })
-})
-
-const completedVisibleDownloads = computed(() => completedDownloads.value.filter((item) => !item.dismissedAt))
+const { counts: downloadCounts } = useAssetDownloadSummary()
 const downloadBadgeCount = computed(() => {
-  return activeDownloads.value.length || failedDownloads.value.length || completedVisibleDownloads.value.length
+  return downloadCounts.value.active || downloadCounts.value.attention || downloadCounts.value.visibleComplete
 })
 
 const navGroups = [

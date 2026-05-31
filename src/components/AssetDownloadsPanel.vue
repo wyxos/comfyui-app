@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Check, Download, LoaderCircle, Pause, Play, Trash2, X } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useAssetDownloads, type AssetDownloadItem } from '../composables/useAssetDownloads'
+import { useAssetDownloadPanel, type AssetDownloadItem } from '../composables/useAssetDownloads'
 
 const props = defineProps<{
   open: boolean
@@ -19,7 +19,9 @@ const {
   resumeDownload,
   cancelDownload,
   clearDownloads,
-} = useAssetDownloads()
+  startPolling,
+  stopPolling,
+} = useAssetDownloadPanel()
 
 const clearing = ref(false)
 let previousBodyOverflow: string | null = null
@@ -144,11 +146,13 @@ watch(
     }
 
     if (open) {
+      startPolling()
       lockBodyScroll()
       window.addEventListener('keydown', handleKeydown)
       return
     }
 
+    stopPolling()
     unlockBodyScroll()
     window.removeEventListener('keydown', handleKeydown)
   },
@@ -160,6 +164,7 @@ onBeforeUnmount(() => {
     window.removeEventListener('keydown', handleKeydown)
   }
 
+  stopPolling()
   unlockBodyScroll()
 })
 </script>

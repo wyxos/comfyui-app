@@ -9,6 +9,8 @@
     "extension:typecheck": "tsc -p extension/tsconfig.json",
     "extension:build": "npm run extension:typecheck && vite build --config extension/vite.config.ts",
     "extension:dev": "vite build --config extension/vite.config.ts --watch",
+    "extension:package": "npm run extension:build && node scripts/package-extension.mjs",
+    "extension:package:local": "npm run extension:package -- --bump=codex",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "vite preview --host 127.0.0.1 --port 3210",

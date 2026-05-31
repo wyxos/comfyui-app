@@ -111,6 +111,43 @@ describe('useAssetDownloads', () => {
     expect(wrapper.text()).toBe('No downloads.')
   })
 
+  it('loads the lightweight downloads summary without fetching the full list', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        ok: true,
+        counts: {
+          active: 1,
+          attention: 0,
+          visibleComplete: 12,
+        },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { useAssetDownloadSummary } = await import('../../src/composables/useAssetDownloads')
+    const Consumer = defineComponent({
+      setup() {
+        const summary = useAssetDownloadSummary()
+        return () => h('div', String(summary.counts.value.active || summary.counts.value.visibleComplete))
+      },
+    })
+
+    const wrapper = mount(Consumer)
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/civitai/downloads/summary', {
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/civitai/downloads', expect.anything())
+    expect(wrapper.text()).toBe('1')
+
+    wrapper.unmount()
+    vi.runOnlyPendingTimers()
+  })
+
   it('posts pause, resume, cancel, delete, redownload, and clear actions', async () => {
     const fetchMock = vi
       .fn()
@@ -172,9 +209,11 @@ describe('AssetDownloadsPanel', () => {
     const resumeDownload = vi.fn()
     const cancelDownload = vi.fn()
     const clearDownloads = vi.fn()
+    const startPolling = vi.fn()
+    const stopPolling = vi.fn()
 
     vi.doMock('../../src/composables/useAssetDownloads', () => ({
-      useAssetDownloads: () => ({
+      useAssetDownloadPanel: () => ({
         downloads,
         activeDownloads: computed(() => downloads.value.filter((item) => item.state === 'downloading')),
         completedDownloads: computed(() => downloads.value.filter((item) => item.state === 'complete')),
@@ -184,6 +223,8 @@ describe('AssetDownloadsPanel', () => {
         resumeDownload,
         cancelDownload,
         clearDownloads,
+        startPolling,
+        stopPolling,
       }),
     }))
 
@@ -235,9 +276,11 @@ describe('AssetDownloadsPanel', () => {
     const resumeDownload = vi.fn()
     const cancelDownload = vi.fn()
     const clearDownloads = vi.fn()
+    const startPolling = vi.fn()
+    const stopPolling = vi.fn()
 
     vi.doMock('../../src/composables/useAssetDownloads', () => ({
-      useAssetDownloads: () => ({
+      useAssetDownloadPanel: () => ({
         downloads,
         activeDownloads: computed(() => []),
         completedDownloads: computed(() => downloads.value.filter((item) => item.state === 'complete')),
@@ -247,6 +290,8 @@ describe('AssetDownloadsPanel', () => {
         resumeDownload,
         cancelDownload,
         clearDownloads,
+        startPolling,
+        stopPolling,
       }),
     }))
 

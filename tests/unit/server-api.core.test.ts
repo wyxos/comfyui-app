@@ -5,6 +5,46 @@ import { useServerHarness } from './serverApiTestUtils'
 
 const { downloadItem, setupHarness } = useServerHarness()
 
+function civitaiImagePageHtml(imageId: number, meta: Record<string, unknown>) {
+  return `<!doctype html><html><body><script id="__NEXT_DATA__" type="application/json">${
+    JSON.stringify({
+      props: {
+        pageProps: {
+          trpcState: {
+            json: {
+              queries: [
+                {
+                  queryHash: `[["image","get"],{"input":{"id":${imageId}},"type":"query"}]`,
+                  state: {
+                    data: {
+                      id: imageId,
+                      url: 'https://image.test/page-image.png',
+                      width: 1536,
+                      height: 2040,
+                      hash: 'PAGEHASH',
+                      type: 'image',
+                      nsfwLevel: 'Soft',
+                      postId: 901,
+                    },
+                  },
+                },
+                {
+                  queryHash: `[["image","getGenerationData"],{"input":{"id":${imageId}},"type":"query"}]`,
+                  state: {
+                    data: {
+                      meta,
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    })
+  }</script></body></html>`
+}
+
 describe('companion server API routes', () => {
   it('serves health, model lists, settings, Ollama models, and Civitai proxies', async () => {
       const server = await setupHarness()
@@ -153,6 +193,53 @@ describe('companion server API routes', () => {
       })
     })
 
+  it('hydrates single-image metadata from the public Civitai image page when the API omits it', async () => {
+      const imageId = 114266630
+      const server = await setupHarness({
+        upstream: {
+          civitaiImages: {
+            items: [],
+            metadata: { totalItems: 0, totalPages: 0 },
+          },
+          civitaiImagePages: {
+            [String(imageId)]: civitaiImagePageHtml(imageId, {
+              prompt: 'mature female, solo, red hair',
+              negativePrompt: 'bad quality,worst quality',
+              cfgScale: 7,
+              steps: 30,
+              sampler: 'Euler a',
+              seed: 561061719,
+              Model: 'WAI-Nsfw-Illustrious-16',
+            }),
+          },
+        },
+      })
+
+      await expect(server.request(`/api/civitai/images?imageId=${imageId}&limit=1`)).resolves.toMatchObject({
+        payload: {
+          items: [
+            expect.objectContaining({
+              id: imageId,
+              url: 'https://image.test/page-image.png',
+              width: 1536,
+              height: 2040,
+              meta: expect.objectContaining({
+                prompt: 'mature female, solo, red hair',
+                negativePrompt: 'bad quality,worst quality',
+                seed: 561061719,
+              }),
+            }),
+          ],
+          metadata: expect.objectContaining({
+            totalItems: 1,
+            totalPages: 1,
+          }),
+        },
+      })
+      expect(server.calls.some((call) => call.url.pathname === '/api/v1/images')).toBe(true)
+      expect(server.calls.some((call) => call.url.pathname === `/images/${imageId}`)).toBe(true)
+    })
+
   it('returns route-level failures for invalid bodies and upstream service errors', async () => {
       const server = await setupHarness({
         upstream: {
@@ -200,6 +287,90 @@ describe('companion server API routes', () => {
         response: expect.objectContaining({ status: 400 }),
         payload: expect.objectContaining({ error: 'missing-prompt' }),
       })
+    })
+
+  it('returns download summary counts without serializing the full history', async () => {
+      const server = await setupHarness()
+
+      await server.writeDownloads([
+        downloadItem('active-model', 'queued'),
+        downloadItem('complete-model', 'complete', { previewImages: Array.from({ length: 50 }, (_, index) => ({ url: `https://image.test/${index}.png` })) }),
+        downloadItem('dismissed-model', 'complete', { dismissedAt: Date.now() }),
+        downloadItem('failed-model', 'error'),
+      ])
+
+      await expect(server.request('/api/civitai/downloads/summary')).resolves.toMatchObject({
+        payload: {
+          ok: true,
+          counts: expect.objectContaining({
+            active: 1,
+            attention: 1,
+            visibleComplete: 1,
+            complete: 2,
+            error: 1,
+          }),
+        },
+      })
+      const summary = await server.request('/api/civitai/downloads/summary')
+      expect(summary.payload.items).toBeUndefined()
+    })
+
+  it('returns a paged job history list while keeping live jobs visible', async () => {
+      const server = await setupHarness()
+      const { ensureJob } = await import('../../server/job-state.mjs')
+      const now = Date.now()
+
+      ensureJob('running-1', {
+        state: 'running',
+        checkpoint: 'running.safetensors',
+        promptText: 'running prompt',
+        createdAt: now,
+        updatedAt: now,
+      })
+      ensureJob('queued-1', {
+        state: 'queued',
+        checkpoint: 'queued.safetensors',
+        promptText: 'queued prompt',
+        createdAt: now,
+        updatedAt: now,
+      })
+
+      for (let index = 1; index <= 12; index += 1) {
+        const timestamp = now - index * 1000
+        ensureJob(`history-${index}`, {
+          state: 'complete',
+          checkpoint: `history-${index}.safetensors`,
+          promptText: `history prompt ${index}`,
+          outputs: [{ filename: 'mock-output.png', subfolder: '', type: 'output' }],
+          createdAt: timestamp - 100,
+          updatedAt: timestamp,
+          finishedAt: timestamp,
+        })
+      }
+
+      const result = await server.request('/api/jobs?historyPage=2&historyLimit=5')
+      const promptIds = result.payload.jobs.map((job: { promptId: string }) => job.promptId)
+
+      expect(result.payload.counts).toEqual({
+        running: 1,
+        queued: 1,
+        history: 12,
+      })
+      expect(result.payload.history).toEqual({
+        page: 2,
+        pageSize: 5,
+        totalItems: 12,
+        totalPages: 3,
+      })
+      expect(promptIds).toContain('running-1')
+      expect(promptIds).toContain('queued-1')
+      expect(promptIds.filter((promptId: string) => promptId.startsWith('history-'))).toEqual([
+        'history-6',
+        'history-7',
+        'history-8',
+        'history-9',
+        'history-10',
+      ])
     })
 
   it('merges completed-download model metadata into checkpoint and LoRA picker options', async () => {

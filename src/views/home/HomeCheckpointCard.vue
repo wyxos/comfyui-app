@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 import AssetPreviewModal from '../../components/asset-preview/AssetPreviewModal.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
@@ -16,7 +16,18 @@ const {
   isVideoPreview,
   removeSelectedCheckpoint,
   toggleSelectedCheckpoint,
+  assetPreviewDownloadActions,
 } = useProvidedHomeView()
+const {
+  queuingDownloadKey,
+  downloadForVersion,
+  downloadStatusLabel,
+  queueAssetDownload,
+  deleteAssetDownload,
+  modelDownloadKey,
+  startPolling,
+  stopPolling,
+} = assetPreviewDownloadActions
 
 const isCheckpointPreviewOpen = ref(false)
 const checkpointPreviewIsVideo = computed(() =>
@@ -36,10 +47,32 @@ function openCheckpointPreview() {
     isCheckpointPreviewOpen.value = true
   }
 }
+
+watch(isCheckpointPreviewOpen, (isOpen) => {
+  if (isOpen) {
+    startPolling()
+    return
+  }
+
+  stopPolling()
+})
+
+onBeforeUnmount(() => {
+  if (isCheckpointPreviewOpen.value) {
+    stopPolling()
+  }
+})
 </script>
 
 <template>
-  <div class="rounded-md border border-primary-foreground/12 bg-primary px-3 py-3">
+  <div
+    class="rounded-md border px-3 py-3 transition-colors"
+    :class="
+      checkpoint.enabled
+        ? 'border-primary-foreground/12 bg-primary'
+        : 'border-primary-foreground/20 bg-primary-foreground/6'
+    "
+  >
     <div class="flex items-start gap-3">
       <button
         v-if="checkpoint.previewUrl"
@@ -148,8 +181,15 @@ function openCheckpointPreview() {
       :base-model="checkpoint.compatibility?.baseModel ?? null"
       :trained-words="checkpoint.compatibility?.trainedWords ?? []"
       :file-name="checkpoint.name"
+      :queuing-download-key="queuingDownloadKey"
+      :download-for-version="downloadForVersion"
+      :download-status-label="downloadStatusLabel"
+      :queue-asset-download="queueAssetDownload"
+      :delete-asset-download="deleteAssetDownload"
+      :model-download-key="modelDownloadKey"
       model-type="Checkpoint"
       kind-label="Checkpoint preview"
+      show-download-actions
       @close="isCheckpointPreviewOpen = false"
     />
   </div>

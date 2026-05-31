@@ -1,77 +1,44 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
+import type {
+  AssetDownloadItem,
+  DownloadCounts,
+  DownloadsResponse,
+  DownloadsSummaryResponse,
+  QueueDownloadPayload,
+} from './assetDownloadTypes'
 
-export type AssetDownloadState = 'queued' | 'downloading' | 'paused' | 'complete' | 'error' | 'cancelled' | 'deleted'
-
-export type AssetDownloadItem = {
-  id: string
-  state: AssetDownloadState
-  modelId: number
-  modelName: string
-  modelType: string
-  modelNsfw?: boolean | null
-  modelMetadata?: {
-    id?: number | null
-    name?: string | null
-    type?: string | null
-    nsfw?: boolean | null
-    creator?: { username?: string | null } | null
-    stats?: Record<string, unknown> | null
-    tags?: string[]
-  } | null
-  versionId: number
-  versionName: string
-  baseModel?: string | null
-  fileId?: string | number | null
-  fileName: string
-  fileSizeKb?: number | null
-  targetPath?: string
-  bytesDownloaded?: number
-  totalBytes?: number
-  progressPercent?: number | null
-  previewUrl?: string | null
-  previewPaths?: Array<{ url?: string | null; mediaType?: 'image' | 'video' | string | null }>
-  dismissedAt?: number | null
-  deletedAt?: number | null
-  createdAt?: number | null
-  startedAt?: number | null
-  finishedAt?: number | null
-  error?: string | null
-  updatedAt: number
-}
-
-type DownloadsResponse = {
-  ok: boolean
-  items?: AssetDownloadItem[]
-  message?: string
-}
-
-export type QueueDownloadPayload = {
-  modelId: number
-  modelName: string
-  modelType: string
-  modelNsfw?: boolean | null
-  modelMetadata?: Record<string, unknown> | null
-  versionId: number
-  versionName: string
-  baseModel?: string | null
-  file: Record<string, unknown>
-  trainedWords?: string[]
-  previewImage?: Record<string, unknown> | null
-  previewImages?: Array<Record<string, unknown>>
-  force?: boolean
-}
+export type { AssetDownloadItem, AssetDownloadState, QueueDownloadPayload } from './assetDownloadTypes'
 
 const downloads = ref<AssetDownloadItem[]>([])
+const panelDownloads = ref<AssetDownloadItem[]>([])
 const loading = ref(false)
 const error = ref('')
+const panelLoading = ref(false)
+const panelError = ref('')
+const summaryCounts = ref<DownloadCounts>(emptyDownloadCounts())
+const summaryLoading = ref(false)
+const summaryError = ref('')
 let pollTimer: number | undefined
+let panelPollTimer: number | undefined
+let summaryPollTimer: number | undefined
 let subscribers = 0
+let panelSubscribers = 0
+let summarySubscribers = 0
 let refreshRequestId = 0
+let panelRefreshRequestId = 0
+let summaryRefreshRequestId = 0
 
 const activeDownloads = computed(() => {
   return downloads.value.filter((item) => ['queued', 'downloading', 'paused'].includes(item.state))
 })
 const completedDownloads = computed(() => downloads.value.filter((item) => item.state === 'complete'))
+const panelActiveDownloads = computed(() => {
+  return panelDownloads.value.filter((item) => ['queued', 'downloading', 'paused'].includes(item.state))
+})
+const panelRunningDownloads = computed(() => {
+  return panelDownloads.value.filter((item) => item.state === 'queued' || item.state === 'downloading')
+})
+const panelCompletedDownloads = computed(() => panelDownloads.value.filter((item) => item.state === 'complete'))
 const downloadById = computed(() => new Map(downloads.value.map((item) => [item.id, item])))
 const downloadByVersionId = computed(() => {
   const map = new Map<number, AssetDownloadItem[]>()
@@ -83,6 +50,28 @@ const downloadByVersionId = computed(() => {
 
   return map
 })
+
+function emptyDownloadCounts(): DownloadCounts {
+  return {
+    queued: 0,
+    downloading: 0,
+    paused: 0,
+    complete: 0,
+    error: 0,
+    cancelled: 0,
+    deleted: 0,
+    active: 0,
+    attention: 0,
+    visibleComplete: 0,
+  }
+}
+
+function normalizeDownloadCounts(counts: Partial<DownloadCounts> | null | undefined): DownloadCounts {
+  return {
+    ...emptyDownloadCounts(),
+    ...(counts ?? {}),
+  }
+}
 
 async function refreshDownloads() {
   const requestId = ++refreshRequestId
@@ -115,6 +104,37 @@ async function refreshDownloads() {
   }
 }
 
+async function refreshDownloadPanel() {
+  const requestId = ++panelRefreshRequestId
+  panelLoading.value = true
+  panelError.value = ''
+
+  try {
+    const response = await fetch('/api/civitai/downloads/panel', {
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+    const payload = (await response.json()) as DownloadsResponse
+
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.message ?? `Downloads panel returned ${response.status}`)
+    }
+
+    if (requestId === panelRefreshRequestId) {
+      panelDownloads.value = Array.isArray(payload.items) ? payload.items : []
+    }
+  } catch (caughtError) {
+    if (requestId === panelRefreshRequestId) {
+      panelError.value = caughtError instanceof Error ? caughtError.message : 'Could not load downloads.'
+    }
+  } finally {
+    if (requestId === panelRefreshRequestId) {
+      panelLoading.value = false
+    }
+  }
+}
+
 function startPolling() {
   window.clearInterval(pollTimer)
   void refreshDownloads()
@@ -127,6 +147,110 @@ function stopPolling() {
   window.clearInterval(pollTimer)
   pollTimer = undefined
   refreshRequestId += 1
+}
+
+function queueNextPanelPoll() {
+  window.clearTimeout(panelPollTimer)
+  panelPollTimer = window.setTimeout(() => {
+    void refreshDownloadPanel().finally(() => {
+      if (panelPollTimer !== undefined) {
+        queueNextPanelPoll()
+      }
+    })
+  }, panelRunningDownloads.value.length ? 1000 : 3500)
+}
+
+function startPanelPolling() {
+  window.clearTimeout(panelPollTimer)
+  panelPollTimer = undefined
+  void refreshDownloadPanel().finally(() => {
+    if (panelSubscribers > 0 && panelPollTimer === undefined) {
+      queueNextPanelPoll()
+    }
+  })
+}
+
+function stopPanelPolling() {
+  window.clearTimeout(panelPollTimer)
+  panelPollTimer = undefined
+  panelRefreshRequestId += 1
+}
+
+async function refreshDownloadSummary() {
+  const requestId = ++summaryRefreshRequestId
+  summaryLoading.value = true
+  summaryError.value = ''
+
+  try {
+    const response = await fetch('/api/civitai/downloads/summary', {
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+    const payload = (await response.json()) as DownloadsSummaryResponse
+
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.message ?? `Downloads summary returned ${response.status}`)
+    }
+
+    if (requestId === summaryRefreshRequestId) {
+      summaryCounts.value = normalizeDownloadCounts(payload.counts)
+    }
+  } catch (caughtError) {
+    if (requestId === summaryRefreshRequestId) {
+      summaryError.value = caughtError instanceof Error ? caughtError.message : 'Could not load downloads summary.'
+    }
+  } finally {
+    if (requestId === summaryRefreshRequestId) {
+      summaryLoading.value = false
+    }
+  }
+}
+
+function startSummaryPolling() {
+  window.clearInterval(summaryPollTimer)
+  void refreshDownloadSummary()
+  summaryPollTimer = window.setInterval(() => {
+    void refreshDownloadSummary()
+  }, 3500)
+}
+
+function stopSummaryPolling() {
+  window.clearInterval(summaryPollTimer)
+  summaryPollTimer = undefined
+  summaryRefreshRequestId += 1
+}
+
+function subscribeDownloads() {
+  subscribers += 1
+  if (subscribers === 1) {
+    startPolling()
+  } else {
+    void refreshDownloads()
+  }
+}
+
+function unsubscribeDownloads() {
+  subscribers = Math.max(0, subscribers - 1)
+  if (subscribers === 0) {
+    stopPolling()
+  }
+}
+
+function subscribeDownloadPanel() {
+  panelSubscribers += 1
+  if (panelSubscribers === 1) {
+    startPanelPolling()
+  } else {
+    void refreshDownloadPanel()
+  }
+}
+
+function unsubscribeDownloadPanel() {
+  panelSubscribers = Math.max(0, panelSubscribers - 1)
+  if (panelSubscribers === 0) {
+    stopPanelPolling()
+  }
 }
 
 async function postDownloadAction(path: string, init?: RequestInit) {
@@ -146,6 +270,32 @@ async function postDownloadAction(path: string, init?: RequestInit) {
   }
 
   await refreshDownloads()
+  void refreshDownloadSummary()
+  return payload
+}
+
+function withPanelViewParam(path: string) {
+  return path.includes('?') ? `${path}&view=panel` : `${path}?view=panel`
+}
+
+async function postPanelDownloadAction(path: string, init?: RequestInit) {
+  const response = await fetch(withPanelViewParam(path), {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json; charset=utf-8',
+      ...(init?.headers ?? {}),
+    },
+    ...init,
+  })
+  const payload = await response.json().catch(() => null)
+
+  if (!response.ok || payload?.ok === false) {
+    throw new Error(payload?.message ?? `Download request returned ${response.status}`)
+  }
+
+  await refreshDownloadPanel()
+  void refreshDownloadSummary()
   return payload
 }
 
@@ -179,19 +329,47 @@ async function clearDownloads() {
   return postDownloadAction('/api/civitai/downloads/clear')
 }
 
-export function useAssetDownloads() {
-  subscribers += 1
-  if (subscribers === 1) {
-    startPolling()
-  } else {
-    void refreshDownloads()
+async function pausePanelDownload(id: string) {
+  return postPanelDownloadAction(`/api/civitai/downloads/${encodeURIComponent(id)}/pause`)
+}
+
+async function resumePanelDownload(id: string) {
+  return postPanelDownloadAction(`/api/civitai/downloads/${encodeURIComponent(id)}/resume`)
+}
+
+async function cancelPanelDownload(id: string) {
+  return postPanelDownloadAction(`/api/civitai/downloads/${encodeURIComponent(id)}/cancel`)
+}
+
+async function clearPanelDownloads() {
+  return postPanelDownloadAction('/api/civitai/downloads/clear')
+}
+
+export function useAssetDownloads(options: { autoStart?: boolean } = {}) {
+  let subscribed = false
+  const start = () => {
+    if (subscribed) {
+      return
+    }
+
+    subscribeDownloads()
+    subscribed = true
+  }
+  const stop = () => {
+    if (!subscribed) {
+      return
+    }
+
+    unsubscribeDownloads()
+    subscribed = false
+  }
+
+  if (options.autoStart !== false) {
+    start()
   }
 
   onBeforeUnmount(() => {
-    subscribers = Math.max(0, subscribers - 1)
-    if (subscribers === 0) {
-      stopPolling()
-    }
+    stop()
   })
 
   return {
@@ -210,5 +388,69 @@ export function useAssetDownloads() {
     deleteDownloadedFile,
     redownloadDownload,
     clearDownloads,
+    startPolling: start,
+    stopPolling: stop,
+  }
+}
+
+export function useAssetDownloadPanel() {
+  let subscribed = false
+  const start = () => {
+    if (subscribed) {
+      return
+    }
+
+    subscribeDownloadPanel()
+    subscribed = true
+  }
+  const stop = () => {
+    if (!subscribed) {
+      return
+    }
+
+    unsubscribeDownloadPanel()
+    subscribed = false
+  }
+
+  onBeforeUnmount(() => {
+    stop()
+  })
+
+  return {
+    downloads: panelDownloads,
+    activeDownloads: panelActiveDownloads,
+    completedDownloads: panelCompletedDownloads,
+    loading: panelLoading,
+    error: panelError,
+    refreshDownloads: refreshDownloadPanel,
+    pauseDownload: pausePanelDownload,
+    resumeDownload: resumePanelDownload,
+    cancelDownload: cancelPanelDownload,
+    clearDownloads: clearPanelDownloads,
+    startPolling: start,
+    stopPolling: stop,
+  }
+}
+
+export function useAssetDownloadSummary() {
+  summarySubscribers += 1
+  if (summarySubscribers === 1) {
+    startSummaryPolling()
+  } else {
+    void refreshDownloadSummary()
+  }
+
+  onBeforeUnmount(() => {
+    summarySubscribers = Math.max(0, summarySubscribers - 1)
+    if (summarySubscribers === 0) {
+      stopSummaryPolling()
+    }
+  })
+
+  return {
+    counts: summaryCounts,
+    loading: summaryLoading,
+    error: summaryError,
+    refreshDownloadSummary,
   }
 }

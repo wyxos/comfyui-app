@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import {
   Check,
   Minus,
@@ -35,7 +35,18 @@ const {
   toggleCheckpointLora,
   setCheckpointLoraStrength,
   removeCheckpointLora,
+  assetPreviewDownloadActions,
 } = useProvidedHomeView()
+const {
+  queuingDownloadKey,
+  downloadForVersion,
+  downloadStatusLabel,
+  queueAssetDownload,
+  deleteAssetDownload,
+  modelDownloadKey,
+  startPolling,
+  stopPolling,
+} = assetPreviewDownloadActions
 
 const isLoraPreviewOpen = ref(false)
 const loraPreviewUrl = computed(() => getLoraPreviewUrl(props.lora.name))
@@ -66,10 +77,32 @@ function openLoraPreview() {
     isLoraPreviewOpen.value = true
   }
 }
+
+watch(isLoraPreviewOpen, (isOpen) => {
+  if (isOpen) {
+    startPolling()
+    return
+  }
+
+  stopPolling()
+})
+
+onBeforeUnmount(() => {
+  if (isLoraPreviewOpen.value) {
+    stopPolling()
+  }
+})
 </script>
 
 <template>
-  <div class="rounded-md border border-primary-foreground/12 bg-primary px-3 py-3">
+  <div
+    class="rounded-md border px-3 py-3 transition-colors"
+    :class="
+      lora.enabled
+        ? 'border-primary-foreground/12 bg-primary'
+        : 'border-primary-foreground/20 bg-primary-foreground/6'
+    "
+  >
     <div class="flex items-start gap-3">
       <button
         v-if="loraPreviewUrl"
@@ -279,8 +312,15 @@ function openLoraPreview() {
       :base-model="loraCompatibility?.baseModel ?? null"
       :trained-words="loraTriggerWords"
       :file-name="lora.name"
+      :queuing-download-key="queuingDownloadKey"
+      :download-for-version="downloadForVersion"
+      :download-status-label="downloadStatusLabel"
+      :queue-asset-download="queueAssetDownload"
+      :delete-asset-download="deleteAssetDownload"
+      :model-download-key="modelDownloadKey"
       model-type="LORA"
       kind-label="LoRA preview"
+      show-download-actions
       @close="isLoraPreviewOpen = false"
     />
   </div>

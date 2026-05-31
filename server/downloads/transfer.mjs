@@ -10,12 +10,14 @@ import { getStoredCivitaiApiKey } from '../settings.mjs'
 import { scheduleDownloadsPersist } from './state.mjs'
 import { refreshDownloadedSidecarsInBackground, safeUnlink, statFileIfExists } from './metadata.mjs'
 
+const progressPersistDelayMs = 15000
+
 export function updateDownloadProgress(download, bytesDownloaded, totalBytes) {
   download.bytesDownloaded = bytesDownloaded
   download.totalBytes = totalBytes
   download.progressPercent = totalBytes > 0 ? Math.min(100, Math.round((bytesDownloaded / totalBytes) * 1000) / 10) : null
   download.updatedAt = Date.now()
-  scheduleDownloadsPersist()
+  scheduleDownloadsPersist(false, progressPersistDelayMs)
 }
 
 export async function buildCivitaiDownloadHeaders(rangeStart = 0, rangeEnd = null) {

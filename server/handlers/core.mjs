@@ -1,10 +1,10 @@
-import { civitaiImagesUrl, civitaiModelsUrl, civitaiModelVersionsUrl, comfyUrl } from '../config.mjs'
+import { civitaiModelsUrl, civitaiModelVersionsUrl, comfyUrl } from '../config.mjs'
 import { safeTrim, tryParseJson } from '../shared.mjs'
 import { readJsonBody, sendError, sendJson } from '../http.mjs'
 import { comfyFetchJson } from '../comfy-client.mjs'
 import { getStoredCivitaiApiKey } from '../settings.mjs'
 import { enrichCheckpointOptions, enrichControlNetOptions, enrichLoraOptions } from '../model-options.mjs'
-import { buildCivitaiImagesQueryParams, buildCivitaiModelsQueryParams, parseInteger } from '../civitai-query.mjs'
+import { buildCivitaiModelsQueryParams, parseInteger } from '../civitai-query.mjs'
 import { getComfyCheckpointDir, getComfyControlNetDir, getComfyLoraDir } from '../model-paths.mjs'
 import { readLoraTriggerWords } from '../model-trigger-words.mjs'
 import { writeManualModelCompatibilityMetadata } from '../model-metadata.mjs'
@@ -12,6 +12,7 @@ import { extractOllamaModels, extractPromptRejectionMessage, getPreferredOllamaM
 import { extractCheckpointList, extractControlNetList, extractDefaultLoraStrength, extractLoraList, getPreferredCheckpoint } from '../comfy-options.mjs'
 import { serializeControlNetPreprocessors } from '../controlnet-options.mjs'
 import { comfySocketConnected } from '../comfy-socket.mjs'
+import { handleCivitaiImagesProxyWithFallback } from '../civitai-image-page.mjs'
 
 export async function handleCheckpointList(response) {
   try {
@@ -470,8 +471,5 @@ export async function handleCivitaiModelsProxy(url, response, request) {
 }
 
 export async function handleCivitaiImagesProxy(url, response, request) {
-  const upstreamUrl = new URL(civitaiImagesUrl.toString())
-  upstreamUrl.search = buildCivitaiImagesQueryParams(url.searchParams).toString()
-
-  return proxyCivitaiRequest(upstreamUrl, response, 'Could not load Civitai images.', request)
+  return handleCivitaiImagesProxyWithFallback(url, response, request)
 }

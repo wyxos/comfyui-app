@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ComfyUI Companion Extension",
   "description": "Queue Civitai model downloads in the local ComfyUI Companion app.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "host_permissions": [
     "https://civitai.com/*",
     "https://*.civitai.com/*",

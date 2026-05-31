@@ -18,6 +18,8 @@ import {
   handleDownloadGalleryPreview,
   handleDownloadPreview,
   handleDownloadsList,
+  handleDownloadsPanel,
+  handleDownloadsSummary,
   handlePostDownload,
   handleRepairDownloadPreviews,
 } from './handlers/downloads.mjs'
@@ -114,6 +116,14 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
     return handleDownloadsList(response)
   }
 
+  if (url.pathname === '/api/civitai/downloads/summary' && request.method === 'GET') {
+    return handleDownloadsSummary(response)
+  }
+
+  if (url.pathname === '/api/civitai/downloads/panel' && request.method === 'GET') {
+    return handleDownloadsPanel(response)
+  }
+
   if (url.pathname === '/api/civitai/downloads' && request.method === 'POST') {
     return handlePostDownload(request, response)
   }
@@ -123,7 +133,7 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
   }
 
   if (url.pathname === '/api/civitai/downloads/clear' && request.method === 'POST') {
-    return handleClearDownloads(response)
+    return handleClearDownloads(response, { compact: url.searchParams.get('view') === 'panel' })
   }
 
   if (url.pathname.startsWith('/api/civitai/downloads/') && url.pathname.endsWith('/preview') && request.method === 'GET') {
@@ -149,7 +159,7 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
       return handleRepairDownloadPreviews(response)
     }
 
-    return handleDownloadAction(downloadId, action, response)
+    return handleDownloadAction(downloadId, action, response, { compact: url.searchParams.get('view') === 'panel' })
   }
 
   if (url.pathname === '/api/model-preview' && request.method === 'GET') {
@@ -177,7 +187,7 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
   }
 
   if (url.pathname === '/api/jobs' && request.method === 'GET') {
-    return handleJobsList(response)
+    return handleJobsList(url, response)
   }
 
   if (url.pathname === '/api/jobs/queued/cancel' && request.method === 'POST') {

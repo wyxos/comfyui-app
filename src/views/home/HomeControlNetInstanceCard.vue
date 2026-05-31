@@ -52,13 +52,9 @@ const selectedPreprocessor = computed({
 const checkpointControlNetOptions = computed(() =>
   getCheckpointControlNetModelOptions(props.checkpoint, props.controlNet.model),
 )
-const canGeneratePreview = computed(() => {
-  return Boolean(
-    props.controlNet.inputImageName &&
-      !props.controlNet.isUploading &&
-      !props.controlNet.isGeneratingPreview,
-  )
-})
+const canGeneratePreview = computed(() =>
+  Boolean(props.controlNet.inputImageName && !props.controlNet.isUploading && !props.controlNet.isGeneratingPreview),
+)
 const canCopyPreview = computed(() => Boolean(props.controlNet.previewImageUrl && !props.controlNet.isCopyingPreview))
 const usesLineartPolarity = computed(() =>
   ['lineart', 'anime-lineart'].includes(props.controlNet.preprocessor),
@@ -102,7 +98,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="rounded-md border border-primary-foreground/12 bg-card p-3 text-card-foreground">
+  <div
+    class="rounded-md border p-3 text-card-foreground transition-colors"
+    :class="controlNet.enabled ? 'border-primary-foreground/12 bg-card' : 'border-primary-foreground/20 bg-muted/60'"
+  >
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="min-w-0">
         <p class="truncate text-sm font-semibold">

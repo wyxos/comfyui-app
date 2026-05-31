@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { AssetPreviewDownload } from '../../components/asset-preview/assetPreviewTypes'
 import { useAssetDownloads } from '../../composables/useAssetDownloads'
 import { createAssetDownloadActions } from './assetDownloadActions'
 import { createAssetSearchController } from './assetSearchController'
@@ -81,6 +82,7 @@ const downloadActionError = ref('')
 const {
   downloadByVersionId,
   queueDownload,
+  deleteDownloadedFile,
 } = useAssetDownloads()
 
 const {
@@ -330,6 +332,21 @@ function closeImageModal() {
   activeImageModel.value = null
 }
 
+async function deleteAssetDownload(download: AssetPreviewDownload) {
+  if (!download.id) {
+    downloadActionError.value = 'No download record was found for this file.'
+    return
+  }
+
+  downloadActionError.value = ''
+
+  try {
+    await deleteDownloadedFile(download.id)
+  } catch (caughtError) {
+    downloadActionError.value = caughtError instanceof Error ? caughtError.message : 'Could not delete downloaded file.'
+  }
+}
+
 onMounted(() => {
   loadBlacklistedModels()
   mountSearchController()
@@ -403,6 +420,7 @@ onBeforeUnmount(() => {
     canQueueVersion,
     versionDownloadButtonLabel,
     queueAssetDownload,
+    deleteAssetDownload,
     handleDownloadClick,
     modelUrl,
     toggleBaseModelFilter,

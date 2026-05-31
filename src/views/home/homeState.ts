@@ -9,6 +9,8 @@ import type {
   GeneratedOutputContextMenu,
   InputImageSnapshot,
   JobOutput,
+  JobCounts,
+  JobHistoryPagination,
   JobListTab,
   JobResponse,
   JobState,
@@ -89,6 +91,13 @@ const ollamaModelError = ref('')
 
 const activePromptId = ref('')
 const jobsList = ref<JobResponse[]>([])
+const jobCounts = ref<JobCounts>({ running: 0, queued: 0, history: 0 })
+const jobHistory = ref<JobHistoryPagination>({
+  page: 1,
+  pageSize: 10,
+  totalItems: 0,
+  totalPages: 1,
+})
 const queueSummary = ref<QueueSummary>(createEmptyQueueSummary())
 const jobListTab = ref<JobListTab>('running')
 const jobState = ref<JobState>('idle')
@@ -195,6 +204,8 @@ return {
   ollamaModelError,
   activePromptId,
   jobsList,
+  jobCounts,
+  jobHistory,
   queueSummary,
   jobListTab,
   jobState,

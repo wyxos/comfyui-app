@@ -2,7 +2,7 @@
 
 import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import UiSelect from '../../src/components/ui/UiSelect.vue'
 import UiPaginatedCardGrid from '../../src/components/ui/UiPaginatedCardGrid.vue'
@@ -165,6 +165,11 @@ describe('AssetPreviewModal', () => {
     document.body.innerHTML = ''
   })
 
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
   it('hydrates local asset previews from Civitai model and image data', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
@@ -266,6 +271,61 @@ describe('AssetPreviewModal', () => {
     expect(document.body.textContent).toContain('blue armor')
     expect(document.body.textContent).toContain('image-detail prompt')
     expect(document.body.textContent).toContain('Civitai API')
+  })
+
+  it('shows download and delete actions for a downloaded version file', async () => {
+    const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
+    const version = {
+      id: 201,
+      name: 'v16.0',
+      baseModel: 'Illustrious',
+      files: [
+        {
+          id: 301,
+          name: 'wai.safetensors',
+          type: 'Model',
+          primary: true,
+          downloadUrl: 'https://example.test/wai.safetensors',
+        },
+      ],
+    }
+    const download = {
+      id: 'download-1',
+      state: 'complete',
+      fileName: 'wai.safetensors',
+    }
+    const deleteAssetDownload = vi.fn()
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const wrapper = mount(AssetPreviewModal, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        model: {
+          id: 101,
+          name: 'Civitai WAI checkpoint',
+          type: 'Checkpoint',
+          modelVersions: [version],
+        },
+        showDownloadActions: true,
+        downloadForVersion: () => download,
+        queueAssetDownload: vi.fn(),
+        deleteAssetDownload,
+        modelDownloadKey: () => '101:201',
+      },
+    })
+
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Re-download')
+    const deleteButton = wrapper.find('button[aria-label="Delete wai.safetensors from disk"]')
+    expect(deleteButton.exists()).toBe(true)
+
+    await deleteButton.trigger('click')
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'Delete wai.safetensors from disk? The download record will remain for redownload.',
+    )
+    expect(deleteAssetDownload).toHaveBeenCalledWith(download, version)
   })
 })
 

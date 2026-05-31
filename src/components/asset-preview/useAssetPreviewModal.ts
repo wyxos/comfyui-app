@@ -95,7 +95,6 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     return words.filter((word) => typeof word === 'string' && word.trim()).map((word) => word.trim())
   })
   const activePrimaryFile = computed(() => primaryFileForVersion(selectedVersion.value))
-  const activeDownload = computed(() => downloadForVersion(selectedVersion.value))
   const modalTitle = computed(() => civitaiModel.value?.name ?? props.title ?? 'Preview')
   const modalSubtitle = computed(() => {
     const versionLabel = selectedVersion.value ? modelVersionLabel(selectedVersion.value) : ''
@@ -284,6 +283,11 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     return Boolean(props.queueAssetDownload && file?.downloadUrl && file.name && !versionDownloadUnavailableLabel(version))
   }
 
+  function canDeleteVersionDownload(version: CivitaiModelVersion) {
+    const download = downloadForVersion(version)
+    return Boolean(props.deleteAssetDownload && download?.id && download.state === 'complete')
+  }
+
   function versionDownloadButtonLabel(version: CivitaiModelVersion) {
     const unavailableLabel = versionDownloadUnavailableLabel(version)
     if (unavailableLabel) {
@@ -301,6 +305,21 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     }
 
     void props.queueAssetDownload(civitaiModel.value, version)
+  }
+
+  function deleteVersionDownload(version: CivitaiModelVersion) {
+    const download = downloadForVersion(version)
+    if (!download || !props.deleteAssetDownload) {
+      return
+    }
+
+    const fileName = download.fileName || primaryFileForVersion(version)?.name || modelVersionLabel(version)
+    const confirmed = window.confirm(`Delete ${fileName} from disk? The download record will remain for redownload.`)
+    if (!confirmed) {
+      return
+    }
+
+    void props.deleteAssetDownload(download, version)
   }
 
   function handleKeydown(event: KeyboardEvent) {
@@ -437,7 +456,6 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     normalizedImageMetaRows,
     activeTriggerWords,
     activePrimaryFile,
-    activeDownload,
     modalTitle,
     modalSubtitle,
     modelTypeLabel,
@@ -456,8 +474,10 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     downloadStatusLabel,
     modelDownloadKey,
     canQueueVersion,
+    canDeleteVersionDownload,
     versionDownloadButtonLabel,
     queueVersionDownload,
+    deleteVersionDownload,
     imageDimensions,
     imageNsfwLabel: (image: CivitaiImage | null | undefined) => imageNsfwLabel(civitaiModel.value, image),
     isImageNsfw: (image: CivitaiImage | null | undefined) => isImageNsfw(civitaiModel.value, image),

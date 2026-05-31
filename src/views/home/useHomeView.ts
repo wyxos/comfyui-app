@@ -1,5 +1,6 @@
 import { nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAssetPreviewDownloadActions } from '../../components/asset-preview/useAssetPreviewDownloadActions'
 import { apiJson } from './homeApi'
 import { createHomeAspectActions } from './homeAspectActions'
 import {
@@ -50,6 +51,7 @@ export function useHomeView() {
 const route = useRoute()
 const router = useRouter()
 const state = createHomeState()
+const assetPreviewDownloadActions = useAssetPreviewDownloadActions({ autoStart: false })
 let suppressFormTabRouteSync = false
 let preview = {} as HomePreviewComputed
 /* eslint-disable prefer-const */
@@ -445,6 +447,7 @@ return {
   ...pollingActions,
   ...generationActions,
   ...previewModalActions,
+  assetPreviewDownloadActions,
   openGeneratedOutputContextMenu,
   closeGeneratedOutputContextMenu,
   useGeneratedOutputAsImageInput,

@@ -26,6 +26,7 @@ type UpstreamState = {
   ollamaChat: unknown
   civitaiModels: unknown
   civitaiImages: unknown
+  civitaiImagePages: Record<string, string>
   civitaiVersion: unknown
   queue: unknown
   histories: Record<string, unknown>
@@ -145,6 +146,7 @@ function createDefaultUpstreamState(): UpstreamState {
       items: [{ id: 401, url: 'https://image.test/detail.png', meta: { prompt: 'sample prompt' } }],
       metadata: { totalItems: 1 },
     },
+    civitaiImagePages: {},
     civitaiVersion: {
       id: 201,
       name: 'v1',
@@ -171,6 +173,10 @@ function mergeUpstreamState(overrides: Partial<UpstreamState> | undefined) {
     failures: {
       ...createDefaultUpstreamState().failures,
       ...overrides?.failures,
+    },
+    civitaiImagePages: {
+      ...createDefaultUpstreamState().civitaiImagePages,
+      ...overrides?.civitaiImagePages,
     },
     histories: {
       ...createDefaultUpstreamState().histories,
@@ -363,6 +369,14 @@ export async function createServerHarness(options: HarnessOptions = {}) {
 
       if (url.pathname === '/api/v1/images') {
         return jsonResponse(upstream.civitaiImages)
+      }
+
+      const imagePageMatch = url.pathname.match(/^\/images\/(\d+)$/)
+      if (imagePageMatch) {
+        const pageBody = upstream.civitaiImagePages[imagePageMatch[1]]
+        return pageBody
+          ? binaryResponse(pageBody, 'text/html; charset=utf-8')
+          : jsonResponse({ error: `No image page with id ${imagePageMatch[1]}` }, 404)
       }
 
       if (url.pathname === '/api/v1/model-versions/201') {

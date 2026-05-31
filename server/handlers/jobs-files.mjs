@@ -6,8 +6,9 @@ import { buildOutputFileMeta, getComfyOutputDir, isFileLike, sanitizeFilename, s
 import { isJobTerminalState, markJob, serializeJob } from '../job-state.mjs'
 import { deletePersistedJob, ensureJobsLoaded } from '../job-store.mjs'
 import { buildQueueSummary, compareJobsForResponse, getQueueSnapshot, syncAllJobs, syncJob } from '../queue-state.mjs'
+import { buildPagedJobList } from '../job-list-pagination.mjs'
 
-export async function handleJobsList(response) {
+export async function handleJobsList(url, response) {
   ensureJobsLoaded()
   let queueSnapshot = null
   let queueError = null
@@ -18,15 +19,14 @@ export async function handleJobsList(response) {
     queueError = error.payload ?? error.message
   }
 
-  const serializedJobs = await Promise.all(
-    [...jobs.values()]
-      .sort(compareJobsForResponse)
-      .map((job) => serializeJob(job)),
-  )
+  const pagedJobs = buildPagedJobList([...jobs.values()].sort(compareJobsForResponse), url)
+  const serializedJobs = await Promise.all(pagedJobs.jobs.map((job) => serializeJob(job)))
 
   return sendJson(response, 200, {
     ok: true,
     jobs: serializedJobs,
+    counts: pagedJobs.counts,
+    history: pagedJobs.history,
     queue: queueSnapshot
       ? {
           ...buildQueueSummary(queueSnapshot),
