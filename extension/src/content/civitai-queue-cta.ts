@@ -1,3 +1,12 @@
+import {
+  applyDownloadStatus,
+  clearStatusPolling,
+  refreshButtonStatus,
+  setButtonState,
+  startStatusPolling,
+  type CompanionDownloadStatusItem,
+} from './download-status'
+
 const URN_PREFIX = 'civitai:'
 const CTA_TEXT = 'Queue in Companion'
 const CTA_PENDING_TEXT = 'Queueing...'
@@ -5,6 +14,7 @@ const CTA_SUCCESS_TEXT = 'Queued'
 const CTA_UNAVAILABLE_TEXT = 'Unavailable'
 const CTA_FAILURE_TEXT = 'Failed'
 const CTA_SELECTOR = '[data-comfy-companion-civitai-queue-cta]'
+const MODEL_PAGE_CTA_SELECTOR = '[data-comfy-companion-model-page-queue-cta]'
 const QUEUE_MESSAGE_TYPE = 'COMFY_COMPANION_QUEUE_CIVITAI_MODEL'
 const CIVITAI_DOMAINS = ['civitai.com', 'civitai.red'] as const
 const noop = () => {}
@@ -24,6 +34,7 @@ type RuntimeQueueResponse = {
   ok?: boolean
   error?: string
   message?: string
+  download?: CompanionDownloadStatusItem | null
 }
 
 declare const chrome: {
@@ -173,14 +184,6 @@ function resolveActionTarget(prefixCode: HTMLElement): CivitaiActionTarget | nul
   }
 }
 
-function setButtonState(button: HTMLButtonElement, label: string, disabled: boolean, title = ''): void {
-  button.textContent = label
-  button.disabled = disabled
-  button.title = title
-  button.style.opacity = disabled ? '0.72' : '1'
-  button.style.cursor = disabled ? 'default' : 'pointer'
-}
-
 function requestQueueCivitaiModel(reference: CivitaiModelReference): Promise<RuntimeQueueResponse | null> {
   if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
     return Promise.resolve(null)
@@ -230,6 +233,7 @@ function createCtaButton(target: CivitaiActionTarget, reference: CivitaiModelRef
     'white-space:nowrap',
   ].join(';')
   setButtonState(button, CTA_TEXT, false)
+  refreshButtonStatus(button, reference)
 
   button.addEventListener('click', () => {
     const currentReference = resolveCurrentModelReference(
@@ -241,7 +245,15 @@ function createCtaButton(target: CivitaiActionTarget, reference: CivitaiModelRef
     void requestQueueCivitaiModel(currentReference)
       .then((response) => {
         if (response?.ok === true) {
-          setButtonState(button, CTA_SUCCESS_TEXT, true)
+          if (response.download) {
+            const shouldPoll = applyDownloadStatus(button, response.download)
+            if (shouldPoll) {
+              startStatusPolling(button, currentReference, response.download.id)
+            }
+          } else {
+            setButtonState(button, CTA_SUCCESS_TEXT, true)
+            startStatusPolling(button, currentReference)
+          }
           return
         }
 
@@ -255,14 +267,62 @@ function createCtaButton(target: CivitaiActionTarget, reference: CivitaiModelRef
       .catch(() => {
         setButtonState(button, CTA_FAILURE_TEXT, true, 'Could not queue this Civitai model.')
       })
-      .finally(() => {
-        window.setTimeout(() => {
-          setButtonState(button, CTA_TEXT, false)
-        }, 1800)
-      })
   })
 
   return button
+}
+
+function isDownloadButton(element: Element): element is HTMLButtonElement | HTMLAnchorElement {
+  if (!(element instanceof HTMLButtonElement || element instanceof HTMLAnchorElement)) {
+    return false
+  }
+
+  const text = element.textContent?.replace(/\s+/g, ' ').trim() ?? ''
+  return /^Download(?:\s|\(|$)/i.test(text)
+}
+
+function findModelPageDownloadAction(root: ParentNode): HTMLButtonElement | HTMLAnchorElement | null {
+  const candidates = [
+    ...Array.from(root.querySelectorAll('button')),
+    ...Array.from(root.querySelectorAll('a')),
+  ]
+
+  return candidates.find(isDownloadButton) ?? null
+}
+
+function applyModelPageCta(root: ParentNode): void {
+  const reference = parseModelReferenceFromUrl()
+  if (reference === null) {
+    return
+  }
+
+  const downloadAction = findModelPageDownloadAction(root) ?? findModelPageDownloadAction(document)
+  if (!(downloadAction instanceof HTMLElement)) {
+    return
+  }
+
+  const actionHost = downloadAction.parentElement
+  if (!(actionHost instanceof HTMLElement)) {
+    return
+  }
+
+  const existingButton = actionHost.querySelector(MODEL_PAGE_CTA_SELECTOR)
+  if (existingButton instanceof HTMLButtonElement) {
+    if (existingButton.dataset.comfyCompanionCivitaiQueueCta === reference.key) {
+      refreshButtonStatus(existingButton, reference)
+      return
+    }
+
+    clearStatusPolling(existingButton)
+    existingButton.remove()
+  }
+
+  const button = createCtaButton({ referenceRoot: actionHost, actionHost }, reference)
+  button.dataset.comfyCompanionModelPageQueueCta = 'true'
+  button.style.width = '100%'
+  button.style.marginTop = '8px'
+  button.style.minHeight = '36px'
+  actionHost.appendChild(button)
 }
 
 function applyBrowseCta(target: CivitaiActionTarget): void {
@@ -274,9 +334,11 @@ function applyBrowseCta(target: CivitaiActionTarget): void {
   const existingButton = target.actionHost.querySelector(CTA_SELECTOR)
   if (existingButton instanceof HTMLButtonElement) {
     if (existingButton.dataset.comfyCompanionCivitaiQueueCta === reference.key) {
+      refreshButtonStatus(existingButton, reference)
       return
     }
 
+    clearStatusPolling(existingButton)
     existingButton.remove()
   }
 
@@ -294,6 +356,8 @@ function syncBrowseCtas(root: ParentNode): void {
   const seen = new Set<HTMLElement>()
   const directCodes = root instanceof HTMLElement && root.tagName === 'CODE' ? [root] : []
 
+  applyModelPageCta(root)
+
   for (const code of [...directCodes, ...Array.from(root.querySelectorAll('code'))]) {
     if (!(code instanceof HTMLElement) || code.textContent?.trim().toLowerCase() !== URN_PREFIX) {
       continue
@@ -310,6 +374,11 @@ function syncBrowseCtas(root: ParentNode): void {
 }
 
 function syncMutationTarget(mutation: MutationRecord): void {
+  const targetElement = mutation.target instanceof Element ? mutation.target : mutation.target.parentElement
+  if (targetElement?.closest(`${CTA_SELECTOR}, ${MODEL_PAGE_CTA_SELECTOR}`)) {
+    return
+  }
+
   if (mutation.target instanceof Element) {
     syncBrowseCtas(mutation.target)
     return
@@ -357,6 +426,11 @@ export function installCivitaiQueueCtas(): () => void {
 
   return () => {
     observer.disconnect()
+    document.querySelectorAll(`${CTA_SELECTOR}, ${MODEL_PAGE_CTA_SELECTOR}`).forEach((button) => {
+      if (button instanceof HTMLButtonElement) {
+        clearStatusPolling(button)
+      }
+    })
     isInstalled = false
   }
 }

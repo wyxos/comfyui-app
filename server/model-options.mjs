@@ -6,6 +6,7 @@ import { downloadsLoaded, readDownloadsState } from './downloads/state.mjs'
 import { getComfyCheckpointDir, getComfyControlNetDir, getComfyLoraDir, resolveModelPath } from './model-paths.mjs'
 import { readJsonFileIfExists } from './model-trigger-words.mjs'
 import { getModelCompatibilityMetadata, normalizeModelCompatibilityMetadata } from './model-metadata.mjs'
+import { detectCheckpointFamily } from './checkpoint-family.mjs'
 
 export async function readModelSidecar(rootPath, modelName) {
   const resolvedModelPath = resolveModelPath(rootPath, modelName)
@@ -245,6 +246,7 @@ export async function enrichCheckpointOptions(checkpoints) {
     )
     return {
       ...checkpoint,
+      family: detectCheckpointFamily(checkpoint.name, compatibility),
       displayName: buildModelDisplayName(checkpoint.name, sidecar?.payload),
       downloaded: Boolean(sidecar || previewPath),
       previewUrl: previewPath ? `/api/model-preview?type=checkpoint&name=${encodeURIComponent(checkpoint.name)}` : null,

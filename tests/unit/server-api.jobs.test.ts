@@ -362,6 +362,70 @@ describe('companion server API routes', () => {
       expect(promptText).toContain('portrait, (detail boost:1.2)')
     })
 
+  it('routes checkpoint generation through Anima workflow when sidecar metadata says Anima', async () => {
+      const server = await setupHarness({
+        upstream: {
+          checkpointInfo: {
+            CheckpointLoaderSimple: {
+              input: {
+                required: {
+                  ckpt_name: [['novaAnimeAM_v20.safetensors']],
+                },
+              },
+            },
+          },
+        },
+      })
+      await writeFile(join(server.checkpointDir, 'novaAnimeAM_v20.safetensors'), 'checkpoint', 'utf8')
+      await writeFile(
+        join(server.checkpointDir, 'novaAnimeAM_v20.safetensors.civitai.info'),
+        JSON.stringify({
+          source: 'civitai',
+          modelId: 2604424,
+          versionId: 2994532,
+          modelType: 'Checkpoint',
+          baseModel: 'Anima',
+        }),
+        'utf8',
+      )
+
+      await expect(server.request('/api/checkpoints')).resolves.toMatchObject({
+        payload: expect.objectContaining({
+          checkpoints: [
+            expect.objectContaining({
+              name: 'novaAnimeAM_v20.safetensors',
+              family: 'anima',
+              compatibility: expect.objectContaining({
+                baseModel: 'Anima',
+                baseModelKey: 'anima',
+              }),
+            }),
+          ],
+        }),
+      })
+
+      await expect(
+        server.json('POST', '/api/generate', {
+          prompt: 'portrait',
+          checkpoint: 'novaAnimeAM_v20.safetensors',
+          width: 1024,
+          height: 1024,
+        }),
+      ).resolves.toMatchObject({
+        payload: expect.objectContaining({
+          ok: true,
+          promptId: 'prompt-1',
+        }),
+      })
+
+      const promptCall = server.calls.find((call) => call.method === 'POST' && call.url.pathname === '/prompt')
+      const workflowNodes = workflowNodesFromBody(promptCall?.body)
+      expect(workflowNodes.some((node) => node.class_type === 'CLIPLoader')).toBe(true)
+      expect(workflowNodes.some((node) => node.class_type === 'VAELoader')).toBe(true)
+      expect(workflowNodes.some((node) => node.class_type === 'EmptySD3LatentImage')).toBe(true)
+      expect(workflowNodes.some((node) => node.class_type === 'EmptyLatentImage')).toBe(false)
+    })
+
   it('cancels only app-known queued jobs from the ComfyUI queue', async () => {
       const server = await setupHarness()
 

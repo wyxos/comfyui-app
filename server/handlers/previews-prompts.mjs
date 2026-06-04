@@ -9,7 +9,7 @@ import {
   safeModelName,
 } from '../model-paths.mjs'
 import { generateControlNetPreview } from '../controlnet-preview.mjs'
-import { detectCheckpointFamily } from '../workflow.mjs'
+import { detectCheckpointFamily } from '../checkpoint-family.mjs'
 import { extractOllamaErrorMessage, improvePromptWithOllama } from '../ollama.mjs'
 
 export async function handleModelPreview(url, response) {

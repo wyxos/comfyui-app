@@ -168,7 +168,7 @@ function applySelectedJobState(job: JobResponse | null) {
 
   if (job.state === 'error') {
     statusLine.value = 'Failed'
-    detailLine.value = job.currentNodeLabel ?? 'Generation failed.'
+    detailLine.value = job.error || job.currentNodeLabel || 'Generation failed.'
     return
   }
 

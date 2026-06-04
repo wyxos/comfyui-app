@@ -6,7 +6,8 @@ import { enrichCheckpointOptions, enrichControlNetOptions } from '../model-optio
 import { appendTriggerWordsToPrompt, extractRequestedCheckpointJobs, isFileLike, resolveStoredInputImageName, storeInputImageFile } from '../model-paths.mjs'
 import { classifyControlNetCompatibility } from '../model-metadata.mjs'
 import { extractControlNetEntries } from '../controlnet-options.mjs'
-import { buildWorkflow, detectCheckpointFamily } from '../workflow.mjs'
+import { detectCheckpointFamily } from '../checkpoint-family.mjs'
+import { buildWorkflow } from '../workflow.mjs'
 import { ensureJob } from '../job-state.mjs'
 import { buildRequestedPromptVariants, extractPromptRejectionMessage, normalizeImprovedPromptText } from '../ollama.mjs'
 
@@ -152,16 +153,31 @@ export async function handleGenerate(request, response) {
     }
   }
 
-  async function validateControlNetCompatibility(checkpointName, controlNetEntries) {
+  async function resolveCheckpointContext(checkpointName) {
+    const fallbackFamily = detectCheckpointFamily(checkpointName)
+    try {
+      const [checkpoint] = await enrichCheckpointOptions([{ name: checkpointName, family: fallbackFamily }])
+      return {
+        checkpoint: checkpoint ?? null,
+        family: checkpoint?.family ?? fallbackFamily,
+      }
+    } catch {
+      return {
+        checkpoint: null,
+        family: fallbackFamily,
+      }
+    }
+  }
+
+  async function validateControlNetCompatibility(checkpointContext, controlNetEntries) {
     if (!controlNetEntries.length) {
       return { ok: true }
     }
 
-    const checkpointFamily = detectCheckpointFamily(checkpointName)
-    let checkpoint
+    const checkpoint = checkpointContext.checkpoint
+    const checkpointFamily = checkpointContext.family
     let controlNetOptions
     try {
-      ;[checkpoint] = await enrichCheckpointOptions([{ name: checkpointName, family: checkpointFamily }])
       controlNetOptions = await enrichControlNetOptions(
         [...new Set(controlNetEntries.map((controlNet) => controlNet.model))]
           .map((name) => ({ name, displayName: name })),
@@ -185,7 +201,7 @@ export async function handleGenerate(request, response) {
           ok: false,
           status: 400,
           error: 'invalid-controlnet',
-          message: `${controlNet.model} is not compatible with ${checkpoint?.displayName ?? checkpointName}.`,
+          message: `${controlNet.model} is not compatible with ${checkpoint?.displayName ?? checkpoint?.name ?? 'the selected checkpoint'}.`,
         }
       }
     }
@@ -207,6 +223,7 @@ export async function handleGenerate(request, response) {
       const checkpointImprovedPromptText = improvedPromptText
         ? appendTriggerWordsToPrompt(improvedPromptText, loraTriggerWords)
         : ''
+      const checkpointContext = await resolveCheckpointContext(checkpointJob.name)
       const checkpointPromptVariants = buildRequestedPromptVariants(
         checkpointPromptText,
         checkpointImprovedPromptText,
@@ -223,7 +240,7 @@ export async function handleGenerate(request, response) {
         )
       }
       const controlNets = resolvedCheckpointControlNets.controlNets ?? []
-      const controlNetCompatibility = await validateControlNetCompatibility(checkpointJob.name, controlNets)
+      const controlNetCompatibility = await validateControlNetCompatibility(checkpointContext, controlNets)
       if (!controlNetCompatibility.ok) {
         return sendError(
           response,
@@ -257,6 +274,7 @@ export async function handleGenerate(request, response) {
         seed,
         inputImageName,
         controlNets,
+        checkpointFamily: checkpointContext.family,
       })
 
       const submission = await submitComfyPrompt(prompt)

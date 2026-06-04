@@ -17,6 +17,7 @@ import {
   handleDownloadAction,
   handleDownloadGalleryPreview,
   handleDownloadPreview,
+  handleDownloadStatus,
   handleDownloadsList,
   handleDownloadsPanel,
   handleDownloadsSummary,
@@ -122,6 +123,10 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
 
   if (url.pathname === '/api/civitai/downloads/panel' && request.method === 'GET') {
     return handleDownloadsPanel(response)
+  }
+
+  if (url.pathname === '/api/civitai/downloads/status' && request.method === 'GET') {
+    return handleDownloadStatus(url, response)
   }
 
   if (url.pathname === '/api/civitai/downloads' && request.method === 'POST') {

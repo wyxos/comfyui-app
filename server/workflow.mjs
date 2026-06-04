@@ -1,5 +1,6 @@
 import { animaAssets, samplerProfiles } from './config.mjs'
 import { safeTrim } from './shared.mjs'
+import { detectCheckpointFamily, normalizeCheckpointFamilyToken } from './checkpoint-family.mjs'
 import { normalizeCfg, normalizeDenoise, normalizeDimension, normalizeSeed, normalizeSteps } from './model-paths.mjs'
 import {
   applyAnimaLLLiteSourcesToModel,
@@ -7,9 +8,6 @@ import {
   createAnimaLLLiteSourceNodes,
   createControlNetSourceNodes,
 } from './controlnet-workflow.mjs'
-export function detectCheckpointFamily(checkpointName) {
-  return checkpointName.toLowerCase().includes('anima') ? 'anima' : 'sdxl'
-}
 export function createNodeIdGenerator(start = 3) {
   let nextId = start
   return () => String(nextId++)
@@ -455,8 +453,9 @@ export function buildWorkflow({
   seed,
   inputImageName,
   controlNets,
+  checkpointFamily,
 }) {
-  const family = detectCheckpointFamily(checkpoint)
+  const family = normalizeCheckpointFamilyToken(checkpointFamily) ?? detectCheckpointFamily(checkpoint)
   const samplerProfile = samplerProfiles[family] ?? samplerProfiles.sdxl
   const normalizedWidth = normalizeDimension(width, samplerProfile.width)
   const normalizedHeight = normalizeDimension(height, samplerProfile.height)

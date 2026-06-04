@@ -37,6 +37,34 @@ export async function handleDownloadsPanel(response) {
   return sendJson(response, 200, createDownloadsPanelResponse(civitaiDownloads.values()))
 }
 
+export async function handleDownloadStatus(url, response) {
+  await ensureDownloadsLoaded()
+
+  const requestedId = url.searchParams.get('id')?.trim() ?? ''
+  const modelId = parseInteger(url.searchParams.get('modelId'))
+  const versionId = parseInteger(url.searchParams.get('versionId'))
+  let download = requestedId ? civitaiDownloads.get(requestedId) : null
+
+  if (!download && modelId) {
+    const matches = [...civitaiDownloads.values()]
+      .filter((item) => {
+        if (parseInteger(item.modelId) !== modelId) {
+          return false
+        }
+
+        return !versionId || parseInteger(item.versionId) === versionId
+      })
+      .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
+
+    download = matches[0] ?? null
+  }
+
+  return sendJson(response, 200, {
+    ok: true,
+    item: download ? serializeDownloadPanelItem(download) : null,
+  })
+}
+
 export async function handlePostDownload(request, response) {
   let body
   try {

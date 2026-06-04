@@ -1,7 +1,7 @@
 import { preferredCheckpoint } from './config.mjs'
 import { safeTrim } from './shared.mjs'
 import { normalizeNumericField } from './model-paths.mjs'
-import { detectCheckpointFamily } from './workflow.mjs'
+import { detectCheckpointFamily } from './checkpoint-family.mjs'
 
 export function extractCheckpointList(payload) {
   const rawList = payload?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0]

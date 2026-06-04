@@ -1,5 +1,6 @@
 const COMPANION_BASE_URL = 'http://127.0.0.1:3210'
 const QUEUE_MESSAGE_TYPE = 'COMFY_COMPANION_QUEUE_CIVITAI_MODEL'
+const STATUS_MESSAGE_TYPE = 'COMFY_COMPANION_CIVITAI_DOWNLOAD_STATUS'
 
 type RuntimeMessageSender = {
   tab?: {
@@ -14,6 +15,13 @@ type QueueCivitaiModelMessage = {
   nsfw?: unknown
   sourceHostname?: unknown
   sourceUrl?: unknown
+}
+
+type DownloadStatusMessage = {
+  type: typeof STATUS_MESSAGE_TYPE
+  downloadId?: unknown
+  modelId?: unknown
+  modelVersionId?: unknown
 }
 
 type CivitaiModelFile = {
@@ -94,8 +102,34 @@ type QueueDownloadPayload = {
 
 type FetchLike = typeof fetch
 
+export type CompanionDownloadStatusItem = {
+  id: string
+  state: string
+  modelId: number
+  modelName?: string
+  modelType?: string
+  versionId: number
+  versionName?: string
+  fileName?: string
+  bytesDownloaded?: number
+  totalBytes?: number | null
+  progressPercent?: number | null
+  error?: string | null
+  updatedAt?: number
+}
+
 export type QueueCompanionResult = {
   ok: boolean
+  status?: number
+  payload?: unknown
+  download?: CompanionDownloadStatusItem | null
+  error?: string
+  message?: string
+}
+
+export type DownloadStatusResult = {
+  ok: boolean
+  item?: CompanionDownloadStatusItem | null
   status?: number
   payload?: unknown
   error?: string
@@ -290,12 +324,88 @@ async function postCompanionDownload(fetchImpl: FetchLike, baseUrl: string, payl
   })
 }
 
+function parseDownloadStatusItem(value: unknown): CompanionDownloadStatusItem | null {
+  if (!isPlainObject(value)) {
+    return null
+  }
+
+  const id = safeTrim(value.id)
+  const state = safeTrim(value.state)
+  const modelId = parsePositiveInteger(value.modelId)
+  const versionId = parsePositiveInteger(value.versionId)
+
+  if (!id || !state || !modelId || !versionId) {
+    return null
+  }
+
+  return {
+    id,
+    state,
+    modelId,
+    modelName: safeTrim(value.modelName),
+    modelType: safeTrim(value.modelType),
+    versionId,
+    versionName: safeTrim(value.versionName),
+    fileName: safeTrim(value.fileName),
+    bytesDownloaded: typeof value.bytesDownloaded === 'number' ? value.bytesDownloaded : 0,
+    totalBytes: typeof value.totalBytes === 'number' ? value.totalBytes : null,
+    progressPercent: typeof value.progressPercent === 'number' ? value.progressPercent : null,
+    error: typeof value.error === 'string' ? value.error : null,
+    updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : 0,
+  }
+}
+
+function extractDownloadStatusItem(payload: unknown): CompanionDownloadStatusItem | null {
+  return isPlainObject(payload) ? parseDownloadStatusItem(payload.item) : null
+}
+
+export async function getCompanionCivitaiDownloadStatus(
+  message: DownloadStatusMessage,
+  options: { fetchImpl?: FetchLike; baseUrl?: string } = {},
+): Promise<DownloadStatusResult> {
+  const downloadId = safeTrim(message.downloadId)
+  const modelId = parsePositiveInteger(message.modelId)
+  const modelVersionId = parsePositiveInteger(message.modelVersionId)
+
+  if (!downloadId && !modelId) {
+    return { ok: false, error: 'invalid-status-request', message: 'A download id or Civitai model id is required.' }
+  }
+
+  const fetchImpl = options.fetchImpl ?? fetch
+  const baseUrl = options.baseUrl ?? COMPANION_BASE_URL
+  const url = new URL('/api/civitai/downloads/status', baseUrl)
+  if (downloadId) {
+    url.searchParams.set('id', downloadId)
+  } else if (modelId) {
+    url.searchParams.set('modelId', String(modelId))
+    if (modelVersionId) {
+      url.searchParams.set('versionId', String(modelVersionId))
+    }
+  }
+
+  try {
+    const payload = await fetchJson(fetchImpl, url, { headers: { Accept: 'application/json' } })
+    return { ok: true, item: extractDownloadStatusItem(payload), payload }
+  } catch (error) {
+    return createStatusFailure(error)
+  }
+}
+
 function createFailure(error: unknown): QueueCompanionResult {
   return {
     ok: false,
     status: isPlainObject(error) && typeof error.status === 'number' ? error.status : 0,
     payload: isPlainObject(error) ? error.payload : null,
     message: error instanceof Error ? error.message : 'Could not queue the Civitai download.',
+  }
+}
+
+function createStatusFailure(error: unknown): DownloadStatusResult {
+  return {
+    ok: false,
+    status: isPlainObject(error) && typeof error.status === 'number' ? error.status : 0,
+    payload: isPlainObject(error) ? error.payload : null,
+    message: error instanceof Error ? error.message : 'Could not read the Civitai download status.',
   }
 }
 
@@ -339,7 +449,7 @@ export async function queueCompanionCivitaiDownload(
     }
 
     const payload = await postCompanionDownload(fetchImpl, baseUrl, downloadPayload)
-    return { ok: true, payload }
+    return { ok: true, payload, download: extractDownloadStatusItem(payload) }
   } catch (error) {
     return createFailure(error)
   }
@@ -350,17 +460,33 @@ export function handleQueueRuntimeMessage(
   _sender: RuntimeMessageSender,
   sendResponse: (response?: unknown) => void,
 ): boolean {
-  if (!isPlainObject(message) || message.type !== QUEUE_MESSAGE_TYPE) {
+  if (!isPlainObject(message)) {
     return false
   }
 
-  void queueCompanionCivitaiDownload(message as QueueCivitaiModelMessage)
-    .then((response) => {
-      sendResponse(response)
-    })
-    .catch((error) => {
-      sendResponse(createFailure(error))
-    })
+  if (message.type === QUEUE_MESSAGE_TYPE) {
+    void queueCompanionCivitaiDownload(message as QueueCivitaiModelMessage)
+      .then((response) => {
+        sendResponse(response)
+      })
+      .catch((error) => {
+        sendResponse(createFailure(error))
+      })
 
-  return true
+    return true
+  }
+
+  if (message.type === STATUS_MESSAGE_TYPE) {
+    void getCompanionCivitaiDownloadStatus(message as DownloadStatusMessage)
+      .then((response) => {
+        sendResponse(response)
+      })
+      .catch((error) => {
+        sendResponse(createStatusFailure(error))
+      })
+
+    return true
+  }
+
+  return false
 }

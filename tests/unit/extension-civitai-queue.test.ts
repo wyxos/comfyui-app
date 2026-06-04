@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   buildCompanionDownloadPayload,
+  getCompanionCivitaiDownloadStatus,
   queueCompanionCivitaiDownload,
 } from '../../extension/src/background/queue-runtime'
 import {
@@ -116,14 +117,20 @@ describe('ComfyUI Companion browser extension Civitai queue helpers', () => {
           },
         ],
       }))
-      .mockResolvedValueOnce(jsonResponse({ ok: true, item: { id: '101__201__301', state: 'queued' } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, item: { id: '101__201__301', state: 'queued', modelId: 101, versionId: 201 } }))
 
     const result = await queueCompanionCivitaiDownload(
       { type: 'COMFY_COMPANION_QUEUE_CIVITAI_MODEL', modelId: 101, modelVersionId: 201 },
       { fetchImpl: fetchMock, baseUrl: 'http://127.0.0.1:3210' },
     )
 
-    expect(result).toMatchObject({ ok: true })
+    expect(result).toMatchObject({
+      ok: true,
+      download: {
+        id: '101__201__301',
+        state: 'queued',
+      },
+    })
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       new URL('http://127.0.0.1:3210/api/civitai/models?modelVersionId=201'),
@@ -136,6 +143,39 @@ describe('ComfyUI Companion browser extension Civitai queue helpers', () => {
         method: 'POST',
         body: expect.stringContaining('"downloadUrl":"https://download.test/detail.safetensors"'),
       }),
+    )
+  })
+
+  it('fetches companion download status by Civitai model reference', async () => {
+    const fetchMock = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>()
+      .mockResolvedValueOnce(jsonResponse({
+        ok: true,
+        item: {
+          id: '101__201__301',
+          state: 'downloading',
+          modelId: 101,
+          versionId: 201,
+          fileName: 'detail.safetensors',
+          progressPercent: 42,
+        },
+      }))
+
+    const result = await getCompanionCivitaiDownloadStatus(
+      { type: 'COMFY_COMPANION_CIVITAI_DOWNLOAD_STATUS', modelId: 101, modelVersionId: 201 },
+      { fetchImpl: fetchMock, baseUrl: 'http://127.0.0.1:3210' },
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      item: {
+        id: '101__201__301',
+        state: 'downloading',
+        progressPercent: 42,
+      },
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL('http://127.0.0.1:3210/api/civitai/downloads/status?modelId=101&versionId=201'),
+      expect.objectContaining({ headers: { Accept: 'application/json' } }),
     )
   })
 
@@ -184,8 +224,23 @@ describe('ComfyUI Companion browser extension Civitai queue helpers', () => {
       configurable: true,
       value: new URL('https://civitai.com/models/101/detail') as unknown as Location,
     })
-    const sendMessage = vi.fn((_: unknown, callback?: (response: unknown) => void) => {
-      callback?.({ ok: true })
+    const sendMessage = vi.fn((message: unknown, callback?: (response: unknown) => void) => {
+      if (message && typeof message === 'object' && 'type' in message && message.type === 'COMFY_COMPANION_CIVITAI_DOWNLOAD_STATUS') {
+        callback?.({ ok: true, item: null })
+        return
+      }
+
+      callback?.({
+        ok: true,
+        download: {
+          id: '101__201__301',
+          state: 'complete',
+          modelId: 101,
+          versionId: 201,
+          fileName: 'detail.safetensors',
+          progressPercent: 100,
+        },
+      })
     })
     vi.stubGlobal('chrome', {
       runtime: {
@@ -231,6 +286,64 @@ describe('ComfyUI Companion browser extension Civitai queue helpers', () => {
       modelVersionId: 201,
       sourceHostname: 'civitai.com',
       sourceUrl: 'https://civitai.com/models/101/detail',
+    }, expect.any(Function))
+    expect(button?.textContent).toBe('Downloaded in Companion')
+
+    cleanup()
+  })
+
+  it('adds a status-aware queue CTA near native Civitai model page downloads', async () => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('https://civitai.com/models/534506/niji-semi-realism') as unknown as Location,
+    })
+    const sendMessage = vi.fn((message: unknown, callback?: (response: unknown) => void) => {
+      if (message && typeof message === 'object' && 'type' in message && message.type === 'COMFY_COMPANION_CIVITAI_DOWNLOAD_STATUS') {
+        callback?.({
+          ok: true,
+          item: {
+            id: '534506__2854725__2740836',
+            state: 'complete',
+            modelId: 534506,
+            versionId: 2854725,
+            fileName: 'Niji_Semi_realism_F_N_R_epoch_10.safetensors',
+            progressPercent: 100,
+          },
+        })
+        return
+      }
+
+      callback?.({ ok: true })
+    })
+    vi.stubGlobal('chrome', {
+      runtime: {
+        lastError: null,
+        sendMessage,
+      },
+    })
+    document.body.innerHTML = `
+      <main>
+        <aside>
+          <section>
+            <h2>Download</h2>
+            <button type="button">Download (217.92 MB)</button>
+          </section>
+        </aside>
+      </main>
+    `
+
+    const cleanup = installCivitaiQueueCtas()
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0)
+    })
+    const button = document.querySelector('[data-comfy-companion-model-page-queue-cta]')
+
+    expect(button).toBeInstanceOf(HTMLButtonElement)
+    expect(button?.textContent).toBe('Downloaded in Companion')
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'COMFY_COMPANION_CIVITAI_DOWNLOAD_STATUS',
+      modelId: 534506,
+      modelVersionId: null,
     }, expect.any(Function))
 
     cleanup()
