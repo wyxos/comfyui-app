@@ -15,7 +15,22 @@ coverage
 .playwright-cli
 .vitest-attachments
 tests/e2e/__screenshots__
+.codex
+.codex-logs
 .codex/*.log
+
+# Local companion state and generated model/download artifacts
+settings.json
+downloads.json
+downloads.json.bak
+downloads.json.*.tmp
+jobs.sqlite
+*.civitai.info
+*.companion.info
+*.part
+*.previews
+*.safetensors
+*.ckpt
 
 .vscode/*
 !.vscode/extensions.json
