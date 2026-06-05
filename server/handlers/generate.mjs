@@ -9,7 +9,7 @@ import { extractControlNetEntries } from '../controlnet-options.mjs'
 import { detectCheckpointFamily } from '../checkpoint-family.mjs'
 import { buildWorkflow } from '../workflow.mjs'
 import { ensureJob } from '../job-state.mjs'
-import { buildRequestedPromptVariants, extractPromptRejectionMessage, normalizeImprovedPromptText } from '../ollama.mjs'
+import { buildRequestedPromptVariants, extractPromptRejectionMessage } from '../prompt-variants.mjs'
 
 export async function handleGenerate(request, response) {
   const contentType = request.headers['content-type'] ?? ''
@@ -28,9 +28,6 @@ export async function handleGenerate(request, response) {
   }
 
   const promptText = safeTrim(body instanceof FormData ? body.get('prompt') : body.prompt)
-  const improvedPromptText = normalizeImprovedPromptText(
-    body instanceof FormData ? body.get('improvedPrompt') : body.improvedPrompt,
-  )
   const negativePrompt = safeTrim(
     body instanceof FormData ? body.get('negativePrompt') : body.negativePrompt,
   )
@@ -47,14 +44,14 @@ export async function handleGenerate(request, response) {
   const inputImageDisplayName = safeTrim(
     body instanceof FormData ? body.get('inputImageDisplayName') : body.inputImageDisplayName,
   )
-  const promptVariants = buildRequestedPromptVariants(promptText, improvedPromptText)
+  const promptVariants = buildRequestedPromptVariants(promptText)
 
   if (!promptVariants.length) {
     return sendError(
       response,
       400,
       'missing-prompt',
-      'Provide an original prompt, an improved prompt, or both.',
+      'Prompt text is required.',
     )
   }
 
@@ -220,14 +217,8 @@ export async function handleGenerate(request, response) {
       }))
       const loraTriggerWords = checkpointJob.loras.flatMap((lora) => lora.triggerWords ?? [])
       const checkpointPromptText = appendTriggerWordsToPrompt(promptText, loraTriggerWords)
-      const checkpointImprovedPromptText = improvedPromptText
-        ? appendTriggerWordsToPrompt(improvedPromptText, loraTriggerWords)
-        : ''
       const checkpointContext = await resolveCheckpointContext(checkpointJob.name)
-      const checkpointPromptVariants = buildRequestedPromptVariants(
-        checkpointPromptText,
-        checkpointImprovedPromptText,
-      )
+      const checkpointPromptVariants = buildRequestedPromptVariants(checkpointPromptText)
       const nestedControlNets = extractControlNetEntries(checkpointJob.controlNets)
       const resolvedCheckpointControlNets = await resolveControlNetImages(nestedControlNets)
       if (!resolvedCheckpointControlNets.ok) {
@@ -289,9 +280,6 @@ export async function handleGenerate(request, response) {
             state: 'queued',
             seed: submittedJobs[0].seed,
             promptVariants: submittedJobs[0].promptVariants,
-            improvedPrompt:
-              submittedJobs[0].promptVariants.find((variant) => variant.isImproved)?.promptText ?? null,
-            promptImprovementError: null,
             inputImageName,
             inputImageDisplayName,
             partialFailure: true,
@@ -315,7 +303,6 @@ export async function handleGenerate(request, response) {
         promptText,
         negativePrompt,
         promptVariants: checkpointPromptVariants,
-        promptImprovementError: null,
         checkpoint: checkpointJob.name,
         loras,
         family,
@@ -353,9 +340,6 @@ export async function handleGenerate(request, response) {
       state: 'queued',
       seed: submittedJobs[0]?.seed ?? null,
       promptVariants: submittedJobs[0]?.promptVariants ?? promptVariants,
-      improvedPrompt:
-        submittedJobs[0]?.promptVariants?.find((variant) => variant.isImproved)?.promptText ?? null,
-      promptImprovementError: null,
       inputImageName,
       inputImageDisplayName,
     })

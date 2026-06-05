@@ -21,7 +21,6 @@ import {
 
 export function createHomePromptTagActions(state: HomeState) {
 const {
-  improvedPrompt,
   negativePromptDraft,
   negativePromptTags,
   prompt,
@@ -72,14 +71,6 @@ function formatCompiledPromptTag(tag: PromptTag) {
 
   const strength = formatPromptWeightInput(tag.strength)
   return isNeutralPromptWeight(strength) ? text : `(${text}:${strength})`
-}
-
-function buildPromptForImprovement() {
-  return buildPromptFromSections(promptSections.value, promptSectionDrafts.value) || prompt.value.trim()
-}
-
-function buildImprovedPromptForGeneration() {
-  return improvedPrompt.value.trim()
 }
 
 function hasPromptSectionDrafts() {
@@ -392,8 +383,6 @@ return {
   buildNegativePromptFromTags,
   buildPromptSectionsForPersistence,
   formatCompiledPromptTag,
-  buildPromptForImprovement,
-  buildImprovedPromptForGeneration,
   hasPromptSectionDrafts,
   addPromptSectionTag,
   removePromptSectionTag,

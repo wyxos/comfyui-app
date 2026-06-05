@@ -46,7 +46,7 @@ function civitaiImagePageHtml(imageId: number, meta: Record<string, unknown>) {
 }
 
 describe('companion server API routes', () => {
-  it('serves health, model lists, settings, Ollama models, and Civitai proxies', async () => {
+  it('serves health, model lists, settings, and Civitai proxies', async () => {
       const server = await setupHarness()
 
       await expect(server.request('/health')).resolves.toMatchObject({
@@ -113,14 +113,6 @@ describe('companion server API routes', () => {
           preprocessors: expect.arrayContaining([
             expect.objectContaining({ id: 'lineart', label: 'Line art' }),
           ]),
-        }),
-      })
-
-      await expect(server.request('/api/ollama/models')).resolves.toMatchObject({
-        payload: expect.objectContaining({
-          ok: true,
-          models: ['gpt-oss:20b', 'llama3.2'],
-          defaultModel: 'gpt-oss:20b',
         }),
       })
 
@@ -248,7 +240,6 @@ describe('companion server API routes', () => {
               status: 500,
               payload: { error: { message: 'Comfy exploded' } },
             },
-            'GET /api/tags': new Error('Ollama offline'),
             'GET https://civitai.com/api/v1/models': {
               status: 503,
               payload: { message: 'Civitai maintenance' },
@@ -260,10 +251,6 @@ describe('companion server API routes', () => {
       await expect(server.request('/api/checkpoints')).resolves.toMatchObject({
         response: expect.objectContaining({ status: 400 }),
         payload: expect.objectContaining({ ok: false, error: 'comfyui-rejected' }),
-      })
-      await expect(server.request('/api/ollama/models')).resolves.toMatchObject({
-        response: expect.objectContaining({ status: 502 }),
-        payload: expect.objectContaining({ ok: false, error: 'ollama-unreachable' }),
       })
       await expect(server.request('/api/civitai/models?query=detail')).resolves.toMatchObject({
         response: expect.objectContaining({ status: 502 }),
@@ -282,10 +269,6 @@ describe('companion server API routes', () => {
       await expect(server.json('PUT', '/api/settings/app', { includeNsfw: 'yes' })).resolves.toMatchObject({
         response: expect.objectContaining({ status: 400 }),
         payload: expect.objectContaining({ error: 'invalid-include-nsfw' }),
-      })
-      await expect(server.json('POST', '/api/improve-prompt', { prompt: '', checkpoint: '' })).resolves.toMatchObject({
-        response: expect.objectContaining({ status: 400 }),
-        payload: expect.objectContaining({ error: 'missing-prompt' }),
       })
     })
 

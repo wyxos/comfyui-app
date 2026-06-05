@@ -8,9 +8,6 @@ export let port = Number(process.env.COMFY_COMPANION_PORT ?? 3210)
 export let comfyUrl = new URL(process.env.COMFYUI_URL ?? 'http://127.0.0.1:8000')
 export let comfyClientId = process.env.COMFYUI_CLIENT_ID ?? 'comfyui-companion-app'
 export let preferredCheckpoint = process.env.COMFYUI_DEFAULT_CHECKPOINT ?? 'waiIllustriousSDXL_v160.safetensors'
-export let ollamaUrl = new URL(process.env.OLLAMA_URL ?? 'http://127.0.0.1:11434')
-export let defaultOllamaModel = process.env.OLLAMA_MODEL ?? 'gpt-oss:20b'
-export let ollamaTimeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS ?? 600000)
 
 export const defaultRuntimeAdapters = {
   openParentFolder(parentDirectory) {
@@ -183,9 +180,6 @@ export function refreshConfigFromEnv() {
   comfyUrl = new URL(process.env.COMFYUI_URL ?? 'http://127.0.0.1:8000')
   comfyClientId = process.env.COMFYUI_CLIENT_ID ?? 'comfyui-companion-app'
   preferredCheckpoint = process.env.COMFYUI_DEFAULT_CHECKPOINT ?? 'waiIllustriousSDXL_v160.safetensors'
-  ollamaUrl = new URL(process.env.OLLAMA_URL ?? 'http://127.0.0.1:11434')
-  defaultOllamaModel = process.env.OLLAMA_MODEL ?? 'gpt-oss:20b'
-  ollamaTimeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS ?? 600000)
   userConfigRoot = process.env.APPDATA || process.env.XDG_CONFIG_HOME || join(homedir(), '.config')
   configDir = normalize(resolve(process.env.COMFY_COMPANION_CONFIG_DIR || join(userConfigRoot, 'comfyui-companion-app')))
   settingsPath = join(configDir, 'settings.json')

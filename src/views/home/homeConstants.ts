@@ -1,13 +1,11 @@
 import type { FormTab, PromptSectionDefinition, PromptSectionId, PromptSectionsState, QueueSummary } from './homeTypes'
 
 export const FORM_STATE_STORAGE_KEY = 'comfyui-companion:home-form:v2'
-export const IMPROVE_PROMPT_TIMEOUT_MS = 600000
-export const PROMPT_IMPROVEMENT_TIMER_INTERVAL_MS = 1000
 export const FORM_TAB_QUERY_KEY = 'tab'
 export const FORM_TAB_IDS: FormTab[] = ['assets', 'prompt', 'config', 'image']
 export const FORM_TABS: Array<{ id: FormTab; label: string; hint: string }> = [
   { id: 'assets', label: 'Assets', hint: 'Checkpoints and LoRAs' },
-  { id: 'prompt', label: 'Prompt', hint: 'Prompt text and improver' },
+  { id: 'prompt', label: 'Prompt', hint: 'Prompt text and negative prompt' },
   { id: 'config', label: 'Config', hint: 'Size, steps, seed, and CFG' },
   { id: 'image', label: 'Image', hint: 'Input image and denoise' },
 ]

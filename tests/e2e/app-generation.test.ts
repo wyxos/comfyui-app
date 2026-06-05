@@ -22,7 +22,7 @@ type GenerateRequestBody = {
 }
 
 describe('companion app e2e flows', () => {
-  it('loads mocked generation dependencies, improves a prompt, and submits generation', async () => {
+  it('loads mocked generation dependencies and submits generation', async () => {
       const { api, screen } = await renderCompanionApp()
 
       await expect.element(screen.getByText('waiIllustriousSDXL_v160.safetensors')).toBeVisible()
@@ -130,7 +130,7 @@ describe('companion app e2e flows', () => {
       await expect.element(widthInput).toHaveValue(1920)
       await expect.element(heightInput).toHaveValue(1088)
 
-      await screen.getByRole('button', { name: /Prompt text and improver/ }).click()
+      await screen.getByRole('button', { name: /Prompt text and negative prompt/ }).click()
       const subjectPrompt = screen.getByRole('textbox', { name: 'Subject', exact: true })
       await subjectPrompt.fill('sunlit cyberpunk portrait')
       const subjectPromptInput = document.querySelector<HTMLInputElement>('input[aria-label="Subject"]')
@@ -140,19 +140,6 @@ describe('companion app e2e flows', () => {
       for (let index = 0; index < 5; index += 1) {
         await screen.getByRole('button', { name: 'Increase sunlit cyberpunk portrait weight' }).click()
       }
-      await screen.getByRole('switch', { name: 'Use Ollama prompt improver' }).click()
-      await screen.getByRole('button', { name: 'Improve', exact: true }).click()
-
-      await expect.element(screen.getByText('Improved prompt ready', { exact: true })).toBeVisible()
-      await expect.element(screen.getByRole('textbox', { name: 'Improved prompt' })).toHaveValue(
-        'cinematic portrait, refined lighting, detailed composition',
-      )
-      const improveCall = api.calls.find((call) => call.method === 'POST' && call.path === '/api/improve-prompt')
-      expect(improveCall?.body).toMatchObject({
-        prompt: '(sunlit cyberpunk portrait:1.5)',
-        checkpoint: 'waiIllustriousSDXL_v160.safetensors',
-      })
-      expect(JSON.stringify(improveCall?.body)).not.toContain('detail boost')
 
       await screen.getByRole('button', { name: 'Generate' }).click()
 
@@ -160,7 +147,6 @@ describe('companion app e2e flows', () => {
       const generateCall = api.calls.find((call) => call.method === 'POST' && call.path === '/api/generate')
       expect(generateCall?.body).toMatchObject({
         prompt: '(sunlit cyberpunk portrait:1.5)',
-        improvedPrompt: 'cinematic portrait, refined lighting, detailed composition',
         steps: 28,
         checkpoints: [
           {
@@ -220,7 +206,7 @@ describe('companion app e2e flows', () => {
         controlNets: [onlyControlNet],
       })
 
-      await screen.getByRole('button', { name: /Prompt text and improver/ }).click()
+      await screen.getByRole('button', { name: /Prompt text and negative prompt/ }).click()
       await screen.getByRole('textbox', { name: 'Subject', exact: true }).fill('line guided portrait')
 
       await screen.getByRole('button', { name: /Assets.*Checkpoints and LoRAs/ }).click()
@@ -390,7 +376,7 @@ describe('companion app e2e flows', () => {
         expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/upload-input-image')).toHaveLength(1)
       })
 
-      await screen.getByRole('button', { name: /Prompt text and improver/ }).click()
+      await screen.getByRole('button', { name: /Prompt text and negative prompt/ }).click()
       await screen.getByRole('textbox', { name: 'Subject', exact: true }).fill('running portrait')
       await screen.getByRole('button', { name: 'Generate' }).click()
       await vi.waitFor(() => {

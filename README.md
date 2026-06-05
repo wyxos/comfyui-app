@@ -12,7 +12,6 @@ jobs, preview outputs, and reuse generated images.
 - Select multiple checkpoints, each with its own LoRAs and ControlNets.
 - Build SDXL-compatible and Anima workflows from local model metadata.
 - Upload or reuse images for img2img and ControlNet inputs.
-- Improve prompts with a local Ollama model.
 - Search Civitai, inspect model/image metadata, and queue downloads.
 - Track Civitai download state, previews, sidecars, and local model library entries.
 - Track ComfyUI jobs, queue state, history, progress, outputs, cancellation, and errors.
@@ -48,7 +47,6 @@ The local server defaults to:
 
 - Companion app: `http://127.0.0.1:3210`
 - ComfyUI: `http://127.0.0.1:8000`
-- Ollama: `http://127.0.0.1:11434`
 
 Environment overrides:
 
@@ -59,9 +57,6 @@ Environment overrides:
 | `COMFYUI_URL` | ComfyUI base URL | `http://127.0.0.1:8000` |
 | `COMFYUI_CLIENT_ID` | Client id used for ComfyUI prompt submission and websocket tracking | `comfyui-companion-app` |
 | `COMFYUI_DEFAULT_CHECKPOINT` | Preferred default checkpoint name | `waiIllustriousSDXL_v160.safetensors` |
-| `OLLAMA_URL` | Ollama base URL | `http://127.0.0.1:11434` |
-| `OLLAMA_MODEL` | Preferred local prompt-improvement model | `gpt-oss:20b` |
-| `OLLAMA_TIMEOUT_MS` | Ollama request timeout | `600000` |
 
 ## App State Paths
 

@@ -71,10 +71,7 @@ function buildPreviewItemsFromJob(
 
   for (const variant of variants) {
     const matchedOutputIndex = remainingOutputs.findIndex((output) => output.variantId === variant.id)
-    const fallbackOutputIndex =
-      matchedOutputIndex >= 0
-        ? matchedOutputIndex
-        : remainingOutputs.findIndex((output) => output.isImproved === variant.isImproved)
+    const fallbackOutputIndex = matchedOutputIndex >= 0 ? matchedOutputIndex : 0
     const output =
       fallbackOutputIndex >= 0 ? remainingOutputs.splice(fallbackOutputIndex, 1)[0] ?? null : null
 
@@ -86,7 +83,6 @@ function buildPreviewItemsFromJob(
       variantId: variant.id,
       variantLabel: buildPreviewItemLabel(checkpointName, variant.label),
       promptText: variant.promptText,
-      isImproved: variant.isImproved,
       output,
       isPlaceholder: !output,
     })
@@ -101,7 +97,6 @@ function buildPreviewItemsFromJob(
       variantId: output.variantId,
       variantLabel: buildPreviewItemLabel(checkpointName, output.variantLabel),
       promptText: output.promptText,
-      isImproved: output.isImproved,
       output,
       isPlaceholder: false,
     }))
@@ -116,7 +111,6 @@ function buildPreviewItemsFromJob(
       variantId: output.variantId,
       variantLabel: buildPreviewItemLabel(checkpointName, output.variantLabel),
       promptText: output.promptText,
-      isImproved: output.isImproved,
       output,
       isPlaceholder: false,
     })

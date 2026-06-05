@@ -13,7 +13,7 @@ export function createNodeIdGenerator(start = 3) {
   return () => String(nextId++)
 }
 export function buildPromptVariantLabel(variant) {
-  return variant.isImproved ? 'Improved prompt' : 'Original prompt'
+  return safeTrim(variant?.label) || 'Prompt'
 }
 export function buildPromptVariantNodeLabel(action, variant) {
   return `${action} ${buildPromptVariantLabel(variant).toLowerCase()}`
@@ -237,7 +237,6 @@ export function buildSdxlWorkflow({
       variantId: variant.id,
       variantLabel: buildPromptVariantLabel(variant),
       promptText: variant.promptText,
-      isImproved: Boolean(variant.isImproved),
     }
     outputNodeOrder.push(saveImageNodeId)
   }
@@ -434,7 +433,6 @@ export function buildAnimaWorkflow({
       variantId: variant.id,
       variantLabel: buildPromptVariantLabel(variant),
       promptText: variant.promptText,
-      isImproved: Boolean(variant.isImproved),
     }
     outputNodeOrder.push(saveImageNodeId)
   }

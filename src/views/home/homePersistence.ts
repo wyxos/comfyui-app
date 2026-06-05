@@ -63,9 +63,7 @@ const {
   flattenInputImageBackground,
   height,
   imageDenoise,
-  improvedPrompt,
   inputImageBackgroundColor,
-  llmInstruction,
   maintainAspectRatio,
   negativePrompt,
   negativePromptDraft,
@@ -77,14 +75,10 @@ const {
   selectedImageDimensions,
   selectedImageDisplayName,
   selectedImagePreviewUrl,
-  selectedOllamaModel,
   seed,
   steps,
   uploadedInputImageName,
-  useImprovedPrompt,
   useInputImage,
-  useOriginalPrompt,
-  usePromptImprover,
   width,
 } = state
 const { compiledNegativePrompt, compiledPrompt, selectedCheckpointEntries } = selection
@@ -221,25 +215,19 @@ function readPersistedFormState(): Partial<PersistedFormState> {
       : []
     return {
       prompt: typeof parsed.prompt === 'string' ? parsed.prompt : '',
-      improvedPrompt: typeof parsed.improvedPrompt === 'string' ? parsed.improvedPrompt : '',
       negativePrompt: typeof parsed.negativePrompt === 'string' ? parsed.negativePrompt : '',
       promptSections: normalizePersistedPromptSections(parsed.promptSections),
       negativePromptTags: normalizePromptTags(parsed.negativePromptTags),
-      useOriginalPrompt: typeof parsed.useOriginalPrompt === 'boolean' ? parsed.useOriginalPrompt : true,
-      useImprovedPrompt: typeof parsed.useImprovedPrompt === 'boolean' ? parsed.useImprovedPrompt : true,
       selectedCheckpoint: typeof parsed.selectedCheckpoint === 'string' ? parsed.selectedCheckpoint : '',
       selectedCheckpoints: selectedCheckpointsFromState,
-      selectedOllamaModel: typeof parsed.selectedOllamaModel === 'string' ? parsed.selectedOllamaModel : '',
       width: typeof parsed.width === 'string' ? parsed.width : '1024',
       height: typeof parsed.height === 'string' ? parsed.height : '1024',
       seed: typeof parsed.seed === 'string' ? parsed.seed : '',
       steps: typeof parsed.steps === 'string' ? parsed.steps : '',
       cfg: typeof parsed.cfg === 'string' ? parsed.cfg : '',
       imageDenoise: typeof parsed.imageDenoise === 'string' ? parsed.imageDenoise : '',
-      usePromptImprover: Boolean(parsed.usePromptImprover),
       maintainAspectRatio:
         typeof parsed.maintainAspectRatio === 'boolean' ? parsed.maintainAspectRatio : false,
-      llmInstruction: typeof parsed.llmInstruction === 'string' ? parsed.llmInstruction : '',
       flattenInputImageBackground: typeof parsed.flattenInputImageBackground === 'boolean'
         ? parsed.flattenInputImageBackground
         : false,
@@ -272,15 +260,12 @@ function persistFormState() {
 
   const payload: PersistedFormState = {
     prompt: compiledPrompt.value,
-    improvedPrompt: improvedPrompt.value,
     negativePrompt: compiledNegativePrompt.value,
     promptSections: buildPromptSectionsForPersistence(),
     negativePromptTags: normalizePromptTags([
       ...negativePromptTags.value,
       ...splitPromptDraft(negativePromptDraft.value),
     ]),
-    useOriginalPrompt: useOriginalPrompt.value,
-    useImprovedPrompt: useImprovedPrompt.value,
     selectedCheckpoint: selectedCheckpointEntries.value[0]?.name ?? '',
     selectedCheckpoints: selectedCheckpoints.value.map((selection) => ({
       name: selection.name,
@@ -297,16 +282,13 @@ function persistFormState() {
       ),
       controlNets: (selection.controlNets ?? []).map(serializePersistedControlNetSelection),
     })),
-    selectedOllamaModel: selectedOllamaModel.value,
     width: coerceFieldString(width.value),
     height: coerceFieldString(height.value),
     seed: coerceFieldString(seed.value),
     steps: coerceFieldString(steps.value),
     cfg: coerceFieldString(cfg.value),
     imageDenoise: coerceFieldString(imageDenoise.value),
-    usePromptImprover: usePromptImprover.value,
     maintainAspectRatio: maintainAspectRatio.value,
-    llmInstruction: llmInstruction.value,
     flattenInputImageBackground: flattenInputImageBackground.value,
     inputImageBackgroundColor: normalizePersistedHexColor(inputImageBackgroundColor.value),
     useInputImage: useInputImage.value,
@@ -322,7 +304,6 @@ function persistFormState() {
 function restoreFormState() {
   const persisted = readPersistedFormState()
   prompt.value = persisted.prompt ?? ''
-  improvedPrompt.value = persisted.improvedPrompt ?? ''
   negativePrompt.value = persisted.negativePrompt ?? ''
   promptSections.value = normalizePersistedPromptSections(persisted.promptSections)
   if (!buildPromptFromSections(promptSections.value) && prompt.value.trim()) {
@@ -336,10 +317,6 @@ function restoreFormState() {
     negativePromptTags.value = splitPromptDraft(negativePrompt.value)
   }
   negativePromptDraft.value = ''
-  useOriginalPrompt.value =
-    typeof persisted.useOriginalPrompt === 'boolean' ? persisted.useOriginalPrompt : true
-  useImprovedPrompt.value =
-    typeof persisted.useImprovedPrompt === 'boolean' ? persisted.useImprovedPrompt : true
   selectedCheckpoints.value = Array.isArray(persisted.selectedCheckpoints)
     ? persisted.selectedCheckpoints.map((selection) =>
         buildCheckpointSelection(
@@ -353,23 +330,17 @@ function restoreFormState() {
     : persisted.selectedCheckpoint
       ? [buildCheckpointSelection(persisted.selectedCheckpoint)]
       : []
-  selectedOllamaModel.value = persisted.selectedOllamaModel ?? ''
   width.value = persisted.width ?? '1024'
   height.value = persisted.height ?? '1024'
   seed.value = persisted.seed ?? ''
   steps.value = persisted.steps ?? ''
   cfg.value = persisted.cfg ?? ''
   imageDenoise.value = persisted.imageDenoise ?? ''
-  usePromptImprover.value = Boolean(persisted.usePromptImprover)
-  if (!usePromptImprover.value) {
-    useImprovedPrompt.value = false
-  }
   maintainAspectRatio.value = Boolean(persisted.maintainAspectRatio)
   aspectRatioScale.value = '0'
   if (maintainAspectRatio.value) {
     captureLockedAspectRatioFromCurrentSize()
   }
-  llmInstruction.value = persisted.llmInstruction ?? ''
   flattenInputImageBackground.value = Boolean(persisted.flattenInputImageBackground)
   inputImageBackgroundColor.value = normalizePersistedHexColor(persisted.inputImageBackgroundColor)
   uploadedInputImageName.value = persisted.inputImageName ? persisted.inputImageName : null

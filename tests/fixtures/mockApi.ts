@@ -110,14 +110,6 @@ export function installMockApi(options: MockApiOptions = {}) {
       })
     }
 
-    if (url.pathname === '/api/ollama/models' && method === 'GET') {
-      return jsonResponse({
-        ok: true,
-        models: ['gpt-oss:20b', 'llama3.2'],
-        defaultModel: 'gpt-oss:20b',
-      })
-    }
-
     if (url.pathname === '/api/jobs' && method === 'GET') {
       const runningJobs = jobs.filter((job) => job.state === 'running' || job.state === 'cancelling')
       const queuedJobs = jobs.filter((job) => job.state === 'queued')
@@ -250,14 +242,6 @@ export function installMockApi(options: MockApiOptions = {}) {
 
     if (url.pathname === '/api/open-parent-folder' && method === 'POST') {
       return jsonResponse({ ok: true, parentDirectory: 'C:\\mock' })
-    }
-
-    if (url.pathname === '/api/improve-prompt' && method === 'POST') {
-      return jsonResponse({
-        ok: true,
-        improvedPrompt: options.improvePrompt ?? 'cinematic portrait, refined lighting, detailed composition',
-        model: 'gpt-oss:20b',
-      })
     }
 
     if (url.pathname === '/api/settings/civitai' && method === 'GET') {

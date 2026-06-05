@@ -24,7 +24,6 @@ export type MockApiOptions = {
   civitaiConfigured?: boolean
   includeNsfwDefault?: boolean
   generateJobState?: string
-  improvePrompt?: string
   uploadInputImageNames?: string[]
   failures?: Record<string, MockFailure>
   waits?: Record<string, Promise<unknown>>
@@ -60,7 +59,6 @@ export async function parseRequestBody(init?: RequestInit) {
 
 export function createMockJob(body: Record<string, unknown> = {}, state = 'complete'): MockJob {
   const promptText = typeof body.prompt === 'string' && body.prompt ? body.prompt : 'test prompt'
-  const improvedPrompt = typeof body.improvedPrompt === 'string' && body.improvedPrompt ? body.improvedPrompt : null
   const checkpointEntry = Array.isArray(body.checkpoints) ? body.checkpoints[0] : null
   const checkpoint =
     checkpointEntry && typeof checkpointEntry === 'object' && 'name' in checkpointEntry
@@ -68,21 +66,11 @@ export function createMockJob(body: Record<string, unknown> = {}, state = 'compl
       : checkpointName
   const promptVariants = [
     {
-      id: 'original',
-      label: 'Original prompt',
+      id: 'prompt',
+      label: 'Prompt',
       promptText,
-      isImproved: false,
     },
   ]
-
-  if (improvedPrompt) {
-    promptVariants.push({
-      id: 'improved',
-      label: 'Improved prompt',
-      promptText: improvedPrompt,
-      isImproved: true,
-    })
-  }
 
   const complete = state === 'complete'
   const failed = state === 'error'
@@ -100,8 +88,6 @@ export function createMockJob(body: Record<string, unknown> = {}, state = 'compl
     promptText,
     negativePrompt: '',
     promptVariants,
-    improvedPrompt,
-    promptImprovementError: null,
     checkpoint,
     inputImageName,
     steps: typeof body.steps === 'number' ? body.steps : null,
@@ -126,7 +112,6 @@ export function createMockJob(body: Record<string, unknown> = {}, state = 'compl
             variantId: promptVariants[0].id,
             variantLabel: promptVariants[0].label,
             promptText: promptVariants[0].promptText,
-            isImproved: false,
             url: '/api/view?filename=mock-output.png&subfolder=&type=output',
             fullPath: 'C:\\mock\\mock-output.png',
             parentDirectory: 'C:\\mock',

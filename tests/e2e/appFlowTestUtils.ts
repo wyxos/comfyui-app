@@ -164,7 +164,6 @@ export function createJobOutput(filename: string, index: number) {
     variantId: `variant-${index}`,
     variantLabel: `Variant ${index}`,
     promptText: `prompt ${index}`,
-    isImproved: false,
     url: `/api/view?filename=${filename}&subfolder=&type=output`,
     fullPath: `C:\\mock\\${filename}`,
     parentDirectory: 'C:\\mock',
@@ -183,13 +182,10 @@ export function createHistoryJob(outputs: unknown[]) {
     promptVariants: [
       {
         id: 'variant-1',
-        label: 'Original prompt',
+        label: 'Prompt',
         promptText: 'history prompt',
-        isImproved: false,
       },
     ],
-    improvedPrompt: null,
-    promptImprovementError: null,
     checkpoint: 'historyCheckpoint.safetensors',
     seed: 42,
     createdAt: Date.now() - 5000,

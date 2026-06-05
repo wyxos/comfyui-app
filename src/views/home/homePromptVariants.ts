@@ -1,29 +1,14 @@
 import type { PromptVariant } from './homeTypes'
 
-export function buildPromptVariantsFromFields(
-  promptText: string,
-  improvedPromptText: string,
-  includeOriginal: boolean,
-  includeImproved: boolean,
-) {
-  const variants: PromptVariant[] = []
-  if (includeOriginal && promptText) {
-    variants.push({
-      id: 'original',
-      label: includeImproved && improvedPromptText ? 'Original prompt' : 'Prompt',
-      promptText,
-      isImproved: false,
-    })
+export function buildPromptVariantsFromFields(promptText: string) {
+  const normalizedPrompt = promptText.trim()
+  if (!normalizedPrompt) {
+    return []
   }
 
-  if (includeImproved && improvedPromptText) {
-    variants.push({
-      id: 'improved',
-      label: includeOriginal && promptText ? 'Improved prompt' : 'Prompt',
-      promptText: improvedPromptText,
-      isImproved: true,
-    })
-  }
-
-  return variants
+  return [{
+    id: 'prompt',
+    label: 'Prompt',
+    promptText: normalizedPrompt,
+  }] satisfies PromptVariant[]
 }

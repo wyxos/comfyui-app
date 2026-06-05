@@ -9,9 +9,8 @@ type HomeBuildPromptFromSections = (
 
 type HomeSelectionComputedDeps = {
   buildNegativePromptFromTags: (includeDraft?: boolean) => string
-  buildImprovedPromptForGeneration: () => string
   buildPromptFromSections: HomeBuildPromptFromSections
-  buildPromptVariantsFromFields: (promptText: string, improvedPromptText: string, includeOriginal: boolean, includeImproved: boolean) => PromptVariant[]
+  buildPromptVariantsFromFields: (promptText: string) => PromptVariant[]
   getLatestOutput: () => unknown
   hasPromptSectionDrafts: () => boolean
 }
@@ -23,25 +22,19 @@ const {
   checkpoints,
   controlNetPreprocessors,
   controlNets,
-  defaultOllamaModel,
   height,
   imageDenoise,
-  improvedPrompt,
   inputImageUploadError,
   flattenInputImageBackground,
   inputImageBackgroundColor,
   jobsList,
   loras,
   loadingCheckpoints,
-  llmInstruction,
   maintainAspectRatio,
   negativePrompt,
   negativePromptDraft,
   negativePromptTags,
-  ollamaModels,
   prompt,
-  promptImprovementError,
-  promptImprovementNotice,
   promptSectionDrafts,
   promptSections,
   seed,
@@ -51,17 +44,12 @@ const {
   selectedImageDisplayName,
   selectedImageFile,
   selectedImagePreviewUrl,
-  selectedOllamaModel,
   submissionError,
   uploadedInputImageName,
-  useImprovedPrompt,
   useInputImage,
-  useOriginalPrompt,
-  usePromptImprover,
   width,
 } = state
 const {
-  buildImprovedPromptForGeneration,
   buildNegativePromptFromTags,
   buildPromptFromSections,
   buildPromptVariantsFromFields,
@@ -187,12 +175,6 @@ const controlNetSummary = computed(() => {
 
   return `${enabled} enabled of ${total} configured`
 })
-const ollamaModelOptions = computed(() => {
-  return ollamaModels.value.map((modelName) => ({
-    label: modelName,
-    value: modelName,
-  }))
-})
 const cfgPlaceholder = computed(() => {
   return primarySelectedCheckpointMeta.value?.family === 'anima' ? '4.0' : '5.5'
 })
@@ -218,9 +200,6 @@ const checkpointPickerPlaceholder = computed(() => {
 
   return checkpointOptions.value.length ? 'Add checkpoint' : 'All checkpoints selected'
 })
-const promptImproverCheckpointName = computed(() => {
-  return enabledCheckpointEntries.value[0]?.name ?? ''
-})
 const sourceImageDimensionLabel = computed(() => {
   if (!selectedImageDimensions.value) {
     return 'Use source image resolution'
@@ -233,33 +212,25 @@ const outputFolderTooltip = computed(() => {
 })
 const compiledPrompt = computed(() => buildPromptFromSections(promptSections.value, promptSectionDrafts.value) || prompt.value.trim())
 const compiledNegativePrompt = computed(() => buildNegativePromptFromTags(true) || negativePrompt.value.trim())
-const hasOriginalPromptText = computed(() => Boolean(compiledPrompt.value))
-const hasImprovedPromptText = computed(() => Boolean(improvedPrompt.value.trim()))
 const hasPromptSectionTags = computed(() =>
   Object.values(promptSections.value).some((sectionTags) => sectionTags.length > 0),
 )
 const canResetForm = computed(() => {
   return Boolean(
     compiledPrompt.value ||
-      improvedPrompt.value ||
       compiledNegativePrompt.value ||
       hasPromptSectionTags.value ||
       hasPromptSectionDrafts() ||
       negativePromptTags.value.length ||
       negativePromptDraft.value ||
-      !useOriginalPrompt.value ||
-      !useImprovedPrompt.value ||
       selectedCheckpoints.value.length ||
-      selectedOllamaModel.value !== defaultOllamaModel.value ||
       width.value !== '1024' ||
       height.value !== '1024' ||
       seed.value ||
       steps.value ||
       cfg.value ||
       imageDenoise.value ||
-      usePromptImprover.value ||
       maintainAspectRatio.value ||
-      llmInstruction.value ||
       useInputImage.value ||
       flattenInputImageBackground.value ||
       inputImageBackgroundColor.value !== '#ffffff' ||
@@ -268,32 +239,11 @@ const canResetForm = computed(() => {
       uploadedInputImageName.value ||
       selectedImageDimensions.value ||
       submissionError.value ||
-      promptImprovementError.value ||
-      promptImprovementNotice.value ||
       inputImageUploadError.value,
   )
 })
 const requestedPromptVariants = computed(() => {
-  return buildPromptVariantsFromFields(
-    compiledPrompt.value,
-    buildImprovedPromptForGeneration(),
-    useOriginalPrompt.value,
-    useImprovedPrompt.value,
-  )
-})
-const originalPromptGenerationState = computed(() => {
-  if (!useOriginalPrompt.value) {
-    return hasOriginalPromptText.value ? 'Skipped' : 'Off'
-  }
-
-  return hasOriginalPromptText.value ? 'Included' : 'Empty'
-})
-const improvedPromptGenerationState = computed(() => {
-  if (!useImprovedPrompt.value) {
-    return hasImprovedPromptText.value ? 'Skipped' : 'Off'
-  }
-
-  return hasImprovedPromptText.value ? 'Included' : 'Empty'
+  return buildPromptVariantsFromFields(compiledPrompt.value)
 })
 
 return {
@@ -314,23 +264,17 @@ return {
   isUploadingAnyControlNetImage,
   controlNetGenerationBlocker,
   controlNetSummary,
-  ollamaModelOptions,
   cfgPlaceholder,
   stepsPlaceholder,
   imageDenoisePlaceholder,
   selectedCheckpointSummary,
   checkpointPickerPlaceholder,
-  promptImproverCheckpointName,
   sourceImageDimensionLabel,
   outputFolderTooltip,
   compiledPrompt,
   compiledNegativePrompt,
-  hasOriginalPromptText,
-  hasImprovedPromptText,
   canResetForm,
   requestedPromptVariants,
-  originalPromptGenerationState,
-  improvedPromptGenerationState,
 }
 }
 

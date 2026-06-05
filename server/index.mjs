@@ -6,7 +6,7 @@ export { buildCivitaiKeyPreview, serializeCivitaiSettings } from './settings.mjs
 export { createCompanionServer, configureCompanionServerForTests, startCompanionServer } from './app.mjs'
 export { createDownloadsResponse, serializeDownload } from './downloads/state.mjs'
 export { buildQueueSummaryForPromptIds, extractInputImageNameFromHistory, getQueueSnapshot, normalizeQueueEntries } from './queue-state.mjs'
-export { buildRequestedPromptVariants, normalizeImprovedPromptText } from './ollama.mjs'
+export { buildRequestedPromptVariants } from './prompt-variants.mjs'
 export { buildWorkflow } from './workflow.mjs'
 export { buildControlNetPreviewWorkflow } from './controlnet-preview.mjs'
 export { extractControlNetEntries, extractRequestedControlNets } from './controlnet-options.mjs'

@@ -1,11 +1,10 @@
-import { IMPROVE_PROMPT_TIMEOUT_MS } from './homeConstants'
 import type { HomeJobListComputed } from './homeJobListComputed'
 import type { HomeJobPollingActions } from './homeJobPollingActions'
 import { getJobListTabForState, isLiveJobState } from './homeJobHelpers'
 import type { HomeSelectionComputed } from './homeSelectionComputed'
 import type { HomeState } from './homeState'
 import type { HomeStatusComputed } from './homeStatusComputed'
-import type { GenerateResponse, ImprovePromptResponse, JobResponse } from './homeTypes'
+import type { GenerateResponse, JobResponse } from './homeTypes'
 import {
   coerceTrimmedFieldString,
   normalizeControlNetNumericField,
@@ -14,17 +13,11 @@ import {
 type HomeGenerationDeps = {
   apiJson: <T>(path: string, init?: RequestInit & { timeoutMs?: number; signal?: AbortSignal }) => Promise<T>
   buildCurrentInputImageSnapshot: () => { name: string; url: string } | null
-  buildImprovedPromptForGeneration: () => string
-  buildPromptForImprovement: () => string
-  capturePromptImprovementElapsed: () => number
-  finishPromptImprovementTimer: () => number
-  formatElapsedDuration: (milliseconds: number) => string
   getCheckpointActiveLoraTriggerWords: (checkpoint: HomeState['selectedCheckpoints']['value'][number]) => Array<{ word: string; weight: number }>
   normalizeControlNetResolutionFromOutputSize: () => number
   normalizeLoraStrength: (value: string | number, fallback?: number) => number
   refreshJobs: () => Promise<void>
   sizeValidation: HomeStatusComputed['sizeValidation']
-  startPromptImprovementTimer: () => void
   syncSubmittedInputImageSnapshots: (promptIds: string[], snapshot: { name: string; url: string } | null) => void
 }
 
@@ -44,121 +37,39 @@ const {
   batchPreviewMode,
   cfg,
   imageDenoise,
-  improvedPrompt,
   isCancellingJob,
-  isImprovingPrompt,
   isSubmittingGenerate,
   jobListTab,
-  llmInstruction,
   pendingSubmittedCheckpoints,
   pendingSubmittedInputImageSnapshot,
   pendingSubmittedVariants,
-  promptImprovementError,
-  promptImprovementNotice,
   previewOutputs,
   seed,
   steps,
-  selectedOllamaModel,
   submissionError,
   uploadedInputImageName,
-  useImprovedPrompt,
-  useOriginalPrompt,
 } = state
 const {
   compiledNegativePrompt,
   compiledPrompt,
   enabledCheckpointEntries,
-  promptImproverCheckpointName,
   requestedPromptVariants,
   selectedInputImageName,
   selectedJob,
   shouldUseInputImage,
 } = selection
-const { canCancelSelectedJob, canGenerate, canImprovePrompt } = jobList
+const { canCancelSelectedJob, canGenerate } = jobList
 const { applySelectedJobState } = polling
 const {
   apiJson,
   buildCurrentInputImageSnapshot,
-  buildImprovedPromptForGeneration,
-  buildPromptForImprovement,
-  capturePromptImprovementElapsed,
-  finishPromptImprovementTimer,
-  formatElapsedDuration,
   getCheckpointActiveLoraTriggerWords,
   normalizeControlNetResolutionFromOutputSize,
   normalizeLoraStrength,
   refreshJobs,
   sizeValidation,
-  startPromptImprovementTimer,
   syncSubmittedInputImageSnapshots,
 } = deps
-let improvePromptRequestController: AbortController | null = null
-let suppressPromptImprovementStoppedNotice = false
-
-function suppressNextPromptImprovementStoppedNotice() {
-  suppressPromptImprovementStoppedNotice = true
-}
-
-async function improvePrompt() {
-  if (!canImprovePrompt.value) {
-    return
-  }
-
-  promptImprovementError.value = ''
-  promptImprovementNotice.value = ''
-  submissionError.value = ''
-  improvedPrompt.value = ''
-  isImprovingPrompt.value = true
-  startPromptImprovementTimer()
-  const abortController = new AbortController()
-  improvePromptRequestController = abortController
-
-  try {
-    const payload = await apiJson<ImprovePromptResponse>('/api/improve-prompt', {
-      method: 'POST',
-      body: JSON.stringify({
-        prompt: buildPromptForImprovement(),
-        negativePrompt: compiledNegativePrompt.value,
-        checkpoint: promptImproverCheckpointName.value,
-        llmInstruction: llmInstruction.value,
-        ollamaModel: selectedOllamaModel.value,
-        inputImageName: shouldUseInputImage.value ? uploadedInputImageName.value : null,
-      }),
-      timeoutMs: IMPROVE_PROMPT_TIMEOUT_MS,
-      signal: abortController.signal,
-    })
-
-    if (!payload.improvedPrompt) {
-      throw new Error('Ollama did not return an improved prompt.')
-    }
-
-    improvedPrompt.value = payload.improvedPrompt
-    if (payload.model) {
-      selectedOllamaModel.value = payload.model
-    }
-    promptImprovementNotice.value = `Prompt improvement finished in ${formatElapsedDuration(capturePromptImprovementElapsed())}.`
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Request cancelled.') {
-      if (!suppressPromptImprovementStoppedNotice) {
-        promptImprovementNotice.value = `Prompt improvement stopped after ${formatElapsedDuration(capturePromptImprovementElapsed())}.`
-      }
-    } else {
-      const message = error instanceof Error ? error.message : 'Could not improve the prompt.'
-      promptImprovementError.value = message
-    }
-  } finally {
-    if (improvePromptRequestController === abortController) {
-      improvePromptRequestController = null
-    }
-    finishPromptImprovementTimer()
-    isImprovingPrompt.value = false
-    suppressPromptImprovementStoppedNotice = false
-  }
-}
-
-function stopPromptImprovement() {
-  improvePromptRequestController?.abort()
-}
 
 async function cancelSelectedJob() {
   if (!selectedJob.value || !canCancelSelectedJob.value || isCancellingJob.value) {
@@ -194,7 +105,6 @@ async function generate() {
   }
 
   submissionError.value = ''
-  promptImprovementError.value = ''
   const enabledCheckpointNames = enabledCheckpointEntries.value.map((checkpoint) => checkpoint.name)
   const shouldUseBatchPreview = enabledCheckpointNames.length > 1
   const previousActivePromptId = activePromptId.value
@@ -214,8 +124,7 @@ async function generate() {
 
   try {
     const payloadBody: Record<string, unknown> = {
-      prompt: useOriginalPrompt.value ? compiledPrompt.value : '',
-      improvedPrompt: useImprovedPrompt.value ? buildImprovedPromptForGeneration() : '',
+      prompt: compiledPrompt.value,
       negativePrompt: compiledNegativePrompt.value,
       checkpoints: enabledCheckpointEntries.value.map((checkpoint) => ({
         name: checkpoint.name,
@@ -326,9 +235,6 @@ async function generate() {
 }
 
 return {
-  improvePrompt,
-  suppressNextPromptImprovementStoppedNotice,
-  stopPromptImprovement,
   cancelSelectedJob,
   generate,
 }

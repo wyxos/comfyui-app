@@ -200,7 +200,7 @@ describe('companion app input and prompt flows', () => {
   it('disables prompt tags with one click and omits them from generation', async () => {
       const { api, screen } = await renderCompanionApp('/')
 
-      await screen.getByRole('button', { name: /Prompt text and improver/ }).click()
+      await screen.getByRole('button', { name: /Prompt text and negative prompt/ }).click()
       await screen.getByRole('textbox', { name: 'Subject', exact: true }).fill('blue hair, red eyes')
 
       await vi.waitFor(() => {
@@ -228,7 +228,7 @@ describe('companion app input and prompt flows', () => {
   it('edits prompt tags on double click and drags them between fields', async () => {
       const { screen } = await renderCompanionApp('/')
 
-      await screen.getByRole('button', { name: /Prompt text and improver/ }).click()
+      await screen.getByRole('button', { name: /Prompt text and negative prompt/ }).click()
       const subjectInput = screen.getByRole('textbox', { name: 'Subject', exact: true })
       await subjectInput.fill('blue hair')
       document.querySelector<HTMLInputElement>('input[aria-label="Subject"]')?.dispatchEvent(
@@ -281,7 +281,7 @@ describe('companion app input and prompt flows', () => {
       })
     })
 
-  it('surfaces generation dependency, validation, improver, running, cancel, and failed states', async () => {
+  it('surfaces generation dependency, validation, running, cancel, and failed states', async () => {
       const dependencyFailure = await renderCompanionApp('/', {
         failures: {
           'GET /api/checkpoints': {
@@ -294,22 +294,8 @@ describe('companion app input and prompt flows', () => {
         .element(dependencyFailure.screen.getByText('Could not load checkpoints from ComfyUI.').first())
         .toBeVisible()
 
-      const improverFailure = await renderCompanionApp('/', {
-        failures: {
-          'POST /api/improve-prompt': {
-            status: 502,
-            payload: { ok: false, message: 'Ollama failed.' },
-          },
-        },
-      })
-      await improverFailure.screen.getByRole('button', { name: /Prompt text and improver/ }).click()
-      await improverFailure.screen.getByRole('textbox', { name: 'Subject', exact: true }).fill('portrait')
-      await improverFailure.screen.getByRole('switch', { name: 'Use Ollama prompt improver' }).click()
-      await improverFailure.screen.getByRole('button', { name: 'Improve', exact: true }).click()
-      await expect.element(improverFailure.screen.getByText('Ollama failed.').first()).toBeVisible()
-
       const running = await renderCompanionApp('/', { generateJobState: 'running' })
-      await running.screen.getByRole('button', { name: /Prompt text and improver/ }).click()
+      await running.screen.getByRole('button', { name: /Prompt text and negative prompt/ }).click()
       await running.screen.getByRole('textbox', { name: 'Subject', exact: true }).fill('running portrait')
       await running.screen.getByRole('button', { name: 'Generate' }).click()
       await expect.element(running.screen.getByText('Sampling', { exact: true }).first()).toBeVisible()
@@ -318,7 +304,7 @@ describe('companion app input and prompt flows', () => {
       await expect.element(running.screen.getByText('Cancelling').first()).toBeVisible()
 
       const failed = await renderCompanionApp('/', { generateJobState: 'error' })
-      await failed.screen.getByRole('button', { name: /Prompt text and improver/ }).click()
+      await failed.screen.getByRole('button', { name: /Prompt text and negative prompt/ }).click()
       await failed.screen.getByRole('textbox', { name: 'Subject', exact: true }).fill('failed portrait')
       await failed.screen.getByRole('button', { name: 'Generate' }).click()
       await expect.element(failed.screen.getByText('Sampler failed').first()).toBeVisible()

@@ -1,4 +1,3 @@
-import { defaultOllamaModel } from '../config.mjs'
 import { safeTrim } from '../shared.mjs'
 import { readJsonBody, sendError, sendJson, streamFile } from '../http.mjs'
 import { findModelPreviewPath } from '../model-options.mjs'
@@ -6,11 +5,8 @@ import {
   getComfyCheckpointDir,
   getComfyLoraDir,
   resolveStoredInputImageName,
-  safeModelName,
 } from '../model-paths.mjs'
 import { generateControlNetPreview } from '../controlnet-preview.mjs'
-import { detectCheckpointFamily } from '../checkpoint-family.mjs'
-import { extractOllamaErrorMessage, improvePromptWithOllama } from '../ollama.mjs'
 
 export async function handleModelPreview(url, response) {
   const modelType = safeTrim(url.searchParams.get('type')).toLowerCase()
@@ -35,102 +31,6 @@ export async function handleModelPreview(url, response) {
   }
 
   return streamFile(response, previewPath)
-}
-
-export async function handleImprovePrompt(request, response) {
-  let body
-  try {
-    body = await readJsonBody(request)
-  } catch {
-    return sendError(response, 400, 'invalid-json', 'Request body must be valid JSON.')
-  }
-
-  const promptText = safeTrim(body.prompt)
-  const negativePrompt = safeTrim(body.negativePrompt)
-  const checkpoint = safeTrim(body.checkpoint)
-  const instruction = safeTrim(body.llmInstruction)
-  const modelName = safeModelName(body.ollamaModel)
-  const storedInputImageName = safeTrim(body.inputImageName)
-
-  if (!promptText) {
-    return sendError(response, 400, 'missing-prompt', 'Prompt is required to improve it.')
-  }
-
-  if (!checkpoint) {
-    return sendError(response, 400, 'missing-checkpoint', 'Checkpoint selection is required.')
-  }
-
-  let inputImageName
-  if (storedInputImageName) {
-    try {
-      inputImageName = await resolveStoredInputImageName(storedInputImageName)
-    } catch (error) {
-      return sendError(
-        response,
-        500,
-        'image-lookup-failed',
-        'Could not verify the selected input image.',
-        error.message,
-      )
-    }
-
-    if (!inputImageName) {
-      return sendError(
-        response,
-        400,
-        'missing-input-image',
-        'The selected input image is no longer available. Reattach it and try again.',
-      )
-    }
-  }
-
-  const abortController = new AbortController()
-  const abortPendingImprove = () => {
-    if (!abortController.signal.aborted && !response.writableEnded) {
-      abortController.abort()
-    }
-  }
-
-  request.once('aborted', abortPendingImprove)
-  response.once('close', abortPendingImprove)
-
-  try {
-    const improvedPrompt = await improvePromptWithOllama({
-      promptText,
-      instruction,
-      checkpoint,
-      family: detectCheckpointFamily(checkpoint),
-      negativePrompt,
-      usingImageInput: Boolean(inputImageName),
-      modelName,
-      signal: abortController.signal,
-    })
-
-    return sendJson(response, 200, {
-      ok: true,
-      improvedPrompt,
-      model: safeModelName(modelName) ?? defaultOllamaModel,
-    })
-  } catch (error) {
-    if (abortController.signal.aborted) {
-      if (!response.destroyed && !response.writableEnded) {
-        return sendError(response, 499, 'ollama-improve-cancelled', 'Prompt improvement stopped.')
-      }
-
-      return
-    }
-
-    return sendError(
-      response,
-      502,
-      'ollama-improve-failed',
-      extractOllamaErrorMessage(error),
-      error.payload ?? error.message,
-    )
-  } finally {
-    request.off('aborted', abortPendingImprove)
-    response.off('close', abortPendingImprove)
-  }
 }
 
 export async function handleControlNetPreview(request, response) {

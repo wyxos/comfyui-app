@@ -16,7 +16,6 @@ export function createHomeJobListComputed(
   status: HomeStatusComputed,
 ) {
   const {
-    isImprovingPrompt,
     isUploadingInputImage,
     jobCounts,
     jobHistory,
@@ -33,7 +32,7 @@ export function createHomeJobListComputed(
     shouldUseInputImage,
   } = selection
   void preview
-  const { improvePromptDisabledReason } = status
+  void status
 
   const jobListEntries = computed<JobListEntry[]>(() => groupJobResponses(jobsList.value))
   const runningJobEntries = computed(() => {
@@ -103,9 +102,6 @@ export function createHomeJobListComputed(
 
     return 'No workflows are currently running.'
   })
-  const canImprovePrompt = computed(() => {
-    return !isImprovingPrompt.value && !improvePromptDisabledReason.value
-  })
   const generateDisabledReason = computed(() => {
     if (loadingCheckpoints.value) {
       return 'Checkpoints are still loading.'
@@ -128,7 +124,7 @@ export function createHomeJobListComputed(
     }
 
     if (!requestedPromptVariants.value.length) {
-      return 'Add prompt text or an improved prompt before generating.'
+      return 'Add prompt text before generating.'
     }
 
     return ''
@@ -156,7 +152,6 @@ export function createHomeJobListComputed(
     canGoNextHistoryPage,
     visibleJobEntries,
     visibleJobsEmptyState,
-    canImprovePrompt,
     generateDisabledReason,
     canGenerate,
     canCancelSelectedJob,

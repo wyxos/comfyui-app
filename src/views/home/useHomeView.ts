@@ -14,7 +14,6 @@ import { createHomeGenerationActions } from './homeGenerationActions'
 import { createHomeImageActions } from './homeImageActions'
 import { createHomeImageSnapshots } from './homeImageSnapshots'
 import {
-  formatElapsedDuration,
   getJobEntryElapsedMs,
   getJobEntryPreviewHiddenOutputCount,
   getJobEntryPreviewOutputKey,
@@ -34,7 +33,6 @@ import { createHomeModelActions } from './homeModelActions'
 import { createHomePersistence } from './homePersistence'
 import { createHomePreviewComputed, type HomePreviewComputed } from './homePreviewComputed'
 import { createHomePreviewModalActions } from './homePreviewModalActions'
-import { createHomePromptImprovementTimer } from './homePromptImprovementTimer'
 import { buildPromptVariantsFromFields } from './homePromptVariants'
 import { createHomePromptTagActions } from './homePromptTagActions'
 import { createHomePromptWeightActions } from './homePromptWeightActions'
@@ -56,7 +54,6 @@ let suppressFormTabRouteSync = false
 let preview = {} as HomePreviewComputed
 /* eslint-disable prefer-const */
 let controlNetActions!: ReturnType<typeof createHomeControlNetActions>
-let generationActions!: ReturnType<typeof createHomeGenerationActions>
 let imageActions!: ReturnType<typeof createHomeImageActions>
 let runtimeActions!: ReturnType<typeof createHomeRuntimeActions>
 /* eslint-enable prefer-const */
@@ -87,9 +84,7 @@ function syncFormTabFromRoute() {
 const promptActions = createHomePromptTagActions(state)
 const promptWeightActions = createHomePromptWeightActions(state)
 const aspectActions = createHomeAspectActions(state)
-const promptTimer = createHomePromptImprovementTimer(state)
 const selection = createHomeSelectionComputed(state, {
-  buildImprovedPromptForGeneration: promptActions.buildImprovedPromptForGeneration,
   buildNegativePromptFromTags: promptActions.buildNegativePromptFromTags,
   buildPromptFromSections: promptActions.buildPromptFromSections,
   buildPromptVariantsFromFields,
@@ -134,9 +129,6 @@ runtimeActions = createHomeRuntimeActions(state, selection, preview, status, {
   latestOutput: preview.latestOutput,
   persistFormState: persistence.persistFormState,
   resolveAvailableControlNetModel: aspectActions.resolveAvailableControlNetModel,
-  stopPromptImprovement: () => generationActions.stopPromptImprovement(),
-  suppressNextPromptImprovementStoppedNotice: () =>
-    generationActions.suppressNextPromptImprovementStoppedNotice(),
 })
 controlNetActions = createHomeControlNetActions(state, {
   apiJson,
@@ -165,20 +157,14 @@ const pollingActions = createHomeJobPollingActions(state, selection, preview, st
   setIdleState: runtimeActions.setIdleState,
   syncBatchPreviewState: runtimeActions.syncBatchPreviewState,
 })
-generationActions = createHomeGenerationActions(state, selection, jobList, pollingActions, {
+const generationActions = createHomeGenerationActions(state, selection, jobList, pollingActions, {
   apiJson,
   buildCurrentInputImageSnapshot: imageSnapshots.buildCurrentInputImageSnapshot,
-  buildImprovedPromptForGeneration: promptActions.buildImprovedPromptForGeneration,
-  buildPromptForImprovement: promptActions.buildPromptForImprovement,
-  capturePromptImprovementElapsed: promptTimer.capturePromptImprovementElapsed,
-  finishPromptImprovementTimer: promptTimer.finishPromptImprovementTimer,
-  formatElapsedDuration,
   getCheckpointActiveLoraTriggerWords: loraActions.getCheckpointActiveLoraTriggerWords,
   normalizeControlNetResolutionFromOutputSize: aspectActions.normalizeControlNetResolutionFromOutputSize,
   normalizeLoraStrength: loraActions.normalizeLoraStrength,
   refreshJobs: pollingActions.refreshJobs,
   sizeValidation: status.sizeValidation,
-  startPromptImprovementTimer: promptTimer.startPromptImprovementTimer,
   syncSubmittedInputImageSnapshots: imageSnapshots.syncSubmittedInputImageSnapshots,
 })
 const previewModalActions = createHomePreviewModalActions({
@@ -320,15 +306,12 @@ watch(() => ({
   imageDenoise: state.imageDenoise.value,
   inputImageBackgroundColor: state.inputImageBackgroundColor.value,
   inputImage: state.uploadedInputImageName.value,
-  llmInstruction: state.llmInstruction.value,
   negativePrompt: selection.compiledNegativePrompt.value,
   prompt: selection.compiledPrompt.value,
   selectedCheckpoints: state.selectedCheckpoints.value,
   selectedImageDimensions: state.selectedImageDimensions.value,
-  selectedOllamaModel: state.selectedOllamaModel.value,
   seed: state.seed.value,
   steps: state.steps.value,
-  toggles: [state.useOriginalPrompt.value, state.useImprovedPrompt.value, state.usePromptImprover.value],
   useInputImage: state.useInputImage.value,
   width: state.width.value,
 }), persistence.persistFormState, { deep: true })
@@ -339,20 +322,6 @@ watch(() => [
 ] as const, () => {
   void imageActions.reprocessSelectedImageBackground()
 })
-
-watch(() => ({
-  checkpointName: selection.promptImproverCheckpointName.value,
-  improvedPrompt: state.improvedPrompt.value,
-  inputImage: state.uploadedInputImageName.value,
-  llmInstruction: state.llmInstruction.value,
-  prompt: selection.compiledPrompt.value,
-  selectedOllamaModel: state.selectedOllamaModel.value,
-  useInputImage: state.useInputImage.value,
-  usePromptImprover: state.usePromptImprover.value,
-}), () => {
-  state.promptImprovementError.value = ''
-  state.promptImprovementNotice.value = ''
-}, { deep: true })
 
 watch(state.selectedCheckpointPicker, (value) => {
   if (value) {
@@ -403,7 +372,6 @@ onMounted(async () => {
     runtimeActions.loadCheckpoints(),
     runtimeActions.loadLoras(),
     runtimeActions.loadControlNets(),
-    runtimeActions.loadOllamaModels(),
     pollingActions.refreshJobs(),
   ])
   pollingActions.applySelectedJobState(selection.selectedJob.value)
@@ -413,14 +381,11 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   pollingActions.clearPolling()
   runtimeActions.clearCopiedPathTimer()
-  promptTimer.clearPromptImprovementTimer()
   imageActions.revokeSelectedImagePreview()
   controlNetActions.getAllControlNetSelections().forEach((controlNet) =>
     controlNetActions.revokeControlNetPreview(controlNet),
   )
   controlNetActions.clearControlNetPreviewCopyTimers()
-  generationActions.suppressNextPromptImprovementStoppedNotice()
-  generationActions.stopPromptImprovement()
   window.removeEventListener('keydown', previewModalActions.handlePreviewModalKeydown)
   document.body.style.overflow = ''
 })

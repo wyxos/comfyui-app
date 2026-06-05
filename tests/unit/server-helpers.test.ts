@@ -17,7 +17,6 @@ import {
   normalizeCfg,
   normalizeDenoise,
   normalizeDimension,
-  normalizeImprovedPromptText,
   normalizeModelCompatibilityMetadata,
   normalizeSeed,
   normalizeSteps,
@@ -64,20 +63,11 @@ describe('server helper exports', () => {
     expect(normalizeDenoise('0.754', 0.5)).toBe(0.75)
     expect(normalizeSeed(9999999999)).toBe(2147483647)
 
-    expect(normalizeImprovedPromptText('```text\nImproved prompt: sharp detail\n```')).toBe('sharp detail')
-
-    expect(buildRequestedPromptVariants(' original ', ' improved ')).toEqual([
+    expect(buildRequestedPromptVariants(' prompt ')).toEqual([
       {
-        id: 'original',
-        label: 'Original prompt',
-        promptText: 'original',
-        isImproved: false,
-      },
-      {
-        id: 'improved',
-        label: 'Improved prompt',
-        promptText: 'improved',
-        isImproved: true,
+        id: 'prompt',
+        label: 'Prompt',
+        promptText: 'prompt',
       },
     ])
   })

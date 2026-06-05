@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { Minus, Plus, X } from 'lucide-vue-next'
 import type { PromptSectionId } from './homeTypes'
-import HomePromptImproverPanel from './HomePromptImproverPanel.vue'
 import { useHomePromptTagInteractions } from './useHomePromptTagInteractions'
 import { useProvidedHomeView } from './homeViewContext'
 
@@ -11,12 +10,10 @@ const {
   promptSectionDrafts,
   negativePromptTags,
   negativePromptDraft,
-  useOriginalPrompt,
   formTab,
   promptSectionDefinitions,
   compiledPrompt,
   compiledNegativePrompt,
-  originalPromptGenerationState,
   addPromptSectionTag,
   removePromptSectionTag,
   movePromptTag,
@@ -97,27 +94,6 @@ const {
                   >
                     <X class="h-3 w-3" />
                     Clear tags
-                  </button>
-                  <span class="text-[11px] text-primary-foreground/60">
-                    {{ originalPromptGenerationState }}
-                  </span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-label="Use original prompt for generation"
-                    :aria-checked="useOriginalPrompt"
-                    class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-ring/25"
-                    :class="
-                      useOriginalPrompt
-                        ? 'border-secondary bg-secondary'
-                        : 'border-primary-foreground/12 bg-primary-foreground/8'
-                    "
-                    @click="useOriginalPrompt = !useOriginalPrompt"
-                  >
-                    <span
-                      class="inline-block h-4 w-4 rounded-full bg-primary-foreground shadow-sm transition-transform"
-                      :class="useOriginalPrompt ? 'translate-x-5' : 'translate-x-1'"
-                    />
                   </button>
                 </div>
               </div>
@@ -364,6 +340,5 @@ const {
               </p>
             </div>
 
-            <HomePromptImproverPanel />
             </div>
 </template>

@@ -22,8 +22,6 @@ type UpstreamState = {
   checkpointInfo: unknown
   loraInfo: unknown
   controlNetInfo: unknown
-  ollamaTags: unknown
-  ollamaChat: unknown
   civitaiModels: unknown
   civitaiImages: unknown
   civitaiImagePages: Record<string, string>
@@ -121,14 +119,6 @@ function createDefaultUpstreamState(): UpstreamState {
             ]],
           },
         },
-      },
-    },
-    ollamaTags: {
-      models: [{ name: 'gpt-oss:20b' }, { name: 'llama3.2' }],
-    },
-    ollamaChat: {
-      message: {
-        content: 'refined prompt, cinematic light, crisp subject detail',
       },
     },
     civitaiModels: {
@@ -260,7 +250,6 @@ export async function createServerHarness(options: HarnessOptions = {}) {
   const previousEnv = {
     COMFY_COMPANION_CONFIG_DIR: process.env.COMFY_COMPANION_CONFIG_DIR,
     COMFYUI_URL: process.env.COMFYUI_URL,
-    OLLAMA_URL: process.env.OLLAMA_URL,
     COMFYUI_INPUT_DIR: process.env.COMFYUI_INPUT_DIR,
     COMFYUI_OUTPUT_DIR: process.env.COMFYUI_OUTPUT_DIR,
     COMFYUI_CHECKPOINT_DIR: process.env.COMFYUI_CHECKPOINT_DIR,
@@ -272,7 +261,6 @@ export async function createServerHarness(options: HarnessOptions = {}) {
   Object.assign(process.env, {
     COMFY_COMPANION_CONFIG_DIR: configDir,
     COMFYUI_URL: 'http://comfy.test',
-    OLLAMA_URL: 'http://ollama.test',
     COMFYUI_INPUT_DIR: inputDir,
     COMFYUI_OUTPUT_DIR: outputDir,
     COMFYUI_CHECKPOINT_DIR: checkpointDir,
@@ -338,16 +326,6 @@ export async function createServerHarness(options: HarnessOptions = {}) {
 
       if (url.pathname === '/view') {
         return binaryResponse('output image', 'image/png')
-      }
-    }
-
-    if (url.origin === 'http://ollama.test') {
-      if (url.pathname === '/api/tags') {
-        return jsonResponse(upstream.ollamaTags)
-      }
-
-      if (url.pathname === '/api/chat' && method === 'POST') {
-        return jsonResponse(upstream.ollamaChat)
       }
     }
 

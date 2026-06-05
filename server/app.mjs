@@ -9,7 +9,6 @@ import {
   handleCivitaiModelsProxy,
   handleControlNetList,
   handleLoraList,
-  handleOllamaModels,
   handlePutModelMetadata,
 } from './handlers/core.mjs'
 import {
@@ -32,7 +31,7 @@ import {
   handlePutCivitaiSettings,
 } from './handlers/settings.mjs'
 import { handleGenerate } from './handlers/generate.mjs'
-import { handleControlNetPreview, handleImprovePrompt, handleModelPreview } from './handlers/previews-prompts.mjs'
+import { handleControlNetPreview, handleModelPreview } from './handlers/previews-prompts.mjs'
 import {
   handleCancelJob,
   handleCancelQueuedJobs,
@@ -79,10 +78,6 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
 
   if (url.pathname === '/api/controlnets' && request.method === 'GET') {
     return handleControlNetList(response)
-  }
-
-  if (url.pathname === '/api/ollama/models' && request.method === 'GET') {
-    return handleOllamaModels(response)
   }
 
   if (url.pathname === '/api/settings/civitai' && request.method === 'GET') {
@@ -173,10 +168,6 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
 
   if (url.pathname === '/api/model-metadata' && request.method === 'PUT') {
     return handlePutModelMetadata(url, request, response)
-  }
-
-  if (url.pathname === '/api/improve-prompt' && request.method === 'POST') {
-    return handleImprovePrompt(request, response)
   }
 
   if (url.pathname === '/api/controlnet-preview' && request.method === 'POST') {

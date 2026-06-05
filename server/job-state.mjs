@@ -12,7 +12,6 @@ export function normalizeImage(image) {
     variantId: image.variantId ?? null,
     variantLabel: image.variantLabel ?? null,
     promptText: image.promptText ?? null,
-    isImproved: Boolean(image.isImproved),
   }
 }
 
@@ -70,7 +69,6 @@ export function ensureJob(promptId, seedData = {}) {
     saveNodeMeta: {},
     outputNodeOrder: [],
     promptVariants: [],
-    promptImprovementError: null,
     queuePosition: null,
     queueNumber: null,
     cancelRequestedAt: null,
@@ -162,9 +160,6 @@ export async function serializeJob(job) {
     promptVariants: Array.isArray(job.promptVariants) ? job.promptVariants : [],
     loras: Array.isArray(job.loras) ? job.loras : [],
     controlNets: Array.isArray(job.controlNets) ? job.controlNets : [],
-    improvedPrompt:
-      job.promptVariants?.find((variant) => variant?.isImproved)?.promptText ?? null,
-    promptImprovementError: job.promptImprovementError ?? null,
     checkpoint: job.checkpoint,
     family: typeof job.family === 'string' ? job.family : null,
     width: typeof job.width === 'number' ? job.width : null,

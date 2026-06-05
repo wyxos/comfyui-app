@@ -24,14 +24,11 @@ import type {
 
 export function createHomeState() {
 const prompt = ref('')
-const improvedPrompt = ref('')
 const negativePrompt = ref('')
 const promptSections = ref<PromptSectionsState>(createEmptyPromptSections())
 const promptSectionDrafts = ref<Record<PromptSectionId, string>>(createEmptyPromptSectionsDrafts())
 const negativePromptTags = ref<PromptTag[]>([])
 const negativePromptDraft = ref('')
-const useOriginalPrompt = ref(true)
-const useImprovedPrompt = ref(true)
 const checkpoints = ref<CheckpointOption[]>([])
 const selectedCheckpoints = ref<CheckpointSelection[]>([])
 const selectedCheckpointPicker = ref('')
@@ -47,22 +44,15 @@ const controlNetPreprocessors = ref<ControlNetPreprocessorOption[]>([
   { id: 'pose', label: 'OpenPose', defaultResolution: 512 },
   { id: 'tile', label: 'Tile', defaultResolution: 512 },
 ])
-const ollamaModels = ref<string[]>([])
-const selectedOllamaModel = ref('')
-const defaultOllamaModel = ref('')
 const width = ref('1024')
 const height = ref('1024')
 const seed = ref('')
 const steps = ref('')
 const cfg = ref('')
-const usePromptImprover = ref(false)
 const maintainAspectRatio = ref(false)
 const lockedAspectRatio = ref<number | null>(null)
 const aspectRatioScale = ref('0')
 const aspectRatioBaseSize = ref<{ width: number; height: number } | null>(null)
-const llmInstruction = ref('')
-const promptImprovementError = ref('')
-const promptImprovementNotice = ref('')
 const imageDenoise = ref('')
 const inputImageField = ref<HTMLInputElement | null>(null)
 const selectedImageFile = ref<File | null>(null)
@@ -86,8 +76,6 @@ const loadingLoras = ref(true)
 const loraLoadingError = ref('')
 const loadingControlNets = ref(true)
 const controlNetLoadingError = ref('')
-const loadingOllamaModels = ref(false)
-const ollamaModelError = ref('')
 
 const activePromptId = ref('')
 const jobsList = ref<JobResponse[]>([])
@@ -122,7 +110,6 @@ const activePreviewIndex = ref(0)
 const errorMessage = ref('')
 const submissionError = ref('')
 const isSubmittingGenerate = ref(false)
-const isImprovingPrompt = ref(false)
 const isCancellingJob = ref(false)
 const isCancellingQueuedJobs = ref(false)
 const queueActionError = ref('')
@@ -135,8 +122,6 @@ const previewModalOffsetY = ref(0)
 const isPreviewModalDragging = ref(false)
 const previewModalViewport = ref<HTMLElement | null>(null)
 const previewModalPanField = ref<HTMLElement | null>(null)
-const promptImprovementStartedAt = ref<number | null>(null)
-const promptImprovementElapsedMs = ref(0)
 const generatedOutputContextMenu = ref<GeneratedOutputContextMenu | null>(null)
 const generatedOutputActionError = ref('')
 const isApplyingGeneratedOutput = ref(false)
@@ -147,14 +132,11 @@ const controlNetImageLoadIds = new Map<string, string>()
 
 return {
   prompt,
-  improvedPrompt,
   negativePrompt,
   promptSections,
   promptSectionDrafts,
   negativePromptTags,
   negativePromptDraft,
-  useOriginalPrompt,
-  useImprovedPrompt,
   checkpoints,
   selectedCheckpoints,
   selectedCheckpointPicker,
@@ -162,22 +144,15 @@ return {
   defaultLoraStrength,
   controlNets,
   controlNetPreprocessors,
-  ollamaModels,
-  selectedOllamaModel,
-  defaultOllamaModel,
   width,
   height,
   seed,
   steps,
   cfg,
-  usePromptImprover,
   maintainAspectRatio,
   lockedAspectRatio,
   aspectRatioScale,
   aspectRatioBaseSize,
-  llmInstruction,
-  promptImprovementError,
-  promptImprovementNotice,
   imageDenoise,
   inputImageField,
   selectedImageFile,
@@ -200,8 +175,6 @@ return {
   loraLoadingError,
   loadingControlNets,
   controlNetLoadingError,
-  loadingOllamaModels,
-  ollamaModelError,
   activePromptId,
   jobsList,
   jobCounts,
@@ -230,7 +203,6 @@ return {
   errorMessage,
   submissionError,
   isSubmittingGenerate,
-  isImprovingPrompt,
   isCancellingJob,
   isCancellingQueuedJobs,
   queueActionError,
@@ -243,8 +215,6 @@ return {
   isPreviewModalDragging,
   previewModalViewport,
   previewModalPanField,
-  promptImprovementStartedAt,
-  promptImprovementElapsedMs,
   generatedOutputContextMenu,
   generatedOutputActionError,
   isApplyingGeneratedOutput,

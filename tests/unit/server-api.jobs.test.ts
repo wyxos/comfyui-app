@@ -7,22 +7,9 @@ import { workflowNodesFromBody } from './workflowTestUtils'
 const { setupHarness } = useServerHarness()
 
 describe('companion server API routes', () => {
-  it('covers prompt improvement, generation, job polling, cancellation, and failure states', async () => {
+  it('covers generation, job polling, cancellation, and failure states', async () => {
       vi.setSystemTime(new Date('2026-04-26T00:00:00.000Z'))
       const server = await setupHarness()
-
-      await expect(
-        server.json('POST', '/api/improve-prompt', {
-          prompt: 'portrait',
-          checkpoint: 'waiIllustriousSDXL_v160.safetensors',
-          ollamaModel: 'gpt-oss:20b',
-        }),
-      ).resolves.toMatchObject({
-        payload: expect.objectContaining({
-          ok: true,
-          improvedPrompt: 'refined prompt, cinematic light, crisp subject detail',
-        }),
-      })
 
       await expect(server.json('POST', '/api/generate', { prompt: '', checkpoint: '' })).resolves.toMatchObject({
         response: expect.objectContaining({ status: 400 }),
@@ -69,7 +56,6 @@ describe('companion server API routes', () => {
 
       const generated = await server.json('POST', '/api/generate', {
         prompt: 'portrait',
-        improvedPrompt: 'refined portrait',
         checkpoints: [
           {
             name: 'waiIllustriousSDXL_v160.safetensors',
@@ -315,12 +301,11 @@ describe('companion server API routes', () => {
       ).toBe(true)
     })
 
-  it('does not turn LoRA trigger words into an improved prompt variant', async () => {
+  it('keeps LoRA trigger words in the submitted prompt variant', async () => {
       const server = await setupHarness()
 
       const generated = await server.json('POST', '/api/generate', {
         prompt: 'portrait',
-        improvedPrompt: '',
         checkpoints: [
           {
             name: 'waiIllustriousSDXL_v160.safetensors',
@@ -345,12 +330,11 @@ describe('companion server API routes', () => {
         promptIds: ['prompt-1'],
         promptVariants: [
           expect.objectContaining({
-            id: 'original',
+            id: 'prompt',
+            label: 'Prompt',
             promptText: 'portrait, (detail boost:1.2)',
-            isImproved: false,
           }),
         ],
-        improvedPrompt: null,
       })
       expect(generated.payload.promptVariants).toHaveLength(1)
 

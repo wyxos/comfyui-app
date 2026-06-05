@@ -6,7 +6,7 @@ import type { HomePreviewComputed } from './homePreviewComputed'
 import type { HomeSelectionComputed } from './homeSelectionComputed'
 import type { HomeState } from './homeState'
 import type { HomeStatusComputed } from './homeStatusComputed'
-import type { CheckpointResponse, LoraResponse, OllamaModelsResponse, ControlNetResponse, JobResponse, LoraSelection } from './homeTypes'
+import type { CheckpointResponse, LoraResponse, ControlNetResponse, JobResponse, LoraSelection } from './homeTypes'
 
 type HomeRuntimeActionDeps = {
   apiJson: <T>(path: string, init?: RequestInit & { timeoutMs?: number }) => Promise<T>
@@ -25,8 +25,6 @@ type HomeRuntimeActionDeps = {
   latestOutput: HomePreviewComputed['latestOutput']
   persistFormState: () => void
   resolveAvailableControlNetModel: (model: unknown) => string
-  stopPromptImprovement: () => void
-  suppressNextPromptImprovementStoppedNotice: () => void
 }
 
 export function createHomeRuntimeActions(
@@ -52,17 +50,14 @@ const {
   currentNodeLabel,
   currentSeed,
   defaultLoraStrength,
-  defaultOllamaModel,
   detailLine,
   errorMessage,
   flattenInputImageBackground,
   formTab,
   height,
   imageDenoise,
-  improvedPrompt,
   inputImageBackgroundColor,
   inputImageUploadError,
-  isImprovingPrompt,
   isResetDialogOpen,
   isSubmittingGenerate,
   jobState,
@@ -71,38 +66,28 @@ const {
   loadingControlNets,
   loadingError,
   loadingLoras,
-  loadingOllamaModels,
   loraLoadingError,
   loras,
   negativePrompt,
   negativePromptDraft,
   negativePromptTags,
-  ollamaModelError,
-  ollamaModels,
   pendingSubmittedCheckpoints,
   openingOutputFolder,
   progressMax,
   progressPercent,
   progressValue,
   prompt,
-  promptImprovementError,
-  promptImprovementNotice,
   promptSectionDrafts,
   promptSections,
   seed,
   steps,
   selectedCheckpointPicker,
   selectedCheckpoints,
-  selectedOllamaModel,
   statusLine,
   submissionError,
-  useImprovedPrompt,
   useInputImage,
-  useOriginalPrompt,
-  usePromptImprover,
   maintainAspectRatio,
   lockedAspectRatio,
-  llmInstruction,
   width,
 } = state
 void selection
@@ -119,8 +104,6 @@ const {
   latestOutput,
   persistFormState,
   resolveAvailableControlNetModel,
-  stopPromptImprovement,
-  suppressNextPromptImprovementStoppedNotice,
 } = deps
 let copiedPathTimer: number | null = null
 
@@ -158,20 +141,6 @@ function setIdleState(message = 'Waiting for a prompt.') {
   errorMessage.value = ''
 }
 
-function togglePromptImprover() {
-  const nextValue = !usePromptImprover.value
-  usePromptImprover.value = nextValue
-
-  if (nextValue) {
-    useImprovedPrompt.value = true
-  } else {
-    useImprovedPrompt.value = false
-    if (isImprovingPrompt.value) {
-      stopPromptImprovement()
-    }
-  }
-}
-
 function openResetDialog() {
   if (!canResetForm.value) {
     return
@@ -185,37 +154,24 @@ function closeResetDialog() {
 }
 
 function resetForm() {
-  if (isImprovingPrompt.value) {
-    suppressNextPromptImprovementStoppedNotice()
-    stopPromptImprovement()
-  }
-
   prompt.value = ''
-  improvedPrompt.value = ''
   negativePrompt.value = ''
   promptSections.value = createEmptyPromptSections()
   promptSectionDrafts.value = createEmptyPromptSectionsDrafts()
   negativePromptTags.value = []
   negativePromptDraft.value = ''
-  useOriginalPrompt.value = true
-  useImprovedPrompt.value = true
   selectedCheckpoints.value = []
   selectedCheckpointPicker.value = ''
-  selectedOllamaModel.value = defaultOllamaModel.value
   width.value = '1024'
   height.value = '1024'
   seed.value = ''
   steps.value = ''
   cfg.value = ''
   imageDenoise.value = ''
-  usePromptImprover.value = false
   maintainAspectRatio.value = false
   lockedAspectRatio.value = null
   aspectRatioScale.value = '0'
   aspectRatioBaseSize.value = null
-  llmInstruction.value = ''
-  promptImprovementError.value = ''
-  promptImprovementNotice.value = ''
   submissionError.value = ''
   inputImageUploadError.value = ''
   useInputImage.value = false
@@ -359,38 +315,6 @@ async function loadLoras() {
   }
 }
 
-async function loadOllamaModels() {
-  loadingOllamaModels.value = true
-  ollamaModelError.value = ''
-
-  try {
-    const payload = await apiJson<OllamaModelsResponse>('/api/ollama/models', {
-      method: 'GET',
-    })
-
-    ollamaModels.value = payload.models ?? []
-    defaultOllamaModel.value =
-      payload.defaultModel && ollamaModels.value.includes(payload.defaultModel)
-        ? payload.defaultModel
-        : ollamaModels.value[0] ?? ''
-
-    const hasStoredModel =
-      Boolean(selectedOllamaModel.value) && ollamaModels.value.includes(selectedOllamaModel.value)
-
-    if (!hasStoredModel) {
-      selectedOllamaModel.value = defaultOllamaModel.value
-    }
-
-    if (!ollamaModels.value.length) {
-      ollamaModelError.value = 'No Ollama models were detected.'
-    }
-  } catch (error) {
-    ollamaModelError.value = error instanceof Error ? error.message : 'Could not load Ollama models.'
-  } finally {
-    loadingOllamaModels.value = false
-  }
-}
-
 async function loadControlNets() {
   loadingControlNets.value = true
   controlNetLoadingError.value = ''
@@ -428,7 +352,6 @@ return {
   useLastGeneratedSeed,
   formatElapsed,
   setIdleState,
-  togglePromptImprover,
   openResetDialog,
   closeResetDialog,
   resetForm,
@@ -437,7 +360,6 @@ return {
   openOutputParentFolder,
   loadCheckpoints,
   loadLoras,
-  loadOllamaModels,
   loadControlNets,
 }
 }

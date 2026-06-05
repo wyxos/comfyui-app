@@ -8,7 +8,7 @@ import { buildCivitaiModelsQueryParams, parseInteger } from '../civitai-query.mj
 import { getComfyCheckpointDir, getComfyControlNetDir, getComfyLoraDir } from '../model-paths.mjs'
 import { readLoraTriggerWords } from '../model-trigger-words.mjs'
 import { writeManualModelCompatibilityMetadata } from '../model-metadata.mjs'
-import { extractOllamaModels, extractPromptRejectionMessage, getPreferredOllamaModel, ollamaFetchJson } from '../ollama.mjs'
+import { extractPromptRejectionMessage } from '../prompt-variants.mjs'
 import { extractCheckpointList, extractControlNetList, extractDefaultLoraStrength, extractLoraList, getPreferredCheckpoint } from '../comfy-options.mjs'
 import { serializeControlNetPreprocessors } from '../controlnet-options.mjs'
 import { comfySocketConnected } from '../comfy-socket.mjs'
@@ -171,29 +171,6 @@ export async function handlePutModelMetadata(url, request, response) {
       'model-metadata-write-failed',
       'Could not save model compatibility metadata.',
       error.message,
-    )
-  }
-}
-
-export async function handleOllamaModels(response) {
-  try {
-    const payload = await ollamaFetchJson('/api/tags', {
-      method: 'GET',
-    })
-    const models = extractOllamaModels(payload)
-
-    return sendJson(response, 200, {
-      ok: true,
-      models,
-      defaultModel: getPreferredOllamaModel(models),
-    })
-  } catch (error) {
-    return sendError(
-      response,
-      502,
-      'ollama-unreachable',
-      'Could not load Ollama models.',
-      error.payload ?? error.message,
     )
   }
 }

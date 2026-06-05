@@ -166,25 +166,9 @@ export type GenerateResponse = {
   seed?: number | null
   steps?: number | null
   promptVariants?: PromptVariant[]
-  improvedPrompt?: string | null
-  promptImprovementError?: string | null
   inputImageName?: string | null
   inputImageDisplayName?: string | null
   partialFailure?: boolean
-  message?: string
-}
-
-export type ImprovePromptResponse = {
-  ok: boolean
-  improvedPrompt?: string
-  model?: string
-  message?: string
-}
-
-export type OllamaModelsResponse = {
-  ok: boolean
-  models?: string[]
-  defaultModel?: string | null
   message?: string
 }
 
@@ -204,7 +188,6 @@ export type JobOutput = {
   variantId: string | null
   variantLabel: string | null
   promptText: string | null
-  isImproved: boolean
 }
 
 export type GeneratedOutputContextMenu = {
@@ -223,7 +206,6 @@ export type PromptVariant = {
   id: string
   label: string
   promptText: string
-  isImproved: boolean
 }
 
 export type PreviewDisplayItem = {
@@ -234,7 +216,6 @@ export type PreviewDisplayItem = {
   variantId: string | null
   variantLabel: string | null
   promptText: string | null
-  isImproved: boolean
   output: JobOutput | null
   isPlaceholder: boolean
 }
@@ -267,8 +248,6 @@ export type JobResponse = {
   seed: number | null
   negativePrompt: string
   promptVariants: PromptVariant[]
-  improvedPrompt?: string | null
-  promptImprovementError?: string | null
   currentNodeLabel: string | null
   progressValue: number | null
   progressMax: number | null
@@ -404,24 +383,18 @@ export type PersistedCheckpointSelection = Omit<CheckpointSelection, 'controlNet
 }
 export type PersistedFormState = {
   prompt: string
-  improvedPrompt: string
   negativePrompt: string
   promptSections?: Partial<Record<PromptSectionId, Array<string | Partial<PromptTag>>>>
   negativePromptTags?: Array<string | Partial<PromptTag>>
-  useOriginalPrompt: boolean
-  useImprovedPrompt: boolean
   selectedCheckpoint?: string
   selectedCheckpoints?: PersistedCheckpointSelection[]
-  selectedOllamaModel: string
   width: string
   height: string
   seed: string
   steps: string
   cfg: string
   imageDenoise: string
-  usePromptImprover: boolean
   maintainAspectRatio?: boolean
-  llmInstruction: string
   useInputImage: boolean
   flattenInputImageBackground?: boolean
   inputImageBackgroundColor?: string

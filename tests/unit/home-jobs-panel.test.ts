@@ -20,7 +20,6 @@ function mountJobsPanel() {
     variantId: null,
     variantLabel: null,
     promptText: null,
-    isImproved: false,
   }
   const job = createMockJob({ prompt: 'fixed rail test prompt' }, 'complete') as JobResponse
   const entry: JobListEntry = {
