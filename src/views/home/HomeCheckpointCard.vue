@@ -17,6 +17,7 @@ const {
   removeSelectedCheckpoint,
   toggleSelectedCheckpoint,
   assetPreviewDownloadActions,
+  applyGenerationMetadataFromSource,
 } = useProvidedHomeView()
 const {
   queuingDownloadKey,
@@ -187,6 +188,7 @@ onBeforeUnmount(() => {
       :queue-asset-download="queueAssetDownload"
       :delete-asset-download="deleteAssetDownload"
       :model-download-key="modelDownloadKey"
+      :apply-generation-metadata="applyGenerationMetadataFromSource"
       model-type="Checkpoint"
       kind-label="Checkpoint preview"
       show-download-actions

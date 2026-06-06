@@ -13,6 +13,7 @@ import { createHomeControlNetActions } from './homeControlNetActions'
 import { createHomeGenerationActions } from './homeGenerationActions'
 import { createHomeImageActions } from './homeImageActions'
 import { createHomeImageSnapshots } from './homeImageSnapshots'
+import { createHomeMetadataActions } from './homeMetadataActions'
 import {
   getJobEntryElapsedMs,
   getJobEntryPreviewHiddenOutputCount,
@@ -35,6 +36,7 @@ import { createHomePreviewComputed, type HomePreviewComputed } from './homePrevi
 import { createHomePreviewModalActions } from './homePreviewModalActions'
 import { buildPromptVariantsFromFields } from './homePromptVariants'
 import { createHomePromptTagActions } from './homePromptTagActions'
+import { createHomePromptModeActions } from './homePromptModeActions'
 import { createHomePromptWeightActions } from './homePromptWeightActions'
 import { createHomeRuntimeActions } from './homeRuntimeActions'
 import { createHomeSelectionComputed } from './homeSelectionComputed'
@@ -82,6 +84,7 @@ function syncFormTabFromRoute() {
 }
 
 const promptActions = createHomePromptTagActions(state)
+const metadataActions = createHomeMetadataActions(state)
 const promptWeightActions = createHomePromptWeightActions(state)
 const aspectActions = createHomeAspectActions(state)
 const selection = createHomeSelectionComputed(state, {
@@ -91,6 +94,7 @@ const selection = createHomeSelectionComputed(state, {
   getLatestOutput: () => preview.latestOutput?.value ?? null,
   hasPromptSectionDrafts: promptActions.hasPromptSectionDrafts,
 })
+const promptModeActions = createHomePromptModeActions(state, selection)
 const imageSnapshots = createHomeImageSnapshots(state, selection)
 preview = createHomePreviewComputed(state, selection, {
   formatElapsed: (elapsedMs) => runtimeActions.formatElapsed(elapsedMs),
@@ -197,8 +201,9 @@ function openGeneratedOutputContextMenu(event: MouseEvent, output: JobOutput, ch
   event.preventDefault()
   event.stopPropagation()
   state.generatedOutputActionError.value = ''
+  state.generatedOutputActionNotice.value = ''
   const menuWidth = 240
-  const menuHeight = 120
+  const menuHeight = 168
   state.generatedOutputContextMenu.value = {
     x: Math.min(event.clientX, Math.max(0, window.innerWidth - menuWidth - 8)),
     y: Math.min(event.clientY, Math.max(0, window.innerHeight - menuHeight - 8)),
@@ -214,6 +219,7 @@ function closeGeneratedOutputContextMenu(force = false) {
 
   state.generatedOutputContextMenu.value = null
   state.generatedOutputActionError.value = ''
+  state.generatedOutputActionNotice.value = ''
 }
 
 async function fetchGeneratedOutputFile(output: JobOutput) {
@@ -237,6 +243,7 @@ async function useGeneratedOutputAsImageInput() {
   }
 
   state.generatedOutputActionError.value = ''
+  state.generatedOutputActionNotice.value = ''
   state.isApplyingGeneratedOutput.value = true
   try {
     const file = await fetchGeneratedOutputFile(menu.output)
@@ -258,6 +265,7 @@ async function useGeneratedOutputAsControlNet() {
   }
 
   state.generatedOutputActionError.value = ''
+  state.generatedOutputActionNotice.value = ''
   state.isApplyingGeneratedOutput.value = true
   try {
     const file = await fetchGeneratedOutputFile(menu.output)
@@ -267,6 +275,38 @@ async function useGeneratedOutputAsControlNet() {
   } catch (error) {
     state.generatedOutputActionError.value =
       error instanceof Error ? error.message : 'Could not use the generated image as ControlNet input.'
+  } finally {
+    state.isApplyingGeneratedOutput.value = false
+  }
+}
+
+async function copyGeneratedOutputImage() {
+  const menu = state.generatedOutputContextMenu.value
+  if (!menu || state.isApplyingGeneratedOutput.value) {
+    return
+  }
+
+  state.generatedOutputActionError.value = ''
+  state.generatedOutputActionNotice.value = ''
+
+  if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+    state.generatedOutputActionError.value = 'Image clipboard copy is not available in this browser.'
+    return
+  }
+
+  state.isApplyingGeneratedOutput.value = true
+  try {
+    const file = await fetchGeneratedOutputFile(menu.output)
+    const mimeType = file.type || 'image/png'
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        [mimeType]: file,
+      }),
+    ])
+    state.generatedOutputActionNotice.value = 'Copied image'
+  } catch (error) {
+    state.generatedOutputActionError.value =
+      error instanceof Error ? error.message : 'Could not copy the generated image.'
   } finally {
     state.isApplyingGeneratedOutput.value = false
   }
@@ -301,6 +341,7 @@ watch(() => [status.sizeValidation.value.width, status.sizeValidation.value.heig
 
 watch(() => ({
   cfg: state.cfg.value,
+  clipName: state.clipName.value,
   flattenInputImageBackground: state.flattenInputImageBackground.value,
   height: state.height.value,
   imageDenoise: state.imageDenoise.value,
@@ -308,11 +349,15 @@ watch(() => ({
   inputImage: state.uploadedInputImageName.value,
   negativePrompt: selection.compiledNegativePrompt.value,
   prompt: selection.compiledPrompt.value,
+  promptMode: state.promptMode.value,
   selectedCheckpoints: state.selectedCheckpoints.value,
   selectedImageDimensions: state.selectedImageDimensions.value,
   seed: state.seed.value,
+  samplerName: state.samplerName.value,
+  scheduler: state.scheduler.value,
   steps: state.steps.value,
   useInputImage: state.useInputImage.value,
+  vaeName: state.vaeName.value,
   width: state.width.value,
 }), persistence.persistFormState, { deep: true })
 
@@ -372,6 +417,7 @@ onMounted(async () => {
     runtimeActions.loadCheckpoints(),
     runtimeActions.loadLoras(),
     runtimeActions.loadControlNets(),
+    runtimeActions.loadGenerationOptions(),
     pollingActions.refreshJobs(),
   ])
   pollingActions.applySelectedJobState(selection.selectedJob.value)
@@ -400,6 +446,8 @@ return {
   ...status,
   ...jobList,
   ...promptActions,
+  ...promptModeActions,
+  ...metadataActions,
   ...promptWeightActions,
   ...aspectActions,
   ...imageSnapshots,
@@ -415,6 +463,7 @@ return {
   assetPreviewDownloadActions,
   openGeneratedOutputContextMenu,
   closeGeneratedOutputContextMenu,
+  copyGeneratedOutputImage,
   useGeneratedOutputAsImageInput,
   useGeneratedOutputAsControlNet,
   formTabs: FORM_TABS,

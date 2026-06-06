@@ -6,7 +6,14 @@ import type { HomePreviewComputed } from './homePreviewComputed'
 import type { HomeSelectionComputed } from './homeSelectionComputed'
 import type { HomeState } from './homeState'
 import type { HomeStatusComputed } from './homeStatusComputed'
-import type { CheckpointResponse, LoraResponse, ControlNetResponse, JobResponse, LoraSelection } from './homeTypes'
+import type {
+  CheckpointResponse,
+  ControlNetResponse,
+  GenerationOptionsResponse,
+  JobResponse,
+  LoraResponse,
+  LoraSelection,
+} from './homeTypes'
 
 type HomeRuntimeActionDeps = {
   apiJson: <T>(path: string, init?: RequestInit & { timeoutMs?: number }) => Promise<T>
@@ -42,6 +49,8 @@ const {
   aspectRatioScale,
   batchPreviewMode,
   cfg,
+  clipName,
+  clipNameOptions,
   checkpoints,
   controlNetLoadingError,
   controlNetPreprocessors,
@@ -54,6 +63,8 @@ const {
   errorMessage,
   flattenInputImageBackground,
   formTab,
+  generationOptionDefaults,
+  generationOptionsError,
   height,
   imageDenoise,
   inputImageBackgroundColor,
@@ -64,6 +75,7 @@ const {
   lastGeneratedSeed,
   loadingCheckpoints,
   loadingControlNets,
+  loadingGenerationOptions,
   loadingError,
   loadingLoras,
   loraLoadingError,
@@ -77,15 +89,22 @@ const {
   progressPercent,
   progressValue,
   prompt,
+  promptMode,
   promptSectionDrafts,
   promptSections,
   seed,
+  samplerName,
+  samplerOptions,
+  scheduler,
+  schedulerOptions,
   steps,
   selectedCheckpointPicker,
   selectedCheckpoints,
   statusLine,
   submissionError,
   useInputImage,
+  vaeName,
+  vaeNameOptions,
   maintainAspectRatio,
   lockedAspectRatio,
   width,
@@ -156,6 +175,7 @@ function closeResetDialog() {
 function resetForm() {
   prompt.value = ''
   negativePrompt.value = ''
+  promptMode.value = 'tags'
   promptSections.value = createEmptyPromptSections()
   promptSectionDrafts.value = createEmptyPromptSectionsDrafts()
   negativePromptTags.value = []
@@ -167,6 +187,10 @@ function resetForm() {
   seed.value = ''
   steps.value = ''
   cfg.value = ''
+  samplerName.value = ''
+  scheduler.value = ''
+  clipName.value = ''
+  vaeName.value = ''
   imageDenoise.value = ''
   maintainAspectRatio.value = false
   lockedAspectRatio.value = null
@@ -347,6 +371,28 @@ async function loadControlNets() {
   }
 }
 
+async function loadGenerationOptions() {
+  loadingGenerationOptions.value = true
+  generationOptionsError.value = ''
+
+  try {
+    const payload = await apiJson<GenerationOptionsResponse>('/api/generation-options', {
+      method: 'GET',
+    })
+
+    samplerOptions.value = payload.samplers ?? []
+    schedulerOptions.value = payload.schedulers ?? []
+    clipNameOptions.value = payload.clipNames ?? []
+    vaeNameOptions.value = payload.vaeNames ?? []
+    generationOptionDefaults.value = payload.defaults ?? {}
+  } catch (error) {
+    generationOptionsError.value =
+      error instanceof Error ? error.message : 'Could not load sampler options.'
+  } finally {
+    loadingGenerationOptions.value = false
+  }
+}
+
 return {
   clearCopiedPathTimer,
   useLastGeneratedSeed,
@@ -361,5 +407,6 @@ return {
   loadCheckpoints,
   loadLoras,
   loadControlNets,
+  loadGenerationOptions,
 }
 }

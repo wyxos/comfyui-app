@@ -19,6 +19,8 @@ export function createHomeSelectionComputed(state: HomeState, deps: HomeSelectio
 const {
   activePromptId,
   cfg,
+  clipName,
+  clipNameOptions,
   checkpoints,
   controlNetPreprocessors,
   controlNets,
@@ -35,9 +37,14 @@ const {
   negativePromptDraft,
   negativePromptTags,
   prompt,
+  promptMode,
   promptSectionDrafts,
   promptSections,
   seed,
+  samplerName,
+  samplerOptions,
+  scheduler,
+  schedulerOptions,
   steps,
   selectedCheckpoints,
   selectedImageDimensions,
@@ -47,6 +54,9 @@ const {
   submissionError,
   uploadedInputImageName,
   useInputImage,
+  vaeName,
+  vaeNameOptions,
+  generationOptionDefaults,
   width,
 } = state
 const {
@@ -178,6 +188,37 @@ const controlNetSummary = computed(() => {
 const cfgPlaceholder = computed(() => {
   return primarySelectedCheckpointMeta.value?.family === 'anima' ? '4.0' : '5.5'
 })
+function selectedOptionList(options: string[], currentValue: string, fallbackValue = '') {
+  return [...new Set([
+    ...options,
+    currentValue,
+    fallbackValue,
+  ].filter(Boolean))]
+}
+const activeGenerationDefaults = computed(() => {
+  return primarySelectedCheckpointMeta.value?.family === 'anima'
+    ? generationOptionDefaults.value.anima ?? {}
+    : generationOptionDefaults.value.sdxl ?? {}
+})
+const samplerPlaceholder = computed(() => activeGenerationDefaults.value.samplerName ?? '')
+const schedulerPlaceholder = computed(() => activeGenerationDefaults.value.scheduler ?? '')
+const clipNamePlaceholder = computed(() => generationOptionDefaults.value.anima?.clipName ?? '')
+const vaeNamePlaceholder = computed(() => generationOptionDefaults.value.anima?.vaeName ?? '')
+const samplerSelectOptions = computed(() =>
+  selectedOptionList(samplerOptions.value, samplerName.value, samplerPlaceholder.value),
+)
+const schedulerSelectOptions = computed(() =>
+  selectedOptionList(schedulerOptions.value, scheduler.value, schedulerPlaceholder.value),
+)
+const clipNameSelectOptions = computed(() =>
+  selectedOptionList(clipNameOptions.value, clipName.value, clipNamePlaceholder.value),
+)
+const vaeNameSelectOptions = computed(() =>
+  selectedOptionList(vaeNameOptions.value, vaeName.value, vaeNamePlaceholder.value),
+)
+const hasAnimaCheckpointSelected = computed(() =>
+  selectedCheckpointEntries.value.some((checkpoint) => checkpoint.family === 'anima'),
+)
 const stepsPlaceholder = computed(() => {
   return '20'
 })
@@ -210,8 +251,16 @@ const sourceImageDimensionLabel = computed(() => {
 const outputFolderTooltip = computed(() => {
   return getLatestOutput() ? 'Open parent folder' : 'Open output folder'
 })
-const compiledPrompt = computed(() => buildPromptFromSections(promptSections.value, promptSectionDrafts.value) || prompt.value.trim())
-const compiledNegativePrompt = computed(() => buildNegativePromptFromTags(true) || negativePrompt.value.trim())
+const compiledPrompt = computed(() =>
+  promptMode.value === 'text'
+    ? prompt.value.trim()
+    : buildPromptFromSections(promptSections.value, promptSectionDrafts.value) || prompt.value.trim(),
+)
+const compiledNegativePrompt = computed(() =>
+  promptMode.value === 'text'
+    ? negativePrompt.value.trim()
+    : buildNegativePromptFromTags(true) || negativePrompt.value.trim(),
+)
 const hasPromptSectionTags = computed(() =>
   Object.values(promptSections.value).some((sectionTags) => sectionTags.length > 0),
 )
@@ -223,12 +272,17 @@ const canResetForm = computed(() => {
       hasPromptSectionDrafts() ||
       negativePromptTags.value.length ||
       negativePromptDraft.value ||
+      promptMode.value !== 'tags' ||
       selectedCheckpoints.value.length ||
       width.value !== '1024' ||
       height.value !== '1024' ||
       seed.value ||
       steps.value ||
       cfg.value ||
+      samplerName.value ||
+      scheduler.value ||
+      clipName.value ||
+      vaeName.value ||
       imageDenoise.value ||
       maintainAspectRatio.value ||
       useInputImage.value ||
@@ -265,6 +319,15 @@ return {
   controlNetGenerationBlocker,
   controlNetSummary,
   cfgPlaceholder,
+  samplerPlaceholder,
+  schedulerPlaceholder,
+  clipNamePlaceholder,
+  vaeNamePlaceholder,
+  samplerSelectOptions,
+  schedulerSelectOptions,
+  clipNameSelectOptions,
+  vaeNameSelectOptions,
+  hasAnimaCheckpointSelected,
   stepsPlaceholder,
   imageDenoisePlaceholder,
   selectedCheckpointSummary,

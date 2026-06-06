@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import {
   civitaiModelWebUrl,
   extractImageMeta,
@@ -9,9 +9,11 @@ import {
   isImageNsfw,
   isVideoPreview,
   modelVersionLabel,
+  numberProp,
   normalizeImageMeta,
   preloadImage,
   primaryFileForVersion,
+  selectedVersionFor,
   versionDownloadUnavailableLabel,
 } from './assetPreviewHelpers'
 import type {
@@ -240,7 +242,6 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
   function close() {
     emitClose()
   }
-
   function selectVersion(version: CivitaiModelVersion) {
     activeVersionId.value = version.id
     activeImageIndex.value = 0
@@ -330,6 +331,16 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     } else if (event.key === 'ArrowRight') {
       showNextImage()
     }
+  }
+
+  function handleMouseNavigation(event: MouseEvent) {
+    if (event.button !== 3 && event.button !== 4) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    ;(event.button === 3 ? showPreviousImage : showNextImage)()
   }
 
   watch(
@@ -425,8 +436,10 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     (open) => {
       if (open) {
         window.addEventListener('keydown', handleKeydown)
+        window.addEventListener('mousedown', handleMouseNavigation, true)
       } else {
         window.removeEventListener('keydown', handleKeydown)
+        window.removeEventListener('mousedown', handleMouseNavigation, true)
       }
     },
     { immediate: true },
@@ -436,6 +449,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     civitaiController?.abort()
     imageDetailsController?.abort()
     window.removeEventListener('keydown', handleKeydown)
+    window.removeEventListener('mousedown', handleMouseNavigation, true)
   })
 
   return {
@@ -452,6 +466,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     previewSlides,
     activeSlide,
     activeImage,
+    activeImageMetaSource,
     activeImageMeta,
     normalizedImageMetaRows,
     activeTriggerWords,
@@ -482,18 +497,4 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     imageNsfwLabel: (image: CivitaiImage | null | undefined) => imageNsfwLabel(civitaiModel.value, image),
     isImageNsfw: (image: CivitaiImage | null | undefined) => isImageNsfw(civitaiModel.value, image),
   }
-}
-
-function numberProp(value: number | null | undefined) {
-  return typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : null
-}
-
-function selectedVersionFor(versions: Ref<CivitaiModelVersion[]>, activeVersionId: Ref<number | null>) {
-  if (!versions.value.length) {
-    return null
-  }
-
-  return versions.value.find((version) => version.id === activeVersionId.value)
-    ?? versions.value[0]
-    ?? null
 }

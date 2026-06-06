@@ -8,6 +8,7 @@ import {
   createAnimaLLLiteSourceNodes,
   createControlNetSourceNodes,
 } from './controlnet-workflow.mjs'
+import { buildFilenamePrefix, getGenerationOutputCategory, stripModelExtension } from './workflow-naming.mjs'
 export function createNodeIdGenerator(start = 3) {
   let nextId = start
   return () => String(nextId++)
@@ -18,26 +19,8 @@ export function buildPromptVariantLabel(variant) {
 export function buildPromptVariantNodeLabel(action, variant) {
   return `${action} ${buildPromptVariantLabel(variant).toLowerCase()}`
 }
-export function stripModelExtension(modelName) {
-  return safeTrim(modelName).replace(/\.[^.]+$/, '')
-}
-
-export function buildModelToken(modelName, fallback = 'model') {
-  const normalized = stripModelExtension(modelName)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48)
-
-  return normalized || fallback
-}
-export function getGenerationOutputCategory(inputImageName) {
-  return inputImageName ? 'img2img' : 'txt2img'
-}
-export function buildFilenamePrefix(outputCategory, checkpoint, variant, variantCount) {
-  const checkpointToken = buildModelToken(checkpoint)
-  const variantSuffix = variantCount > 1 ? `-${buildModelToken(variant.id, 'variant')}` : ''
-  return `%year%-%month%-%day%/${outputCategory}/${checkpointToken}${variantSuffix}`
+function normalizeWorkflowOption(value, fallback) {
+  return safeTrim(value) || fallback
 }
 export function applyLorasToModelAndClip({ prompt, nodeLabels, nextNodeId, modelRef, clipRef, loras }) {
   let activeModelRef = modelRef
@@ -76,6 +59,8 @@ export function buildSdxlWorkflow({
   cfg,
   denoise,
   seed,
+  samplerName,
+  scheduler,
   inputImageName,
   controlNets = [],
 }) {
@@ -201,8 +186,8 @@ export function buildSdxlWorkflow({
         seed,
         steps,
         cfg,
-        sampler_name: samplerProfile.samplerName,
-        scheduler: samplerProfile.scheduler,
+        sampler_name: samplerName,
+        scheduler,
         denoise: usingImageInput ? denoise : samplerProfile.txt2imgDenoise,
         model: activeModelRef,
         positive: conditioningRefs.positiveRef,
@@ -253,6 +238,10 @@ export function buildAnimaWorkflow({
   cfg,
   denoise,
   seed,
+  samplerName,
+  scheduler,
+  clipName,
+  vaeName,
   inputImageName,
   controlNets = [],
 }) {
@@ -277,14 +266,14 @@ export function buildAnimaWorkflow({
   prompt[clipLoaderNodeId] = {
     class_type: 'CLIPLoader',
     inputs: {
-      clip_name: animaAssets.clipName,
+      clip_name: clipName,
       type: animaAssets.clipType,
     },
   }
   prompt[vaeLoaderNodeId] = {
     class_type: 'VAELoader',
     inputs: {
-      vae_name: animaAssets.vaeName,
+      vae_name: vaeName,
     },
   }
   prompt[negativeNodeId] = {
@@ -397,8 +386,8 @@ export function buildAnimaWorkflow({
         seed,
         steps,
         cfg,
-        sampler_name: samplerProfile.samplerName,
-        scheduler: samplerProfile.scheduler,
+        sampler_name: samplerName,
+        scheduler,
         denoise: usingImageInput ? denoise : samplerProfile.txt2imgDenoise,
         model: activeModelRef,
         positive: [positiveNodeIds[variant.id], 0],
@@ -449,6 +438,10 @@ export function buildWorkflow({
   cfg,
   denoise,
   seed,
+  samplerName,
+  scheduler,
+  clipName,
+  vaeName,
   inputImageName,
   controlNets,
   checkpointFamily,
@@ -461,6 +454,10 @@ export function buildWorkflow({
   const normalizedCfg = normalizeCfg(cfg, samplerProfile.cfg)
   const normalizedDenoise = normalizeDenoise(denoise, samplerProfile.img2imgDenoise)
   const normalizedSeed = normalizeSeed(seed)
+  const normalizedSamplerName = normalizeWorkflowOption(samplerName, samplerProfile.samplerName)
+  const normalizedScheduler = normalizeWorkflowOption(scheduler, samplerProfile.scheduler)
+  const normalizedClipName = family === 'anima' ? normalizeWorkflowOption(clipName, animaAssets.clipName) : null
+  const normalizedVaeName = family === 'anima' ? normalizeWorkflowOption(vaeName, animaAssets.vaeName) : null
   const workflowInput = {
     promptVariants,
     negativePrompt,
@@ -472,6 +469,10 @@ export function buildWorkflow({
     cfg: normalizedCfg,
     denoise: normalizedDenoise,
     seed: normalizedSeed,
+    samplerName: normalizedSamplerName,
+    scheduler: normalizedScheduler,
+    clipName: normalizedClipName,
+    vaeName: normalizedVaeName,
     inputImageName,
     controlNets,
   }
@@ -486,5 +487,9 @@ export function buildWorkflow({
     cfg: normalizedCfg,
     denoise: normalizedDenoise,
     seed: normalizedSeed,
+    samplerName: normalizedSamplerName,
+    scheduler: normalizedScheduler,
+    clipName: normalizedClipName,
+    vaeName: normalizedVaeName,
   }
 }

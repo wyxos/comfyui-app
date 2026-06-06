@@ -23,6 +23,7 @@ import {
   handlePostDownload,
   handleRepairDownloadPreviews,
 } from './handlers/downloads.mjs'
+import { handleGenerationOptions } from './handlers/generation-options.mjs'
 import {
   handleDeleteCivitaiSettings,
   handleGetAppSettings,
@@ -49,11 +50,7 @@ import { resetModelMetadataRuntimeState } from './model-metadata.mjs'
 import { resetJobStoreRuntimeState } from './job-store.mjs'
 
 export function createCompanionServer({ connectWebSocket = true } = {}) {
-  if (connectWebSocket) {
-    connectComfySocket()
-  }
-
-  return createServer(async (request, response) => {
+  const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', `http://${request.headers.host ?? `${host}:${port}`}`)
 
   if (url.pathname === '/health') {
@@ -78,6 +75,10 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
 
   if (url.pathname === '/api/controlnets' && request.method === 'GET') {
     return handleControlNetList(response)
+  }
+
+  if (url.pathname === '/api/generation-options' && request.method === 'GET') {
+    return handleGenerationOptions(response)
   }
 
   if (url.pathname === '/api/settings/civitai' && request.method === 'GET') {
@@ -231,6 +232,12 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
 
   streamFile(response, assetPath)
   })
+
+  if (connectWebSocket) {
+    server.once('listening', connectComfySocket)
+  }
+
+  return server
 }
 
 export function configureCompanionServerForTests(adapters = {}) {

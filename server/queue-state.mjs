@@ -299,18 +299,21 @@ export function applyQueueStateToJob(job, queueEntry) {
 
 export async function syncJob(promptId, queueSnapshot = null) {
   const job = ensureJob(promptId)
+  const resolvedQueueSnapshot = queueSnapshot ?? getQueueSnapshot(await comfyFetchJson('/queue'))
+  const queueEntry = resolvedQueueSnapshot.byPromptId.get(promptId) ?? null
+
+  if (queueEntry) {
+    applyQueueStateToJob(job, queueEntry)
+    return job
+  }
+
   const historyJob = await syncJobFromHistory(promptId)
 
   if (historyJob && isJobTerminalState(historyJob.state)) {
     return historyJob
   }
 
-  const resolvedQueueSnapshot = queueSnapshot ?? getQueueSnapshot(await comfyFetchJson('/queue'))
-  const queueEntry = resolvedQueueSnapshot.byPromptId.get(promptId) ?? null
-
-  if (queueEntry) {
-    applyQueueStateToJob(job, queueEntry)
-  } else if (!isJobTerminalState(job.state)) {
+  if (!isJobTerminalState(job.state)) {
     if (job.cancelRequestedAt) {
       markJob(job, {
         state: 'cancelled',

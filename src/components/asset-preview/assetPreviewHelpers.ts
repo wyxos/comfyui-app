@@ -1,4 +1,7 @@
 import type {
+  Ref,
+} from 'vue'
+import type {
   CivitaiImage,
   CivitaiModel,
   CivitaiModelVersion,
@@ -18,6 +21,20 @@ export function primaryFileForVersion(version: CivitaiModelVersion | null | unde
   return version?.files?.find((file) => file.primary === true && file.type === 'Model')
     ?? version?.files?.find((file) => file.type === 'Model')
     ?? version?.files?.find((file) => file.primary === true)
+    ?? null
+}
+
+export function numberProp(value: number | null | undefined) {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : null
+}
+
+export function selectedVersionFor(versions: Ref<CivitaiModelVersion[]>, activeVersionId: Ref<number | null>) {
+  if (!versions.value.length) {
+    return null
+  }
+
+  return versions.value.find((version) => version.id === activeVersionId.value)
+    ?? versions.value[0]
     ?? null
 }
 
@@ -229,6 +246,7 @@ export function normalizeImageMeta(meta: Record<string, unknown> | null | undefi
     { label: 'Seed', keys: ['seed', 'Seed'] },
     { label: 'Steps', keys: ['steps', 'Steps'] },
     { label: 'CFG scale', keys: ['cfgScale', 'cfg_scale', 'cfg', 'CFG scale', 'Cfg Scale'] },
+    { label: 'Denoise', keys: ['denoise', 'Denoise', 'Denoising strength', 'Denoising Strength'] },
     { label: 'Sampler', keys: ['sampler', 'Sampler', 'samplerName', 'sampler_name'] },
     { label: 'Scheduler', keys: ['scheduler', 'Scheduler'] },
     { label: 'Model', keys: ['Model', 'model', 'modelName', 'model_name'] },

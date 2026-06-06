@@ -2,7 +2,9 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { createHomePromptModeActions } from '../../src/views/home/homePromptModeActions'
 import { createHomePromptTagActions } from '../../src/views/home/homePromptTagActions'
+import { createHomeSelectionComputed } from '../../src/views/home/homeSelectionComputed'
 import { createHomeState } from '../../src/views/home/homeState'
 
 describe('home prompt tags', () => {
@@ -229,5 +231,54 @@ describe('home prompt tags', () => {
 
     expect(state.promptSections.value.subject.map((tag) => tag.text)).toEqual(['blue hair', 'red eyes'])
     expect(state.negativePromptTags.value.map((tag) => tag.text)).toEqual(['blue hair'])
+  })
+
+  it('preserves existing tag sections when toggling to text mode and back without edits', () => {
+    const state = createHomeState()
+    const promptActions = createHomePromptTagActions(state)
+    const selection = createHomeSelectionComputed(state, {
+      buildNegativePromptFromTags: promptActions.buildNegativePromptFromTags,
+      buildPromptFromSections: promptActions.buildPromptFromSections,
+      buildPromptVariantsFromFields: () => [],
+      getLatestOutput: () => null,
+      hasPromptSectionDrafts: promptActions.hasPromptSectionDrafts,
+    })
+    const modeActions = createHomePromptModeActions(state, selection)
+
+    state.promptSections.value.subject = [{ text: 'blue hair', strength: '1' }]
+    state.promptSections.value.others = [{ text: 'rooftop sign', strength: '1' }]
+    state.negativePromptTags.value = [{ text: 'watermark', strength: '1' }]
+
+    modeActions.setPromptMode('text')
+    modeActions.setPromptMode('tags')
+
+    expect(state.promptSections.value.subject).toEqual([{ text: 'blue hair', strength: '1' }])
+    expect(state.promptSections.value.others).toEqual([{ text: 'rooftop sign', strength: '1' }])
+    expect(state.negativePromptTags.value).toEqual([{ text: 'watermark', strength: '1' }])
+  })
+
+  it('parses edited simple prompt text into Others when returning to tag mode', () => {
+    const state = createHomeState()
+    const promptActions = createHomePromptTagActions(state)
+    const selection = createHomeSelectionComputed(state, {
+      buildNegativePromptFromTags: promptActions.buildNegativePromptFromTags,
+      buildPromptFromSections: promptActions.buildPromptFromSections,
+      buildPromptVariantsFromFields: () => [],
+      getLatestOutput: () => null,
+      hasPromptSectionDrafts: promptActions.hasPromptSectionDrafts,
+    })
+    const modeActions = createHomePromptModeActions(state, selection)
+
+    state.promptSections.value.subject = [{ text: 'blue hair', strength: '1' }]
+    state.negativePromptTags.value = [{ text: 'watermark', strength: '1' }]
+
+    modeActions.setPromptMode('text')
+    state.prompt.value = 'edited prompt, rooftop sign'
+    state.negativePrompt.value = 'lowres, bad hands'
+    modeActions.setPromptMode('tags')
+
+    expect(state.promptSections.value.subject).toEqual([])
+    expect(state.promptSections.value.others.map((tag) => tag.text)).toEqual(['edited prompt', 'rooftop sign'])
+    expect(state.negativePromptTags.value.map((tag) => tag.text)).toEqual(['lowres', 'bad hands'])
   })
 })

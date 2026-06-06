@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import {
+  Clipboard,
+  ClipboardPaste,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -12,6 +15,7 @@ import AssetPreviewFileDetails from './AssetPreviewFileDetails.vue'
 import AssetPreviewVersionList from './AssetPreviewVersionList.vue'
 import type { AssetPreviewModalProps } from './assetPreviewTypes'
 import { useAssetPreviewModal } from './useAssetPreviewModal'
+import { serializeGenerationMetadataClipboard } from '../../lib/generationMetadata'
 
 const props = withDefaults(
   defineProps<AssetPreviewModalProps>(),
@@ -39,6 +43,7 @@ const props = withDefaults(
     queueAssetDownload: undefined,
     deleteAssetDownload: undefined,
     modelDownloadKey: undefined,
+    applyGenerationMetadata: undefined,
   },
 )
 
@@ -65,6 +70,7 @@ const {
   previewSlides,
   activeSlide,
   activeImage,
+  activeImageMetaSource,
   activeImageMeta,
   normalizedImageMetaRows,
   activeTriggerWords,
@@ -95,6 +101,42 @@ const {
   imageNsfwLabel,
   isImageNsfw,
 } = useAssetPreviewModal(props, () => emit('close'))
+
+const metadataActionNotice = ref('')
+const metadataActionError = ref('')
+const isHandlingMetadataAction = ref(false)
+const hasApplyGenerationMetadataAction = computed(() => typeof props.applyGenerationMetadata === 'function')
+
+async function handleActiveImageMetadataAction() {
+  if (isHandlingMetadataAction.value) {
+    return
+  }
+
+  metadataActionNotice.value = ''
+  metadataActionError.value = ''
+  isHandlingMetadataAction.value = true
+
+  try {
+    if (!activeImageMetaSource.value) {
+      throw new Error('No generation metadata is available for this image.')
+    }
+
+    if (hasApplyGenerationMetadataAction.value) {
+      await props.applyGenerationMetadata?.(activeImageMetaSource.value)
+      metadataActionNotice.value = 'Metadata applied.'
+      close()
+      return
+    }
+
+    await navigator.clipboard.writeText(serializeGenerationMetadataClipboard(activeImageMetaSource.value))
+    metadataActionNotice.value = 'Metadata copied.'
+  } catch (error) {
+    metadataActionError.value =
+      error instanceof Error ? error.message : 'Could not use generation metadata.'
+  } finally {
+    isHandlingMetadataAction.value = false
+  }
+}
 </script>
 
 <template>
@@ -360,7 +402,35 @@ const {
             v-if="imageMetaLoading || imageMetaError || activeImageMeta || normalizedImageMetaRows.length"
             class="space-y-3 border-t border-border pt-5"
           >
-            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">Image generation metadata</p>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">
+                Image generation metadata
+              </p>
+              <button
+                v-if="activeImageMeta"
+                type="button"
+                class="inline-flex h-8 items-center gap-1.5 rounded-sm border border-border bg-card px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-card-foreground transition hover:border-secondary hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25"
+                :disabled="isHandlingMetadataAction"
+                @click="handleActiveImageMetadataAction"
+              >
+                <ClipboardPaste
+                  v-if="hasApplyGenerationMetadataAction"
+                  class="h-3.5 w-3.5"
+                />
+                <Clipboard
+                  v-else
+                  class="h-3.5 w-3.5"
+                />
+                {{ hasApplyGenerationMetadataAction ? 'Apply metadata' : 'Copy metadata' }}
+              </button>
+            </div>
+            <p
+              v-if="metadataActionError || metadataActionNotice"
+              class="text-xs font-semibold"
+              :class="metadataActionError ? 'text-destructive' : 'text-secondary'"
+            >
+              {{ metadataActionError || metadataActionNotice }}
+            </p>
             <div class="rounded-md border border-accent/35 bg-background p-3">
               <p
                 v-if="imageMetaLoading"

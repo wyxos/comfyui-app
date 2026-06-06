@@ -23,6 +23,23 @@ describe('companion app input and prompt flows', () => {
     return Array.from(context.getImageData(0, 0, 1, 1).data)
   }
 
+  it('submits simple positive and negative prompt text when prompt text mode is selected', async () => {
+      const { api, screen } = await renderCompanionApp('/?tab=prompt')
+
+      await screen.getByRole('button', { name: 'Text', exact: true }).click()
+      await screen.getByRole('textbox', { name: 'Positive prompt text' }).fill('simple portrait, blue hair')
+      await screen.getByRole('textbox', { name: 'Negative prompt text' }).fill('bad hands, watermark')
+      await screen.getByRole('button', { name: 'Generate' }).click()
+
+      await vi.waitFor(() => {
+        const generateCall = api.calls.find((call) => call.method === 'POST' && call.path === '/api/generate')
+        expect(generateCall?.body).toMatchObject({
+          prompt: 'simple portrait, blue hair',
+          negativePrompt: 'bad hands, watermark',
+        })
+      })
+    })
+
   it('flattens transparent input images onto the selected background color', async () => {
       const { api, screen } = await renderCompanionApp('/', {
         uploadInputImageNames: ['transparent-input.png'],

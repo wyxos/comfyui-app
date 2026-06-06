@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted } from 'vue'
-import { Image as ImageIcon, LoaderCircle, SlidersHorizontal } from 'lucide-vue-next'
+import { Copy, Image as ImageIcon, LoaderCircle, SlidersHorizontal } from 'lucide-vue-next'
 import { useProvidedHomeView } from './homeViewContext'
 
 const {
   generatedOutputContextMenu,
+  generatedOutputActionNotice,
   generatedOutputActionError,
   isApplyingGeneratedOutput,
   closeGeneratedOutputContextMenu,
+  copyGeneratedOutputImage,
   useGeneratedOutputAsImageInput,
   useGeneratedOutputAsControlNet,
 } = useProvidedHomeView()
@@ -54,6 +56,24 @@ onBeforeUnmount(() => {
         role="menuitem"
         class="flex h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold transition hover:bg-accent/12 hover:text-accent disabled:cursor-wait disabled:opacity-60"
         :disabled="isApplyingGeneratedOutput"
+        @click="copyGeneratedOutputImage"
+      >
+        <LoaderCircle
+          v-if="isApplyingGeneratedOutput"
+          class="h-4 w-4 animate-spin"
+        />
+        <Copy
+          v-else
+          class="h-4 w-4"
+        />
+        <span>Copy image</span>
+      </button>
+
+      <button
+        type="button"
+        role="menuitem"
+        class="flex h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold transition hover:bg-accent/12 hover:text-accent disabled:cursor-wait disabled:opacity-60"
+        :disabled="isApplyingGeneratedOutput"
         @click="useGeneratedOutputAsImageInput"
       >
         <LoaderCircle
@@ -85,6 +105,12 @@ onBeforeUnmount(() => {
         <span>Use as ControlNet input</span>
       </button>
 
+      <p
+        v-if="generatedOutputActionNotice"
+        class="border-t border-border px-3 py-2 text-xs font-semibold text-accent"
+      >
+        {{ generatedOutputActionNotice }}
+      </p>
       <p
         v-if="generatedOutputActionError"
         class="border-t border-border px-3 py-2 text-xs font-semibold text-destructive"

@@ -38,6 +38,10 @@ export async function handleGenerate(request, response) {
   const seed = body instanceof FormData ? body.get('seed') : body.seed
   const cfg = body instanceof FormData ? body.get('cfg') : body.cfg
   const imageDenoise = body instanceof FormData ? body.get('imageDenoise') : body.imageDenoise
+  const samplerName = body instanceof FormData ? body.get('samplerName') : body.samplerName
+  const scheduler = body instanceof FormData ? body.get('scheduler') : body.scheduler
+  const clipName = body instanceof FormData ? body.get('clipName') : body.clipName
+  const vaeName = body instanceof FormData ? body.get('vaeName') : body.vaeName
   const storedInputImageName = safeTrim(
     body instanceof FormData ? body.get('inputImageName') : body.inputImageName,
   )
@@ -251,6 +255,10 @@ export async function handleGenerate(request, response) {
         steps: normalizedSteps,
         cfg: normalizedCfg,
         denoise: normalizedDenoise,
+        samplerName: normalizedSamplerName,
+        scheduler: normalizedScheduler,
+        clipName: normalizedClipName,
+        vaeName: normalizedVaeName,
         seed: normalizedSeed,
       } = buildWorkflow({
         promptVariants: checkpointPromptVariants,
@@ -262,6 +270,10 @@ export async function handleGenerate(request, response) {
         steps,
         cfg,
         denoise: imageDenoise,
+        samplerName,
+        scheduler,
+        clipName,
+        vaeName,
         seed,
         inputImageName,
         controlNets,
@@ -311,6 +323,10 @@ export async function handleGenerate(request, response) {
         steps: normalizedSteps,
         cfg: normalizedCfg,
         denoise: normalizedDenoise,
+        samplerName: normalizedSamplerName,
+        scheduler: normalizedScheduler,
+        clipName: normalizedClipName,
+        vaeName: normalizedVaeName,
         seed: normalizedSeed,
         inputImageName,
         inputImageDisplayName,

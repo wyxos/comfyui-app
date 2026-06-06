@@ -327,6 +327,49 @@ describe('AssetPreviewModal', () => {
     )
     expect(deleteAssetDownload).toHaveBeenCalledWith(download, version)
   })
+
+  it('cycles preview images with mouse back and forward buttons while open', async () => {
+    const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
+    mount(AssetPreviewModal, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        model: {
+          id: 101,
+          name: 'Mouse navigation model',
+          type: 'Checkpoint',
+          modelVersions: [
+            {
+              id: 201,
+              name: 'v1',
+              baseModel: 'Illustrious',
+              images: [
+                { url: 'https://example.test/first.jpg', type: 'image', nsfw: false },
+                { url: 'https://example.test/second.jpg', type: 'image', nsfw: false },
+              ],
+            },
+          ],
+        },
+      },
+    })
+
+    await nextTick()
+    expect(document.body.textContent).toContain('1 / 2')
+
+    const forwardEvent = new MouseEvent('mousedown', { button: 4, bubbles: true, cancelable: true })
+    window.dispatchEvent(forwardEvent)
+    await nextTick()
+
+    expect(forwardEvent.defaultPrevented).toBe(true)
+    expect(document.body.textContent).toContain('2 / 2')
+
+    const backEvent = new MouseEvent('mousedown', { button: 3, bubbles: true, cancelable: true })
+    window.dispatchEvent(backEvent)
+    await nextTick()
+
+    expect(backEvent.defaultPrevented).toBe(true)
+    expect(document.body.textContent).toContain('1 / 2')
+  })
 })
 
 describe('UiCarousel', () => {

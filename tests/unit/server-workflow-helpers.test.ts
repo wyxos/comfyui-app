@@ -125,4 +125,41 @@ describe('server workflow helpers', () => {
     expect(entries.some(([, node]) => node.class_type === 'ControlNetLoader')).toBe(false)
     expect(entries.some(([, node]) => node.class_type === 'ControlNetApplyAdvanced')).toBe(false)
   })
+
+  it('uses requested sampler, scheduler, and Anima asset overrides', () => {
+    const anima = buildWorkflow({
+      promptVariants: buildRequestedPromptVariants('a portrait', ''),
+      negativePrompt: '',
+      checkpoint: 'animaPencilXL.safetensors',
+      checkpointFamily: 'anima',
+      loras: [],
+      width: 1024,
+      height: 1024,
+      steps: 22,
+      cfg: 4.5,
+      denoise: 0.7,
+      seed: 12,
+      inputImageName: '',
+      samplerName: 'dpmpp_2m',
+      scheduler: 'karras',
+      clipName: 'custom-clip.safetensors',
+      vaeName: 'custom-vae.safetensors',
+    })
+
+    const entries = workflowEntries(anima.prompt)
+    const samplerNode = entries.find(([, node]) => node.class_type === 'KSampler')
+    const clipNode = entries.find(([, node]) => node.class_type === 'CLIPLoader')
+    const vaeNode = entries.find(([, node]) => node.class_type === 'VAELoader')
+
+    expect(anima.samplerName).toBe('dpmpp_2m')
+    expect(anima.scheduler).toBe('karras')
+    expect(anima.clipName).toBe('custom-clip.safetensors')
+    expect(anima.vaeName).toBe('custom-vae.safetensors')
+    expect(samplerNode?.[1].inputs).toMatchObject({
+      sampler_name: 'dpmpp_2m',
+      scheduler: 'karras',
+    })
+    expect(clipNode?.[1].inputs.clip_name).toBe('custom-clip.safetensors')
+    expect(vaeNode?.[1].inputs.vae_name).toBe('custom-vae.safetensors')
+  })
 })

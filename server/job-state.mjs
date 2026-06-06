@@ -167,6 +167,10 @@ export async function serializeJob(job) {
     steps: typeof job.steps === 'number' ? job.steps : null,
     cfg: typeof job.cfg === 'number' ? job.cfg : null,
     denoise: typeof job.denoise === 'number' ? job.denoise : null,
+    samplerName: typeof job.samplerName === 'string' ? job.samplerName : null,
+    scheduler: typeof job.scheduler === 'string' ? job.scheduler : null,
+    clipName: typeof job.clipName === 'string' ? job.clipName : null,
+    vaeName: typeof job.vaeName === 'string' ? job.vaeName : null,
     seed: typeof job.seed === 'number' ? job.seed : null,
     inputImageName: typeof job.inputImageName === 'string' ? job.inputImageName : null,
     inputImageDisplayName:

@@ -17,6 +17,10 @@ const {
   seed,
   steps,
   cfg,
+  samplerName,
+  scheduler,
+  clipName,
+  vaeName,
   maintainAspectRatio,
   aspectRatioSliderValue,
   aspectRatioLabel,
@@ -24,6 +28,17 @@ const {
   lastGeneratedSeed,
   stepsPlaceholder,
   cfgPlaceholder,
+  samplerPlaceholder,
+  schedulerPlaceholder,
+  clipNamePlaceholder,
+  vaeNamePlaceholder,
+  samplerSelectOptions,
+  schedulerSelectOptions,
+  clipNameSelectOptions,
+  vaeNameSelectOptions,
+  hasAnimaCheckpointSelected,
+  loadingGenerationOptions,
+  generationOptionsError,
   lastGeneratedSeedTooltip,
   sizeValidation,
   sizeValidationClass,
@@ -40,12 +55,22 @@ const aspectRatioSliderModel = computed({
     setAspectRatioSliderValue(value[0] ?? 0)
   },
 })
+const seedModeLabel = computed(() => (String(seed.value).trim() ? 'Fixed' : 'Random'))
+const seedModeClass = computed(() =>
+  seedModeLabel.value === 'Random'
+    ? 'border-secondary/45 bg-secondary/10 text-secondary'
+    : 'border-accent/35 bg-accent/10 text-accent',
+)
 
 function handleAspectRatioInput(event: Event) {
   const target = event.target
   if (target instanceof HTMLInputElement) {
     setAspectRatioSliderValue(target.value)
   }
+}
+
+function defaultOptionLabel(value: string) {
+  return value ? `Default (${value})` : 'Default'
 }
 </script>
 
@@ -191,7 +216,16 @@ function handleAspectRatioInput(event: Event) {
 
     <div class="grid gap-4 sm:grid-cols-3">
       <label class="flex flex-col gap-2">
-        <span class="field-label">Seed</span>
+        <span class="flex items-center justify-between gap-2">
+          <span class="field-label">Seed</span>
+          <span
+            data-testid="seed-mode-label"
+            class="inline-flex h-5 items-center rounded-sm border px-2 text-[10px] font-semibold uppercase tracking-[0.12em]"
+            :class="seedModeClass"
+          >
+            {{ seedModeLabel }}
+          </span>
+        </span>
         <div class="relative">
           <input
             v-model="seed"
@@ -242,6 +276,103 @@ function handleAspectRatioInput(event: Event) {
           :placeholder="cfgPlaceholder"
         />
       </label>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="flex flex-col gap-2">
+        <span class="field-label">Sampler</span>
+        <select
+          v-model="samplerName"
+          aria-label="Sampler"
+          class="h-11 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-card-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-55"
+          :disabled="loadingGenerationOptions"
+        >
+          <option value="">{{ defaultOptionLabel(samplerPlaceholder) }}</option>
+          <option
+            v-for="option in samplerSelectOptions"
+            :key="option"
+            :value="option"
+          >
+            {{ option }}
+          </option>
+        </select>
+      </label>
+
+      <label class="flex flex-col gap-2">
+        <span class="field-label">Scheduler</span>
+        <select
+          v-model="scheduler"
+          aria-label="Scheduler"
+          class="h-11 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-card-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-55"
+          :disabled="loadingGenerationOptions"
+        >
+          <option value="">{{ defaultOptionLabel(schedulerPlaceholder) }}</option>
+          <option
+            v-for="option in schedulerSelectOptions"
+            :key="option"
+            :value="option"
+          >
+            {{ option }}
+          </option>
+        </select>
+      </label>
+    </div>
+
+    <p
+      v-if="generationOptionsError"
+      class="text-xs font-semibold text-destructive"
+    >
+      {{ generationOptionsError }}
+    </p>
+
+    <div
+      v-if="hasAnimaCheckpointSelected"
+      class="space-y-3 rounded-md border border-primary-foreground/10 bg-primary-foreground/4 p-3"
+    >
+      <span class="field-label">Anima template</span>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <label class="flex flex-col gap-2">
+          <span class="text-xs font-semibold uppercase tracking-[0.12em] text-primary-foreground/72">
+            CLIP name
+          </span>
+          <select
+            v-model="clipName"
+            aria-label="CLIP name"
+            class="h-11 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-card-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-55"
+            :disabled="loadingGenerationOptions"
+          >
+            <option value="">{{ defaultOptionLabel(clipNamePlaceholder) }}</option>
+            <option
+              v-for="option in clipNameSelectOptions"
+              :key="option"
+              :value="option"
+            >
+              {{ option }}
+            </option>
+          </select>
+        </label>
+
+        <label class="flex flex-col gap-2">
+          <span class="text-xs font-semibold uppercase tracking-[0.12em] text-primary-foreground/72">
+            VAE name
+          </span>
+          <select
+            v-model="vaeName"
+            aria-label="VAE name"
+            class="h-11 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-card-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-55"
+            :disabled="loadingGenerationOptions"
+          >
+            <option value="">{{ defaultOptionLabel(vaeNamePlaceholder) }}</option>
+            <option
+              v-for="option in vaeNameSelectOptions"
+              :key="option"
+              :value="option"
+            >
+              {{ option }}
+            </option>
+          </select>
+        </label>
+      </div>
     </div>
   </div>
 </template>

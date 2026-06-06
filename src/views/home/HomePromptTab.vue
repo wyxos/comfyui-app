@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Minus, Plus, X } from 'lucide-vue-next'
+import {
+  Minus,
+  Plus,
+  X,
+} from 'lucide-vue-next'
 import type { PromptSectionId } from './homeTypes'
 import { useHomePromptTagInteractions } from './useHomePromptTagInteractions'
 import { useProvidedHomeView } from './homeViewContext'
 
 const {
+  prompt,
+  negativePrompt,
+  promptMode,
   promptSections,
   promptSectionDrafts,
   negativePromptTags,
@@ -14,6 +21,8 @@ const {
   promptSectionDefinitions,
   compiledPrompt,
   compiledNegativePrompt,
+  setPromptMode,
+  handlePromptWeightKeydown,
   addPromptSectionTag,
   removePromptSectionTag,
   movePromptTag,
@@ -82,10 +91,38 @@ const {
               v-show="formTab === 'prompt'"
               class="space-y-5"
             >
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <span class="field-label">Prompt mode</span>
+              <div
+                class="inline-flex overflow-hidden rounded-sm border border-primary-foreground/12 bg-card"
+                aria-label="Prompt mode"
+              >
+                <button
+                  type="button"
+                  class="h-7 px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-ring/25"
+                  :class="promptMode === 'tags' ? 'bg-accent text-accent-foreground' : 'text-primary-foreground/68 hover:bg-accent/12 hover:text-accent'"
+                  :aria-pressed="promptMode === 'tags'"
+                  @click="setPromptMode('tags')"
+                >
+                  Tags
+                </button>
+                <button
+                  type="button"
+                  class="h-7 border-l border-primary-foreground/12 px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-ring/25"
+                  :class="promptMode === 'text' ? 'bg-accent text-accent-foreground' : 'text-primary-foreground/68 hover:bg-accent/12 hover:text-accent'"
+                  :aria-pressed="promptMode === 'text'"
+                  @click="setPromptMode('text')"
+                >
+                  Text
+                </button>
+              </div>
+            </div>
+
+            <template v-if="promptMode === 'tags'">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-3">
                 <span class="field-label">Prompt sections</span>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center justify-end gap-2">
                   <button
                     type="button"
                     class="inline-flex h-6 items-center gap-1 rounded-sm border border-destructive/40 bg-destructive/10 px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-destructive transition hover:border-destructive hover:bg-destructive hover:text-destructive-foreground focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-45"
@@ -338,6 +375,46 @@ const {
               <p class="break-words text-xs leading-5 text-primary-foreground/56">
                 {{ compiledNegativePrompt || 'No negative prompt tags yet.' }}
               </p>
+            </div>
+            </template>
+
+            <div
+              v-else
+              class="space-y-4"
+            >
+              <div class="flex flex-col gap-2">
+                <label
+                  for="positive-prompt-text"
+                  class="field-label"
+                >
+                  Positive prompt text
+                </label>
+                <textarea
+                  id="positive-prompt-text"
+                  v-model="prompt"
+                  aria-label="Positive prompt text"
+                  class="min-h-48 resize-y rounded-md border border-input bg-card px-3 py-2 text-sm leading-6 text-card-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-ring/25"
+                  spellcheck="false"
+                  @keydown="handlePromptWeightKeydown($event, 'prompt')"
+                />
+              </div>
+
+              <div class="flex flex-col gap-2">
+                <label
+                  for="negative-prompt-text"
+                  class="field-label"
+                >
+                  Negative prompt text
+                </label>
+                <textarea
+                  id="negative-prompt-text"
+                  v-model="negativePrompt"
+                  aria-label="Negative prompt text"
+                  class="min-h-36 resize-y rounded-md border border-input bg-card px-3 py-2 text-sm leading-6 text-card-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-ring/25"
+                  spellcheck="false"
+                  @keydown="handlePromptWeightKeydown($event, 'negativePrompt')"
+                />
+              </div>
             </div>
 
             </div>

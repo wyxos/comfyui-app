@@ -1,6 +1,6 @@
 import type { HomeState } from './homeState'
 import type { PromptField } from './homeTypes'
-import { transformWeightedPrompt } from './homeValueHelpers'
+import { applyPromptTextWeightStep } from './homePromptTextWeight'
 
 export function createHomePromptWeightActions(state: HomeState) {
 const { negativePrompt, prompt } = state
@@ -11,7 +11,7 @@ function getPromptFieldRef(field: PromptField) {
 
 function handlePromptWeightKeydown(event: KeyboardEvent, field: PromptField) {
   if (
-    !event.ctrlKey ||
+    !(event.ctrlKey || event.metaKey) ||
     event.altKey ||
     event.shiftKey ||
     (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')
@@ -28,7 +28,12 @@ function handlePromptWeightKeydown(event: KeyboardEvent, field: PromptField) {
   const selectionEnd = target.selectionEnd ?? 0
   const direction: 1 | -1 = event.key === 'ArrowUp' ? 1 : -1
   const fieldRef = getPromptFieldRef(field)
-  const transformed = transformWeightedPrompt(fieldRef.value, selectionStart, selectionEnd, direction)
+  const transformed = applyPromptTextWeightStep({
+    text: fieldRef.value,
+    selectionStart,
+    selectionEnd,
+    direction,
+  })
 
   if (!transformed) {
     return
@@ -36,8 +41,8 @@ function handlePromptWeightKeydown(event: KeyboardEvent, field: PromptField) {
 
   event.preventDefault()
 
-  fieldRef.value = transformed.nextText
-  target.value = transformed.nextText
+  fieldRef.value = transformed.text
+  target.value = transformed.text
   target.setSelectionRange(transformed.selectionStart, transformed.selectionEnd)
 
   requestAnimationFrame(() => {

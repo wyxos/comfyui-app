@@ -36,6 +36,7 @@ const {
   activePromptId,
   batchPreviewMode,
   cfg,
+  clipName,
   imageDenoise,
   isCancellingJob,
   isSubmittingGenerate,
@@ -45,9 +46,12 @@ const {
   pendingSubmittedVariants,
   previewOutputs,
   seed,
+  samplerName,
+  scheduler,
   steps,
   submissionError,
   uploadedInputImageName,
+  vaeName,
 } = state
 const {
   compiledNegativePrompt,
@@ -174,6 +178,26 @@ async function generate() {
     const trimmedCfg = coerceTrimmedFieldString(cfg.value)
     if (trimmedCfg) {
       payloadBody.cfg = Number.parseFloat(trimmedCfg)
+    }
+
+    const trimmedSamplerName = coerceTrimmedFieldString(samplerName.value)
+    if (trimmedSamplerName) {
+      payloadBody.samplerName = trimmedSamplerName
+    }
+
+    const trimmedScheduler = coerceTrimmedFieldString(scheduler.value)
+    if (trimmedScheduler) {
+      payloadBody.scheduler = trimmedScheduler
+    }
+
+    const trimmedClipName = coerceTrimmedFieldString(clipName.value)
+    if (trimmedClipName) {
+      payloadBody.clipName = trimmedClipName
+    }
+
+    const trimmedVaeName = coerceTrimmedFieldString(vaeName.value)
+    if (trimmedVaeName) {
+      payloadBody.vaeName = trimmedVaeName
     }
 
     if (shouldUseInputImage.value && uploadedInputImageName.value) {

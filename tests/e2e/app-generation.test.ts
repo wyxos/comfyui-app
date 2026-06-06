@@ -324,6 +324,38 @@ describe('companion app e2e flows', () => {
       await vi.waitFor(() => {
         expect(document.querySelector('[role="menuitem"]')).not.toBeNull()
       })
+      expect(
+        Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).some((button) =>
+          button.textContent?.includes('Copy image'),
+        ),
+      ).toBe(true)
+      ;(Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+        .find((button) => button.textContent?.includes('Copy image')) as HTMLButtonElement).click()
+
+      await vi.waitFor(() => {
+        expect(navigator.clipboard.write).toHaveBeenCalled()
+      })
+      expect(api.calls.some((call) => call.method === 'GET' && call.path === '/api/view')).toBe(true)
+      await vi.waitFor(() => {
+        expect(document.body.textContent).toContain('Copied image')
+      })
+
+      generatedImage()?.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 48,
+          clientY: 48,
+          button: 2,
+        }),
+      )
+      await vi.waitFor(() => {
+        expect(
+          Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).some((button) =>
+            button.textContent?.includes('Use as image input'),
+          ),
+        ).toBe(true)
+      })
       ;(Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
         .find((button) => button.textContent?.includes('Use as image input')) as HTMLButtonElement).click()
 

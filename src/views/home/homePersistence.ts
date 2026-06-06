@@ -59,6 +59,7 @@ export function createHomePersistence(
 const {
   aspectRatioScale,
   cfg,
+  clipName,
   defaultLoraStrength,
   flattenInputImageBackground,
   height,
@@ -69,6 +70,7 @@ const {
   negativePromptDraft,
   negativePromptTags,
   prompt,
+  promptMode,
   promptSectionDrafts,
   promptSections,
   selectedCheckpoints,
@@ -76,9 +78,12 @@ const {
   selectedImageDisplayName,
   selectedImagePreviewUrl,
   seed,
+  samplerName,
+  scheduler,
   steps,
   uploadedInputImageName,
   useInputImage,
+  vaeName,
   width,
 } = state
 const { compiledNegativePrompt, compiledPrompt, selectedCheckpointEntries } = selection
@@ -214,6 +219,7 @@ function readPersistedFormState(): Partial<PersistedFormState> {
           .filter((entry): entry is CheckpointSelection => Boolean(entry))
       : []
     return {
+      promptMode: parsed.promptMode === 'text' ? 'text' : 'tags',
       prompt: typeof parsed.prompt === 'string' ? parsed.prompt : '',
       negativePrompt: typeof parsed.negativePrompt === 'string' ? parsed.negativePrompt : '',
       promptSections: normalizePersistedPromptSections(parsed.promptSections),
@@ -225,6 +231,10 @@ function readPersistedFormState(): Partial<PersistedFormState> {
       seed: typeof parsed.seed === 'string' ? parsed.seed : '',
       steps: typeof parsed.steps === 'string' ? parsed.steps : '',
       cfg: typeof parsed.cfg === 'string' ? parsed.cfg : '',
+      samplerName: typeof parsed.samplerName === 'string' ? parsed.samplerName : '',
+      scheduler: typeof parsed.scheduler === 'string' ? parsed.scheduler : '',
+      clipName: typeof parsed.clipName === 'string' ? parsed.clipName : '',
+      vaeName: typeof parsed.vaeName === 'string' ? parsed.vaeName : '',
       imageDenoise: typeof parsed.imageDenoise === 'string' ? parsed.imageDenoise : '',
       maintainAspectRatio:
         typeof parsed.maintainAspectRatio === 'boolean' ? parsed.maintainAspectRatio : false,
@@ -259,6 +269,7 @@ function persistFormState() {
   }
 
   const payload: PersistedFormState = {
+    promptMode: promptMode.value,
     prompt: compiledPrompt.value,
     negativePrompt: compiledNegativePrompt.value,
     promptSections: buildPromptSectionsForPersistence(),
@@ -287,6 +298,10 @@ function persistFormState() {
     seed: coerceFieldString(seed.value),
     steps: coerceFieldString(steps.value),
     cfg: coerceFieldString(cfg.value),
+    samplerName: coerceFieldString(samplerName.value),
+    scheduler: coerceFieldString(scheduler.value),
+    clipName: coerceFieldString(clipName.value),
+    vaeName: coerceFieldString(vaeName.value),
     imageDenoise: coerceFieldString(imageDenoise.value),
     maintainAspectRatio: maintainAspectRatio.value,
     flattenInputImageBackground: flattenInputImageBackground.value,
@@ -305,15 +320,16 @@ function restoreFormState() {
   const persisted = readPersistedFormState()
   prompt.value = persisted.prompt ?? ''
   negativePrompt.value = persisted.negativePrompt ?? ''
+  promptMode.value = persisted.promptMode === 'text' ? 'text' : 'tags'
   promptSections.value = normalizePersistedPromptSections(persisted.promptSections)
-  if (!buildPromptFromSections(promptSections.value) && prompt.value.trim()) {
+  if (promptMode.value === 'tags' && !buildPromptFromSections(promptSections.value) && prompt.value.trim()) {
     promptSections.value.subject = [buildPromptTag(prompt.value.trim())].filter(
       (tag): tag is PromptTag => Boolean(tag),
     )
   }
   promptSectionDrafts.value = createEmptyPromptSectionsDrafts()
   negativePromptTags.value = normalizePromptTags(persisted.negativePromptTags)
-  if (!negativePromptTags.value.length && negativePrompt.value.trim()) {
+  if (promptMode.value === 'tags' && !negativePromptTags.value.length && negativePrompt.value.trim()) {
     negativePromptTags.value = splitPromptDraft(negativePrompt.value)
   }
   negativePromptDraft.value = ''
@@ -335,6 +351,10 @@ function restoreFormState() {
   seed.value = persisted.seed ?? ''
   steps.value = persisted.steps ?? ''
   cfg.value = persisted.cfg ?? ''
+  samplerName.value = persisted.samplerName ?? ''
+  scheduler.value = persisted.scheduler ?? ''
+  clipName.value = persisted.clipName ?? ''
+  vaeName.value = persisted.vaeName ?? ''
   imageDenoise.value = persisted.imageDenoise ?? ''
   maintainAspectRatio.value = Boolean(persisted.maintainAspectRatio)
   aspectRatioScale.value = '0'

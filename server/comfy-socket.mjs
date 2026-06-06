@@ -1,6 +1,6 @@
 import { comfyClientId, comfyUrl, jobs } from './config.mjs'
 import { tryParseJson } from './shared.mjs'
-import { getJobActiveState, markJob, mergeJobOutputs, normalizeImage } from './job-state.mjs'
+import { getJobActiveState, isJobTerminalState, markJob, mergeJobOutputs, normalizeImage } from './job-state.mjs'
 
 let comfySocket = null
 export let comfySocketConnected = false
@@ -72,6 +72,29 @@ export function connectComfySocket() {
   })
 }
 
+function markJobComplete(job) {
+  markJob(job, {
+    state: 'complete',
+    queuePosition: null,
+    queueNumber: null,
+    currentNodeLabel: 'Completed',
+    progressValue: job.progressMax ?? 1,
+    progressMax: job.progressMax ?? 1,
+    error: null,
+  })
+}
+
+function markJobCancelled(job, data) {
+  markJob(job, {
+    state: 'cancelled',
+    queuePosition: null,
+    queueNumber: null,
+    currentNode: data.node_id ? String(data.node_id) : job.currentNode,
+    currentNodeLabel: 'Cancelled',
+    error: null,
+  })
+}
+
 export function handleComfySocketMessage(rawMessage) {
   const message = tryParseJson(String(rawMessage))
   if (!message?.type) {
@@ -87,6 +110,10 @@ export function handleComfySocketMessage(rawMessage) {
   const job = jobs.get(promptId)
 
   if (message.type === 'execution_start') {
+    if (isJobTerminalState(job.state)) {
+      return
+    }
+
     markJob(job, {
       state: getJobActiveState(job, 'running'),
       queuePosition: null,
@@ -97,6 +124,21 @@ export function handleComfySocketMessage(rawMessage) {
   }
 
   if (message.type === 'executing') {
+    if (data.node === null) {
+      if (!isJobTerminalState(job.state)) {
+        if (job.cancelRequestedAt) {
+          markJobCancelled(job, data)
+        } else {
+          markJobComplete(job)
+        }
+      }
+      return
+    }
+
+    if (isJobTerminalState(job.state)) {
+      return
+    }
+
     const nodeId = data.node ? String(data.node) : null
     markJob(job, {
       state: getJobActiveState(job, 'running'),
@@ -108,6 +150,10 @@ export function handleComfySocketMessage(rawMessage) {
   }
 
   if (message.type === 'progress') {
+    if (isJobTerminalState(job.state)) {
+      return
+    }
+
     const nodeId = data.node ? String(data.node) : null
     markJob(job, {
       state: getJobActiveState(job, 'running'),
@@ -121,6 +167,10 @@ export function handleComfySocketMessage(rawMessage) {
   }
 
   if (message.type === 'progress_state') {
+    if (isJobTerminalState(job.state)) {
+      return
+    }
+
     const nodes = Object.values(data.nodes ?? {})
     const runningNode = nodes.find((node) => node?.state === 'running')
     if (!runningNode) {
@@ -156,6 +206,11 @@ export function handleComfySocketMessage(rawMessage) {
     return
   }
 
+  if (message.type === 'execution_interrupted') {
+    markJobCancelled(job, data)
+    return
+  }
+
   if (message.type === 'execution_error') {
     markJob(job, {
       state: job.cancelRequestedAt ? 'cancelled' : 'error',
@@ -169,14 +224,6 @@ export function handleComfySocketMessage(rawMessage) {
   }
 
   if (message.type === 'execution_success') {
-    markJob(job, {
-      state: 'complete',
-      queuePosition: null,
-      queueNumber: null,
-      currentNodeLabel: 'Completed',
-      progressValue: job.progressMax ?? 1,
-      progressMax: job.progressMax ?? 1,
-      error: null,
-    })
+    markJobComplete(job)
   }
 }

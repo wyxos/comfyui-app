@@ -7,6 +7,7 @@ import type {
   ControlNetPreprocessorOption,
   FormTab,
   GeneratedOutputContextMenu,
+  GenerationOptionDefaults,
   InputImageSnapshot,
   JobOutput,
   JobCounts,
@@ -15,6 +16,7 @@ import type {
   JobResponse,
   JobState,
   LoraOption,
+  PromptMode,
   PromptSectionId,
   PromptSectionsState,
   PromptTag,
@@ -25,6 +27,7 @@ import type {
 export function createHomeState() {
 const prompt = ref('')
 const negativePrompt = ref('')
+const promptMode = ref<PromptMode>('tags')
 const promptSections = ref<PromptSectionsState>(createEmptyPromptSections())
 const promptSectionDrafts = ref<Record<PromptSectionId, string>>(createEmptyPromptSectionsDrafts())
 const negativePromptTags = ref<PromptTag[]>([])
@@ -49,6 +52,17 @@ const height = ref('1024')
 const seed = ref('')
 const steps = ref('')
 const cfg = ref('')
+const samplerName = ref('')
+const scheduler = ref('')
+const clipName = ref('')
+const vaeName = ref('')
+const samplerOptions = ref<string[]>([])
+const schedulerOptions = ref<string[]>([])
+const clipNameOptions = ref<string[]>([])
+const vaeNameOptions = ref<string[]>([])
+const generationOptionDefaults = ref<GenerationOptionDefaults>({})
+const loadingGenerationOptions = ref(true)
+const generationOptionsError = ref('')
 const maintainAspectRatio = ref(false)
 const lockedAspectRatio = ref<number | null>(null)
 const aspectRatioScale = ref('0')
@@ -109,6 +123,9 @@ const batchPreviewMode = ref(false)
 const activePreviewIndex = ref(0)
 const errorMessage = ref('')
 const submissionError = ref('')
+const metadataPasteNotice = ref('')
+const metadataPasteError = ref('')
+const isPastingMetadata = ref(false)
 const isSubmittingGenerate = ref(false)
 const isCancellingJob = ref(false)
 const isCancellingQueuedJobs = ref(false)
@@ -123,6 +140,7 @@ const isPreviewModalDragging = ref(false)
 const previewModalViewport = ref<HTMLElement | null>(null)
 const previewModalPanField = ref<HTMLElement | null>(null)
 const generatedOutputContextMenu = ref<GeneratedOutputContextMenu | null>(null)
+const generatedOutputActionNotice = ref('')
 const generatedOutputActionError = ref('')
 const isApplyingGeneratedOutput = ref(false)
 const deletingJobEntryKeys = ref<string[]>([])
@@ -133,6 +151,7 @@ const controlNetImageLoadIds = new Map<string, string>()
 return {
   prompt,
   negativePrompt,
+  promptMode,
   promptSections,
   promptSectionDrafts,
   negativePromptTags,
@@ -149,6 +168,17 @@ return {
   seed,
   steps,
   cfg,
+  samplerName,
+  scheduler,
+  clipName,
+  vaeName,
+  samplerOptions,
+  schedulerOptions,
+  clipNameOptions,
+  vaeNameOptions,
+  generationOptionDefaults,
+  loadingGenerationOptions,
+  generationOptionsError,
   maintainAspectRatio,
   lockedAspectRatio,
   aspectRatioScale,
@@ -202,6 +232,9 @@ return {
   activePreviewIndex,
   errorMessage,
   submissionError,
+  metadataPasteNotice,
+  metadataPasteError,
+  isPastingMetadata,
   isSubmittingGenerate,
   isCancellingJob,
   isCancellingQueuedJobs,
@@ -216,6 +249,7 @@ return {
   previewModalViewport,
   previewModalPanField,
   generatedOutputContextMenu,
+  generatedOutputActionNotice,
   generatedOutputActionError,
   isApplyingGeneratedOutput,
   deletingJobEntryKeys,

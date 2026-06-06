@@ -1,16 +1,23 @@
+import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { describe, expect, it } from 'vitest'
 
 import {
   buildQueueSummaryForPromptIds,
+  configureCompanionServerForTests,
   createCompanionServer,
   createDownloadsResponse,
   extractInputImageNameFromHistory,
   getQueueSnapshot,
   mergeJobOutputs,
   normalizeQueueEntries,
+  resetJobStoreRuntimeState,
   serializeDownload,
+  startCompanionServer,
 } from '../../server/index.mjs'
+import { handleComfySocketMessage } from '../../server/comfy-socket.mjs'
+import { ensureJob } from '../../server/job-state.mjs'
+import { deletePersistedJob } from '../../server/job-store.mjs'
 
 describe('server runtime helpers', () => {
   it('serializes downloads without abort controllers and summarizes counts', () => {
@@ -115,6 +122,94 @@ describe('server runtime helpers', () => {
     ])
   })
 
+  it('keeps websocket progress events from reopening terminal ComfyUI jobs', () => {
+    const promptId = 'prompt-progress-websocket-terminal'
+    resetJobStoreRuntimeState()
+    deletePersistedJob(promptId)
+    const job = ensureJob(promptId, {
+      nodeLabels: {
+        9: 'Sampling prompt',
+      },
+    })
+
+    handleComfySocketMessage(JSON.stringify({
+      type: 'progress',
+      data: { prompt_id: promptId, node: '9', value: 12, max: 30 },
+    }))
+    expect(job).toMatchObject({
+      state: 'running',
+      currentNode: '9',
+      currentNodeLabel: 'Sampling prompt',
+      progressValue: 12,
+      progressMax: 30,
+    })
+
+    handleComfySocketMessage(JSON.stringify({
+      type: 'execution_success',
+      data: { prompt_id: promptId },
+    }))
+    expect(job).toMatchObject({
+      state: 'complete',
+      currentNodeLabel: 'Completed',
+      progressValue: 30,
+      progressMax: 30,
+    })
+
+    handleComfySocketMessage(JSON.stringify({
+      type: 'executing',
+      data: { prompt_id: promptId, node: null },
+    }))
+    handleComfySocketMessage(JSON.stringify({
+      type: 'progress_state',
+      data: {
+        prompt_id: promptId,
+        nodes: {
+          9: {
+            state: 'running',
+            node_id: '9',
+            real_node_id: '9',
+            value: 14,
+            max: 30,
+          },
+        },
+      },
+    }))
+
+    expect(job).toMatchObject({
+      state: 'complete',
+      currentNodeLabel: 'Completed',
+      progressValue: 30,
+      progressMax: 30,
+    })
+
+    deletePersistedJob(promptId)
+  })
+
+  it('marks websocket interruption as cancelled without waiting for history polling', () => {
+    const promptId = 'prompt-cancelled-websocket-interrupted'
+    resetJobStoreRuntimeState()
+    deletePersistedJob(promptId)
+    const job = ensureJob(promptId, { cancelRequestedAt: 1000 })
+
+    handleComfySocketMessage(JSON.stringify({
+      type: 'execution_interrupted',
+      data: { prompt_id: promptId, node_id: '9' },
+    }))
+
+    expect(job).toMatchObject({
+      state: 'cancelled',
+      queuePosition: null,
+      queueNumber: null,
+      currentNode: '9',
+      currentNodeLabel: 'Cancelled',
+      error: null,
+      progressValue: null,
+      progressMax: null,
+    })
+
+    deletePersistedJob(promptId)
+  })
+
   it('creates an importable HTTP server without connecting to ComfyUI', async () => {
     const server = createCompanionServer({ connectWebSocket: false })
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
@@ -130,6 +225,59 @@ describe('server runtime helpers', () => {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()))
       })
+    }
+  })
+
+  it('does not connect a ComfyUI websocket when the HTTP server cannot bind', async () => {
+    const blocker = createServer()
+    await new Promise<void>((resolve) => blocker.listen(0, '127.0.0.1', resolve))
+    const blockedPort = (blocker.address() as AddressInfo).port
+    const originalPort = process.env.COMFY_COMPANION_PORT
+    const originalWebSocket = globalThis.WebSocket
+    let constructedSockets = 0
+
+    class FakeWebSocket {
+      static CONNECTING = 0
+      static OPEN = 1
+      readyState = FakeWebSocket.CONNECTING
+
+      constructor() {
+        constructedSockets += 1
+      }
+
+      addEventListener() {}
+    }
+
+    let restoreAdapters: (() => void) | null = null
+    let server: ReturnType<typeof startCompanionServer> | null = null
+
+    try {
+      process.env.COMFY_COMPANION_PORT = String(blockedPort)
+      restoreAdapters = configureCompanionServerForTests()
+      globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket
+
+      server = startCompanionServer()
+      await expect(new Promise((resolve) => server?.once('error', resolve))).resolves.toMatchObject({
+        code: 'EADDRINUSE',
+      })
+
+      expect(constructedSockets).toBe(0)
+    } finally {
+      if (server?.listening) {
+        await new Promise<void>((resolve, reject) => {
+          server?.close((error) => (error ? reject(error) : resolve()))
+        })
+      }
+      await new Promise<void>((resolve, reject) => {
+        blocker.close((error) => (error ? reject(error) : resolve()))
+      })
+      if (originalPort === undefined) {
+        delete process.env.COMFY_COMPANION_PORT
+      } else {
+        process.env.COMFY_COMPANION_PORT = originalPort
+      }
+      globalThis.WebSocket = originalWebSocket
+      restoreAdapters?.()
     }
   })
 })

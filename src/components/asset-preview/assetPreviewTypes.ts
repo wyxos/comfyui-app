@@ -129,4 +129,5 @@ export type AssetPreviewModalProps = {
   queueAssetDownload?: (model: CivitaiModel, version: CivitaiModelVersion) => void | Promise<void>
   deleteAssetDownload?: (download: AssetPreviewDownload, version: CivitaiModelVersion) => void | Promise<void>
   modelDownloadKey?: (model: CivitaiModel, version: CivitaiModelVersion) => string
+  applyGenerationMetadata?: (metadata: Record<string, unknown>) => void | Promise<void>
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RotateCcw } from 'lucide-vue-next'
+import { ClipboardPaste, RotateCcw } from 'lucide-vue-next'
 import HomeAssetsTab from './HomeAssetsTab.vue'
 import HomePromptTab from './HomePromptTab.vue'
 import HomeConfigTab from './HomeConfigTab.vue'
@@ -12,6 +12,9 @@ const {
   isUploadingAnyControlNetImage,
   formTab,
   submissionError,
+  metadataPasteNotice,
+  metadataPasteError,
+  isPastingMetadata,
   isSubmittingGenerate,
   isCancellingJob,
   formTabs,
@@ -22,6 +25,7 @@ const {
   canCancelSelectedJob,
   openResetDialog,
   cancelSelectedJob,
+  pasteGenerationMetadataFromClipboard,
   generate,
 } = useProvidedHomeView()
 </script>
@@ -82,6 +86,13 @@ const {
       >
         {{ generateDisabledReason }}
       </p>
+      <p
+        v-if="metadataPasteError || metadataPasteNotice"
+        class="mb-3 text-xs font-semibold"
+        :class="metadataPasteError ? 'text-destructive' : 'text-secondary'"
+      >
+        {{ metadataPasteError || metadataPasteNotice }}
+      </p>
 
       <div class="flex flex-wrap items-center gap-2">
         <button
@@ -95,7 +106,17 @@ const {
 
         <button
           type="button"
-          class="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border border-primary-foreground/12 bg-primary-foreground/6 px-4 py-2 text-sm font-bold uppercase tracking-[0.12em] text-primary-foreground transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
+          class="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border border-primary-foreground/12 bg-primary-foreground/6 px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] text-primary-foreground transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
+          :disabled="isPastingMetadata"
+          @click="pasteGenerationMetadataFromClipboard"
+        >
+          <ClipboardPaste class="h-4 w-4" />
+          {{ isPastingMetadata ? 'Pasting...' : 'Paste metadata' }}
+        </button>
+
+        <button
+          type="button"
+          class="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border border-primary-foreground/12 bg-primary-foreground/6 px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] text-primary-foreground transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
           :disabled="!canResetForm"
           @click="openResetDialog"
         >

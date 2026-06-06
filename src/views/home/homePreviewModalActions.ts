@@ -93,9 +93,7 @@ function getPreviewItemActiveVariantId(item: PreviewDisplayItem) {
 
   if (itemsForJob.length === 1) {
     const onlyItem = itemsForJob[0]
-    if (onlyItem?.variantId === 'original' || onlyItem?.variantId === 'improved') {
-      return onlyItem.variantId
-    }
+    return onlyItem?.variantId ?? null
   }
 
   return null

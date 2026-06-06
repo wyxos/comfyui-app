@@ -27,6 +27,19 @@ function mockImageResponse() {
   })
 }
 
+function modelImages(models: MockModel[]) {
+  return models.flatMap((model) => {
+    const versions = Array.isArray(model.modelVersions) ? model.modelVersions : []
+    return versions.flatMap((version) => {
+      if (!version || typeof version !== 'object' || !('images' in version)) {
+        return []
+      }
+
+      return Array.isArray(version.images) ? version.images : []
+    })
+  })
+}
+
 export function installMockApi(options: MockApiOptions = {}) {
   let civitaiConfigured = options.civitaiConfigured ?? false
   let includeNsfwDefault = options.includeNsfwDefault ?? false
@@ -90,6 +103,25 @@ export function installMockApi(options: MockApiOptions = {}) {
         ok: true,
         controlNets: options.controlNets ?? defaultControlNets(),
         preprocessors: defaultControlNetPreprocessors(),
+      })
+    }
+
+    if (url.pathname === '/api/generation-options' && method === 'GET') {
+      return jsonResponse({
+        ok: true,
+        samplers: ['dpmpp_2m', 'euler', 'euler_ancestral'],
+        schedulers: ['karras', 'normal'],
+        clipNames: ['qwen_3_06b_base.safetensors', 'custom-clip.safetensors'],
+        vaeNames: ['wan_2.1_vae.safetensors', 'custom-vae.safetensors'],
+        defaults: {
+          sdxl: { samplerName: 'dpmpp_2m', scheduler: 'karras' },
+          anima: {
+            samplerName: 'euler',
+            scheduler: 'normal',
+            clipName: 'qwen_3_06b_base.safetensors',
+            vaeName: 'wan_2.1_vae.safetensors',
+          },
+        },
       })
     }
 
@@ -316,10 +348,18 @@ export function installMockApi(options: MockApiOptions = {}) {
     }
 
     if (url.pathname === '/api/civitai/images' && method === 'GET') {
+      const imageId = url.searchParams.get('imageId')
+      const images = modelImages(models)
+      const matchingImages = imageId
+        ? images.filter((image) =>
+            image && typeof image === 'object' && 'id' in image && String(image.id) === imageId,
+          )
+        : images
+
       return jsonResponse({
-        items: createMockModel().modelVersions[0].images,
+        items: matchingImages.length ? matchingImages : createMockModel().modelVersions[0].images,
         metadata: {
-          totalItems: 1,
+          totalItems: matchingImages.length || 1,
         },
       })
     }

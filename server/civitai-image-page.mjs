@@ -83,9 +83,25 @@ function normalizeMetaObject(value) {
   return isPlainObject(value) ? value : null
 }
 
+function usableMetaObject(value) {
+  const meta = normalizeMetaObject(value)
+  return meta && Object.keys(meta).length ? meta : null
+}
+
+function imageMetaFromItem(image) {
+  if (!isPlainObject(image)) {
+    return null
+  }
+
+  const metadata = isPlainObject(image.metadata) ? image.metadata : null
+  return usableMetaObject(image.meta) ?? usableMetaObject(metadata?.meta)
+}
+
 function normalizeCivitaiPageImage(imageId, image, generationData) {
   const metadata = isPlainObject(image?.metadata) ? image.metadata : null
-  const meta = normalizeMetaObject(generationData?.meta ?? image?.meta ?? metadata?.meta)
+  const meta = usableMetaObject(generationData?.meta)
+    ?? usableMetaObject(image?.meta)
+    ?? usableMetaObject(metadata?.meta)
   if (!isPlainObject(image) && !meta) {
     return null
   }
@@ -156,7 +172,48 @@ async function resolveCivitaiApiKey(response) {
 }
 
 function shouldFetchImagePageFallback(imageId, payload) {
-  return imageId && Array.isArray(payload?.items) && payload.items.length === 0
+  if (!imageId || !Array.isArray(payload?.items)) {
+    return false
+  }
+
+  if (payload.items.length === 0) {
+    return true
+  }
+
+  const matchingItem = payload.items.find((item) => parseCivitaiLookupId(item?.id) === imageId)
+    ?? (payload.items.length === 1 ? payload.items[0] : null)
+
+  return !imageMetaFromItem(matchingItem)
+}
+
+function mergeCivitaiPageImageFallback(imageId, items, fallbackImage) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return [fallbackImage]
+  }
+
+  const fallbackMeta = imageMetaFromItem(fallbackImage)
+  let merged = false
+  const nextItems = items.map((item, index) => {
+    if (!isPlainObject(item)) {
+      return item
+    }
+
+    const itemId = parseCivitaiLookupId(item.id)
+    const matchesRequestedImage = itemId === imageId || (!itemId && items.length === 1 && index === 0)
+    if (!matchesRequestedImage) {
+      return item
+    }
+
+    merged = true
+    return {
+      ...fallbackImage,
+      ...item,
+      id: itemId ?? imageId,
+      meta: imageMetaFromItem(item) ?? fallbackMeta ?? null,
+    }
+  })
+
+  return merged ? nextItems : [fallbackImage, ...items]
 }
 
 export async function handleCivitaiImagesProxyWithFallback(url, response, request = null) {
@@ -206,11 +263,12 @@ export async function handleCivitaiImagesProxyWithFallback(url, response, reques
     if (shouldFetchImagePageFallback(imageId, payload)) {
       const image = await fetchCivitaiImagePageFallback(imageId, abortController.signal)
       if (image) {
-        const items = [image]
+        const apiReturnedItems = Array.isArray(payload.items) && payload.items.length > 0
+        const items = mergeCivitaiPageImageFallback(imageId, payload.items, image)
         return sendJson(response, 200, {
           ...payload,
           items,
-          metadata: civitaiSingleImageMetadata(items),
+          metadata: apiReturnedItems ? payload.metadata : civitaiSingleImageMetadata(items),
         })
       }
     }

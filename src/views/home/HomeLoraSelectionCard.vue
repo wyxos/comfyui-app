@@ -36,6 +36,7 @@ const {
   setCheckpointLoraStrength,
   removeCheckpointLora,
   assetPreviewDownloadActions,
+  applyGenerationMetadataFromSource,
 } = useProvidedHomeView()
 const {
   queuingDownloadKey,
@@ -318,6 +319,7 @@ onBeforeUnmount(() => {
       :queue-asset-download="queueAssetDownload"
       :delete-asset-download="deleteAssetDownload"
       :model-download-key="modelDownloadKey"
+      :apply-generation-metadata="applyGenerationMetadataFromSource"
       model-type="LORA"
       kind-label="LoRA preview"
       show-download-actions

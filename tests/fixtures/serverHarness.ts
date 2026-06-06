@@ -22,6 +22,9 @@ type UpstreamState = {
   checkpointInfo: unknown
   loraInfo: unknown
   controlNetInfo: unknown
+  samplerInfo: unknown
+  clipInfo: unknown
+  vaeInfo: unknown
   civitaiModels: unknown
   civitaiImages: unknown
   civitaiImagePages: Record<string, string>
@@ -121,6 +124,11 @@ function createDefaultUpstreamState(): UpstreamState {
         },
       },
     },
+    samplerInfo: { KSampler: { input: { required: {
+      sampler_name: [['dpmpp_2m', 'euler', 'euler_ancestral']], scheduler: [['karras', 'normal']],
+    } } } },
+    clipInfo: { CLIPLoader: { input: { required: { clip_name: [['qwen_3_06b_base.safetensors']] } } } },
+    vaeInfo: { VAELoader: { input: { required: { vae_name: [['wan_2.1_vae.safetensors']] } } } },
     civitaiModels: {
       items: [
         {
@@ -292,6 +300,18 @@ export async function createServerHarness(options: HarnessOptions = {}) {
 
       if (url.pathname === '/object_info/ControlNetLoader') {
         return jsonResponse(upstream.controlNetInfo)
+      }
+
+      if (url.pathname === '/object_info/KSampler') {
+        return jsonResponse(upstream.samplerInfo)
+      }
+
+      if (url.pathname === '/object_info/CLIPLoader') {
+        return jsonResponse(upstream.clipInfo)
+      }
+
+      if (url.pathname === '/object_info/VAELoader') {
+        return jsonResponse(upstream.vaeInfo)
       }
 
       if (url.pathname === '/system_stats') {

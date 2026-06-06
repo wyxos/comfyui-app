@@ -209,6 +209,45 @@ export function serializeDownloadPreview(image) {
   }
 }
 
+export function nsfwFlagIndicatesContent(value) {
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'number') {
+    return value > 0
+  }
+
+  const normalized = safeTrim(value).toLowerCase()
+  if (!normalized) {
+    return false
+  }
+
+  return !['false', '0', 'no', 'n', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized)
+}
+
+export function downloadHasNsfwContent(download) {
+  if (!download || typeof download !== 'object') {
+    return false
+  }
+
+  if (
+    nsfwFlagIndicatesContent(download.modelNsfw ?? download.modelMetadata?.nsfw ?? download.model?.nsfw)
+  ) {
+    return true
+  }
+
+  return [
+    download.previewImage,
+    ...(Array.isArray(download.previewImages) ? download.previewImages : []),
+    ...(Array.isArray(download.previewPaths) ? download.previewPaths : []),
+  ].some((image) => nsfwFlagIndicatesContent(image?.nsfw ?? image?.nsfwLevel))
+}
+
+export function filterDownloadsForNsfwSetting(downloads, includeNsfw) {
+  return includeNsfw ? [...downloads] : [...downloads].filter((download) => !downloadHasNsfwContent(download))
+}
+
 function compareSerializedDownloads(left, right) {
   const stateRank = {
     downloading: 0,
@@ -324,8 +363,8 @@ export function createDownloadsSummaryResponse(downloads) {
   }
 }
 
-export function serializeDownloadsResponse() {
-  return createDownloadsResponse(civitaiDownloads.values())
+export function serializeDownloadsResponse(downloads = civitaiDownloads.values()) {
+  return createDownloadsResponse(downloads)
 }
 
 export async function clearDismissibleDownloads() {

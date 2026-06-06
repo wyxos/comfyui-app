@@ -346,6 +346,34 @@ describe('companion server API routes', () => {
       expect(promptText).toContain('portrait, (detail boost:1.2)')
     })
 
+  it('does not poll ComfyUI history while the queue still reports an active job', async () => {
+    const server = await setupHarness()
+
+    await server.json('POST', '/api/generate', {
+      prompt: 'running portrait',
+      checkpoint: 'waiIllustriousSDXL_v160.safetensors',
+    })
+    server.upstream.queue = {
+      queue_running: [[1, 'prompt-1']],
+      queue_pending: [],
+    }
+
+    await expect(server.request('/api/jobs')).resolves.toMatchObject({
+      payload: expect.objectContaining({
+        jobs: expect.arrayContaining([
+          expect.objectContaining({
+            promptId: 'prompt-1',
+            state: 'running',
+          }),
+        ]),
+      }),
+    })
+
+    expect(
+      server.calls.some((call) => call.method === 'GET' && call.url.pathname === '/history/prompt-1'),
+    ).toBe(false)
+  })
+
   it('routes checkpoint generation through Anima workflow when sidecar metadata says Anima', async () => {
       const server = await setupHarness({
         upstream: {

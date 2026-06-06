@@ -172,6 +172,29 @@ export type GenerateResponse = {
   message?: string
 }
 
+export type GenerationOptionDefaults = {
+  sdxl?: {
+    samplerName?: string
+    scheduler?: string
+  }
+  anima?: {
+    samplerName?: string
+    scheduler?: string
+    clipName?: string
+    vaeName?: string
+  }
+}
+
+export type GenerationOptionsResponse = {
+  ok: boolean
+  samplers?: string[]
+  schedulers?: string[]
+  clipNames?: string[]
+  vaeNames?: string[]
+  defaults?: GenerationOptionDefaults
+  message?: string
+}
+
 export type UploadInputImageResponse = {
   ok: boolean
   inputImageName?: string
@@ -259,6 +282,10 @@ export type JobResponse = {
   steps?: number | null
   cfg?: number | null
   denoise?: number | null
+  samplerName?: string | null
+  scheduler?: string | null
+  clipName?: string | null
+  vaeName?: string | null
   loras?: Array<{ name: string; strength: number }>
   inputImageName?: string | null
   inputImageDisplayName?: string | null
@@ -328,6 +355,7 @@ export type DeleteJobResponse = {
 
 export type JobListTab = 'running' | 'queued' | 'history'
 export type FormTab = 'assets' | 'prompt' | 'config' | 'image'
+export type PromptMode = 'tags' | 'text'
 export type PromptField = 'prompt' | 'negativePrompt'
 export type PromptSectionId = 'subject' | 'details' | 'environment' | 'style' | 'lighting' | 'quality' | 'others'
 export type PromptSectionDefinition = {
@@ -382,6 +410,7 @@ export type PersistedCheckpointSelection = Omit<CheckpointSelection, 'controlNet
   controlNets?: PersistedControlNetSelection[]
 }
 export type PersistedFormState = {
+  promptMode?: PromptMode
   prompt: string
   negativePrompt: string
   promptSections?: Partial<Record<PromptSectionId, Array<string | Partial<PromptTag>>>>
@@ -393,6 +422,10 @@ export type PersistedFormState = {
   seed: string
   steps: string
   cfg: string
+  samplerName?: string
+  scheduler?: string
+  clipName?: string
+  vaeName?: string
   imageDenoise: string
   maintainAspectRatio?: boolean
   useInputImage: boolean
