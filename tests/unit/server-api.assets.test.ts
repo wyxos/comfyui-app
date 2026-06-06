@@ -310,7 +310,7 @@ describe('companion server API routes', () => {
       })
     })
 
-  it('hides NSFW downloads from list, panel, and summary when app settings disable NSFW', async () => {
+  it('keeps NSFW downloads in list, panel, and summary when app settings disable NSFW', async () => {
       const server = await setupHarness()
 
       await server.writeDownloads([
@@ -344,33 +344,39 @@ describe('companion server API routes', () => {
 
       await server.json('PUT', '/api/settings/app', { includeNsfw: false })
 
-      const hiddenList = await server.request('/api/civitai/downloads')
-      expect(hiddenList.payload).toMatchObject({
+      const visibleList = await server.request('/api/civitai/downloads')
+      expect(visibleList.payload).toMatchObject({
         ok: true,
         items: [
           expect.objectContaining({ id: 'safe-active' }),
+          expect.objectContaining({ id: 'nsfw-active' }),
+          expect.objectContaining({ id: 'nsfw-preview' }),
           expect.objectContaining({ id: 'safe-complete' }),
+          expect.objectContaining({ id: 'nsfw-complete' }),
         ],
         counts: expect.objectContaining({
-          paused: 1,
-          complete: 1,
-          error: 0,
+          paused: 2,
+          complete: 2,
+          error: 1,
         }),
       })
-      expect(hiddenList.payload.items.map((item: { id: string }) => item.id)).not.toContain('nsfw-active')
-      expect(hiddenList.payload.items.map((item: { id: string }) => item.id)).not.toContain('nsfw-complete')
-      expect(hiddenList.payload.items.map((item: { id: string }) => item.id)).not.toContain('nsfw-preview')
+      expect(visibleList.payload.items.map((item: { id: string }) => item.id)).toContain('nsfw-active')
+      expect(visibleList.payload.items.map((item: { id: string }) => item.id)).toContain('nsfw-complete')
+      expect(visibleList.payload.items.map((item: { id: string }) => item.id)).toContain('nsfw-preview')
 
       await expect(server.request('/api/civitai/downloads/panel')).resolves.toMatchObject({
         payload: expect.objectContaining({
           items: [
             expect.objectContaining({ id: 'safe-active' }),
+            expect.objectContaining({ id: 'nsfw-active' }),
+            expect.objectContaining({ id: 'nsfw-preview' }),
             expect.objectContaining({ id: 'safe-complete' }),
+            expect.objectContaining({ id: 'nsfw-complete' }),
           ],
           counts: expect.objectContaining({
-            active: 1,
-            visibleComplete: 1,
-            attention: 0,
+            active: 2,
+            visibleComplete: 2,
+            attention: 1,
           }),
         }),
       })
@@ -378,19 +384,12 @@ describe('companion server API routes', () => {
       await expect(server.request('/api/civitai/downloads/summary')).resolves.toMatchObject({
         payload: expect.objectContaining({
           counts: expect.objectContaining({
-            active: 1,
-            visibleComplete: 1,
-            attention: 0,
-            complete: 1,
+            active: 2,
+            visibleComplete: 2,
+            attention: 1,
+            complete: 2,
           }),
         }),
       })
-
-      await server.json('PUT', '/api/settings/app', { includeNsfw: true })
-
-      const visibleList = await server.request('/api/civitai/downloads')
-      expect(visibleList.payload.items.map((item: { id: string }) => item.id)).toContain('nsfw-active')
-      expect(visibleList.payload.items.map((item: { id: string }) => item.id)).toContain('nsfw-complete')
-      expect(visibleList.payload.items.map((item: { id: string }) => item.id)).toContain('nsfw-preview')
     })
 })

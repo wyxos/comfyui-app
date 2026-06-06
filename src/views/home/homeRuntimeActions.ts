@@ -339,6 +339,33 @@ async function loadLoras() {
   }
 }
 
+async function saveModelSafetyOverride({
+  modelName,
+  modelType,
+  modelNsfwOverride,
+}: {
+  modelName: string
+  modelType: 'checkpoint' | 'lora'
+  modelNsfwOverride: boolean | null
+}) {
+  await apiJson(`/api/model-metadata?type=${encodeURIComponent(modelType)}&name=${encodeURIComponent(modelName)}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      metadata: {
+        modelNsfw: modelNsfwOverride,
+        modelNsfwOverride,
+      },
+    }),
+  })
+
+  if (modelType === 'checkpoint') {
+    await loadCheckpoints()
+    return
+  }
+
+  await loadLoras()
+}
+
 async function loadControlNets() {
   loadingControlNets.value = true
   controlNetLoadingError.value = ''
@@ -406,6 +433,7 @@ return {
   openOutputParentFolder,
   loadCheckpoints,
   loadLoras,
+  saveModelSafetyOverride,
   loadControlNets,
   loadGenerationOptions,
 }

@@ -171,6 +171,7 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
       versionName: '',
       modelType: normalizeModelType(null, options.modelType),
       modelNsfw: null,
+      modelNsfwOverride: null,
       baseModel: '',
       baseModelKey: '',
       trainedWords: [],
@@ -189,6 +190,8 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
   const version = getVersionPayload(payload)
   const model = payload.model && typeof payload.model === 'object' ? payload.model : payload
   const baseModel = safeTrim(payload.baseModel ?? version.baseModel ?? payload.metadata?.baseModel)
+  const modelNsfw = normalizeOptionalBoolean(payload.modelNsfw ?? payload.nsfw ?? model.nsfw ?? payload.modelMetadata?.nsfw)
+  const modelNsfwOverride = normalizeOptionalBoolean(payload.modelNsfwOverride ?? payload.localModelNsfw ?? payload.metadata?.modelNsfwOverride) ?? (payload.source === 'manual' && modelNsfw !== null ? modelNsfw : null)
   const trainedWords = normalizeStringList([
     ...normalizeStringList(payload.trainedWords),
     ...normalizeStringList(version.trainedWords),
@@ -215,7 +218,8 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
     modelName: safeTrim(payload.modelName ?? model.name ?? options.modelName),
     versionName: safeTrim(payload.versionName ?? version.name),
     modelType: normalizeModelType(payload.modelType ?? model.type ?? payload.type, options.modelType),
-    modelNsfw: normalizeOptionalBoolean(payload.modelNsfw ?? payload.nsfw ?? model.nsfw ?? payload.modelMetadata?.nsfw),
+    modelNsfw,
+    modelNsfwOverride,
     baseModel,
     baseModelKey: normalizeBaseModelKey(baseModel),
     trainedWords,

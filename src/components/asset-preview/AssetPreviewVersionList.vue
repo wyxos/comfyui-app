@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue'
 import {
   Check,
   Clock,
@@ -17,7 +18,7 @@ import type {
   CivitaiModelVersion,
 } from './assetPreviewTypes'
 
-defineProps<{
+const props = defineProps<{
   modelVersions: CivitaiModelVersion[]
   selectedVersion: CivitaiModelVersion | null
   hasDownloadActions: boolean
@@ -36,6 +37,50 @@ const emit = defineEmits<{
   queueDownload: [version: CivitaiModelVersion]
   deleteDownload: [version: CivitaiModelVersion]
 }>()
+
+const selectedBaseModelFilter = ref('')
+const baseModelOptions = computed(() => {
+  const counts = new Map<string, number>()
+  for (const version of props.modelVersions) {
+    const baseModel = version.baseModel?.trim()
+    if (baseModel) {
+      counts.set(baseModel, (counts.get(baseModel) ?? 0) + 1)
+    }
+  }
+
+  return Array.from(counts, ([baseModel, count]) => ({ baseModel, count }))
+})
+const hasBaseModelFilters = computed(() => baseModelOptions.value.length > 1)
+const filteredModelVersions = computed(() => {
+  return selectedBaseModelFilter.value
+    ? props.modelVersions.filter((version) => version.baseModel?.trim() === selectedBaseModelFilter.value)
+    : props.modelVersions
+})
+
+function applyBaseModelFilter(baseModel: string) {
+  selectedBaseModelFilter.value = baseModel
+
+  if (!baseModel || props.selectedVersion?.baseModel?.trim() === baseModel) {
+    return
+  }
+
+  const nextVersion = props.modelVersions.find((version) =>
+    version.baseModel?.trim() === baseModel && imagesForVersion(version).length,
+  ) ?? props.modelVersions.find((version) => version.baseModel?.trim() === baseModel)
+
+  if (nextVersion) {
+    emit('select', nextVersion)
+  }
+}
+
+watch(
+  () => baseModelOptions.value.map((option) => option.baseModel).join('|'),
+  () => {
+    if (!baseModelOptions.value.some((option) => option.baseModel === selectedBaseModelFilter.value)) {
+      selectedBaseModelFilter.value = ''
+    }
+  },
+)
 </script>
 
 <template>
@@ -52,9 +97,39 @@ const emit = defineEmits<{
       </div>
     </div>
 
+    <div
+      v-if="hasBaseModelFilters"
+      class="flex flex-wrap gap-1.5"
+      aria-label="Filter model versions by base model"
+    >
+      <button
+        class="inline-flex h-7 items-center rounded-sm border px-2 text-[11px] font-semibold transition"
+        :class="!selectedBaseModelFilter ? 'border-secondary bg-secondary text-secondary-foreground' : 'border-border bg-background text-muted-foreground hover:border-secondary hover:text-secondary'"
+        type="button"
+        aria-label="Show all versions"
+        :aria-pressed="!selectedBaseModelFilter"
+        @click="applyBaseModelFilter('')"
+      >
+        All
+      </button>
+      <button
+        v-for="option in baseModelOptions"
+        :key="option.baseModel"
+        class="inline-flex h-7 items-center gap-1 rounded-sm border px-2 text-[11px] font-semibold transition"
+        :class="selectedBaseModelFilter === option.baseModel ? 'border-secondary bg-secondary text-secondary-foreground' : 'border-border bg-background text-muted-foreground hover:border-secondary hover:text-secondary'"
+        type="button"
+        :aria-label="`Show ${option.baseModel} versions`"
+        :aria-pressed="selectedBaseModelFilter === option.baseModel"
+        @click="applyBaseModelFilter(option.baseModel)"
+      >
+        {{ option.baseModel }}
+        <span class="text-current/70">{{ option.count }}</span>
+      </button>
+    </div>
+
     <ul class="grid max-h-64 gap-1 overflow-auto rounded-md border border-border bg-background text-xs">
       <li
-        v-for="version in modelVersions"
+        v-for="version in filteredModelVersions"
         :key="version.id"
         class="grid min-w-0 border-b border-border/60 last:border-b-0"
         :class="[

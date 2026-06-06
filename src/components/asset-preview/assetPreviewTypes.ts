@@ -115,18 +115,23 @@ export type AssetPreviewModalProps = {
   fileName?: string | null
   compatibility?: {
     compatibleBaseModels?: string[]
+    modelNsfw?: boolean | null
+    modelNsfwOverride?: boolean | null
     controlType?: string
     loaderType?: string
     status?: string
   } | null
   editableCompatibility?: boolean
+  editableSafety?: boolean
   savingCompatibility?: boolean
+  savingSafety?: boolean
   compatibilityError?: string
+  safetyError?: string
   showDownloadActions?: boolean
   queuingDownloadKey?: string
   downloadForVersion?: (version: CivitaiModelVersion | null | undefined) => AssetPreviewDownload | null
   downloadStatusLabel?: (download: AssetPreviewDownload | null) => string
-  queueAssetDownload?: (model: CivitaiModel, version: CivitaiModelVersion) => void | Promise<void>
+  queueAssetDownload?: (model: CivitaiModel, version: CivitaiModelVersion) => void | Promise<unknown>
   deleteAssetDownload?: (download: AssetPreviewDownload, version: CivitaiModelVersion) => void | Promise<void>
   modelDownloadKey?: (model: CivitaiModel, version: CivitaiModelVersion) => string
   applyGenerationMetadata?: (metadata: Record<string, unknown>) => void | Promise<void>

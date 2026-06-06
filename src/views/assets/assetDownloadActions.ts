@@ -14,9 +14,15 @@ import type { CivitaiModel, CivitaiModelVersion } from './assetViewTypes'
 type DownloadActionState = {
   downloadByVersionId: ComputedRef<Map<number, AssetDownloadItem[]>>
   downloadActionError: Ref<string>
+  downloadActionNotice: Ref<string>
   openDownloadMenuKey: Ref<string>
   queuingDownloadKey: Ref<string>
   queueDownload: (payload: QueueDownloadPayload) => Promise<unknown>
+}
+
+type QueueAssetDownloadOptions = {
+  closeMenu?: boolean
+  showNotice?: boolean
 }
 
 export function createAssetDownloadActions(state: DownloadActionState) {
@@ -42,6 +48,14 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     return versionsForModel(model)
       .flatMap((version) => downloadsForVersion(version))
       .find((download) => ['queued', 'downloading', 'paused'].includes(download.state)) ?? null
+  }
+
+  function isVersionQueuing(model: CivitaiModel, version: CivitaiModelVersion | null | undefined) {
+    return version ? state.queuingDownloadKey.value === modelDownloadKey(model, version) : false
+  }
+
+  function isModelDownloadQueuing(model: CivitaiModel) {
+    return versionsForModel(model).some((version) => isVersionQueuing(model, version))
   }
 
   function downloadStatusLabel(download: AssetDownloadItem | null) {
@@ -96,12 +110,55 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     return versionsForModel(model).length > 1 ? 'Versions' : 'Download'
   }
 
-  async function queueAssetDownload(model: CivitaiModel, version: CivitaiModelVersion) {
+  function canQueueMissingVersion(version: CivitaiModelVersion | null | undefined) {
+    if (!canQueueVersion(version)) {
+      return false
+    }
+
+    const existingState = downloadForVersion(version)?.state
+    return !existingState || existingState === 'error' || existingState === 'cancelled' || existingState === 'deleted'
+  }
+
+  function queueableMissingVersionsForModel(model: CivitaiModel) {
+    return versionsForModel(model).filter((version) => canQueueMissingVersion(version))
+  }
+
+  function clearDownloadActionNotice() {
+    state.downloadActionNotice.value = ''
+  }
+
+  function clearDownloadActionError() {
+    state.downloadActionError.value = ''
+  }
+
+  function queueDownloadNotice(payload: unknown, fallbackFileName: string) {
+    const item = typeof payload === 'object' && payload !== null && 'item' in payload
+      ? (payload as { item?: Partial<AssetDownloadItem> }).item
+      : null
+    const fileName = item?.fileName || fallbackFileName
+
+    if (item?.state === 'complete') {
+      return `Downloaded ${fileName}.`
+    }
+
+    if (item?.state === 'downloading') {
+      return `Started ${fileName}.`
+    }
+
+    return `Queued ${fileName}.`
+  }
+
+  async function queueAssetDownload(
+    model: CivitaiModel,
+    version: CivitaiModelVersion,
+    { closeMenu = true, showNotice = true }: QueueAssetDownloadOptions = {},
+  ) {
     const file = primaryFileForVersion(version)
     const key = modelDownloadKey(model, version)
     if (!file?.downloadUrl || !file.name) {
       state.downloadActionError.value = 'No downloadable model file listed.'
-      return
+      clearDownloadActionNotice()
+      return false
     }
 
     const unavailableLabel = versionDownloadUnavailableLabel(version)
@@ -109,14 +166,18 @@ export function createAssetDownloadActions(state: DownloadActionState) {
       state.downloadActionError.value = unavailableLabel === 'Early access locked'
         ? 'This Civitai version is early access and is not covered by the saved account API key.'
         : `This Civitai version is not downloadable: ${unavailableLabel}.`
-      return
+      clearDownloadActionNotice()
+      return false
     }
 
     state.queuingDownloadKey.value = key
-    state.downloadActionError.value = ''
+    clearDownloadActionError()
+    if (showNotice) {
+      clearDownloadActionNotice()
+    }
 
     try {
-      await state.queueDownload({
+      const payload = await state.queueDownload({
         modelId: model.id,
         modelName: model.name,
         modelType: model.type,
@@ -139,14 +200,44 @@ export function createAssetDownloadActions(state: DownloadActionState) {
         previewImages: previewImagesForVersion(version),
         force: downloadForVersion(version)?.state === 'complete',
       })
-      state.openDownloadMenuKey.value = ''
+      if (closeMenu) {
+        state.openDownloadMenuKey.value = ''
+      }
+      if (showNotice) {
+        state.downloadActionNotice.value = queueDownloadNotice(payload, file.name)
+      }
+      return true
     } catch (caughtError) {
       state.downloadActionError.value = caughtError instanceof Error ? caughtError.message : 'Could not queue download.'
+      clearDownloadActionNotice()
+      return false
     } finally {
       if (state.queuingDownloadKey.value === key) {
         state.queuingDownloadKey.value = ''
       }
     }
+  }
+
+  async function queueMissingVersionsForModel(model: CivitaiModel) {
+    const versions = queueableMissingVersionsForModel(model)
+    if (!versions.length) {
+      state.downloadActionError.value = 'No missing downloadable versions found.'
+      clearDownloadActionNotice()
+      return
+    }
+
+    clearDownloadActionError()
+    clearDownloadActionNotice()
+    let queuedCount = 0
+    for (const version of versions) {
+      if (await queueAssetDownload(model, version, { closeMenu: false, showNotice: false })) {
+        queuedCount += 1
+      }
+    }
+    if (queuedCount > 0) {
+      state.downloadActionNotice.value = `Queued ${queuedCount} version${queuedCount === 1 ? '' : 's'} for ${model.name}.`
+    }
+    state.openDownloadMenuKey.value = ''
   }
 
   function toggleDownloadMenu(model: CivitaiModel) {
@@ -171,7 +262,11 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     downloadStatusLabel,
     handleDownloadClick,
     hasDownloadedVersion,
+    isModelDownloadQueuing,
+    isVersionQueuing,
     queueAssetDownload,
+    queueMissingVersionsForModel,
+    queueableMissingVersionsForModel,
     toggleDownloadMenu,
     versionDownloadButtonLabel,
   }

@@ -25,7 +25,6 @@ const {
   activeModelVersionId,
   activeUsername,
   openDownloadMenuKey,
-  queuingDownloadKey,
   visibleModels,
   hasRenderableState,
   resultSummary,
@@ -48,7 +47,6 @@ const {
   versionsForModel,
   primaryFileForVersion,
   fileSizeFor,
-  modelDownloadKey,
   downloadForVersion,
   hasDownloadedVersion,
   activeDownloadForModel,
@@ -56,7 +54,11 @@ const {
   downloadButtonLabel,
   canQueueVersion,
   versionDownloadButtonLabel,
+  isModelDownloadQueuing,
+  isVersionQueuing,
   queueAssetDownload,
+  queueMissingVersionsForModel,
+  queueableMissingVersionsForModel,
   handleDownloadClick,
   modelUrl,
   blacklistModel,
@@ -144,7 +146,7 @@ const {
       <article
         v-for="model in visibleModels"
         :key="model.id"
-        class="group flex min-h-[17.5rem] min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-accent/70 hover:shadow-[0_18px_50px_rgba(0,0,0,0.22)]"
+        class="group flex min-h-[17.5rem] min-w-0 flex-col overflow-visible rounded-md border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-accent/70 hover:shadow-[0_18px_50px_rgba(0,0,0,0.22)]"
         :class="{
           'border-secondary/70 shadow-[0_0_0_1px_rgba(255,198,0,0.28)]': hasDownloadedVersion(model),
           'border-accent/70 shadow-[0_0_0_1px_rgba(0,175,255,0.25)]': activeDownloadForModel(model),
@@ -305,7 +307,7 @@ const {
               <button
                 class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold text-card-foreground transition hover:border-secondary/60 hover:text-secondary disabled:cursor-not-allowed disabled:opacity-50"
                 type="button"
-                :disabled="!versionsForModel(model).length || Boolean(queuingDownloadKey) || (versionsForModel(model).length === 1 && !canQueueVersion(firstVersion(model)))"
+                :disabled="!versionsForModel(model).length || (versionsForModel(model).length === 1 && (!canQueueVersion(firstVersion(model)) || isModelDownloadQueuing(model)))"
                 @click="handleDownloadClick(model)"
               >
                 <Check
@@ -313,7 +315,7 @@ const {
                   class="h-4 w-4 text-secondary"
                 />
                 <LoaderCircle
-                  v-else-if="activeDownloadForModel(model)?.state === 'downloading' || queuingDownloadKey.startsWith(`${model.id}__`)"
+                  v-else-if="activeDownloadForModel(model)?.state === 'downloading' || isModelDownloadQueuing(model)"
                   class="h-4 w-4 animate-spin text-accent"
                 />
                 <Clock
@@ -332,8 +334,26 @@ const {
               v-if="openDownloadMenuKey === String(model.id)"
               class="absolute bottom-11 right-0 z-30 w-80 overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
             >
-              <div class="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Download version
+              <div class="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
+                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Download version
+                </span>
+                <button
+                  class="inline-flex h-7 items-center gap-1 rounded-sm border border-secondary/35 bg-secondary/10 px-2 text-xs font-semibold text-secondary transition hover:border-secondary hover:bg-secondary hover:text-secondary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                  type="button"
+                  :disabled="!queueableMissingVersionsForModel(model).length || isModelDownloadQueuing(model)"
+                  @click="queueMissingVersionsForModel(model)"
+                >
+                  <LoaderCircle
+                    v-if="isModelDownloadQueuing(model)"
+                    class="h-3.5 w-3.5 animate-spin"
+                  />
+                  <Download
+                    v-else
+                    class="h-3.5 w-3.5"
+                  />
+                  Queue all
+                </button>
               </div>
               <div class="max-h-72 overflow-auto p-1">
                 <button
@@ -341,7 +361,7 @@ const {
                   :key="version.id"
                   class="flex w-full items-start justify-between gap-3 rounded-sm px-3 py-2 text-left text-xs transition hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-50"
                   type="button"
-                  :disabled="!canQueueVersion(version) || queuingDownloadKey === modelDownloadKey(model, version)"
+                  :disabled="!canQueueVersion(version) || isVersionQueuing(model, version)"
                   @click="queueAssetDownload(model, version)"
                 >
                   <span class="min-w-0">
@@ -361,7 +381,7 @@ const {
                       class="h-3.5 w-3.5 text-secondary"
                     />
                     <LoaderCircle
-                      v-else-if="downloadForVersion(version)?.state === 'downloading' || queuingDownloadKey === modelDownloadKey(model, version)"
+                      v-else-if="downloadForVersion(version)?.state === 'downloading' || isVersionQueuing(model, version)"
                       class="h-3.5 w-3.5 animate-spin text-accent"
                     />
                     <Clock

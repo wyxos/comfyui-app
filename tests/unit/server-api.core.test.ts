@@ -407,6 +407,33 @@ describe('companion server API routes', () => {
       })
     })
 
+  it('keeps provider compatibility metadata when a manual sidecar only overrides model safety', async () => {
+      const server = await setupHarness()
+      await writeFile(
+        join(server.checkpointDir, 'waiIllustriousSDXL_v160.safetensors.companion.info'),
+        `${JSON.stringify({
+          source: 'manual',
+          modelNsfw: true,
+          modelNsfwOverride: true,
+        })}\n`,
+        'utf8',
+      )
+
+      const checkpoints = await server.request('/api/checkpoints')
+
+      expect(checkpoints.payload.checkpoints[0]).toMatchObject({
+        name: 'waiIllustriousSDXL_v160.safetensors',
+        modelNsfw: true,
+        compatibility: expect.objectContaining({
+          modelId: 901,
+          versionId: 902,
+          modelNsfw: true,
+          modelNsfwOverride: true,
+          baseModel: 'Pony',
+        }),
+      })
+    })
+
   it('uses completed-download compatibility while sidecar metadata is still missing', async () => {
       const server = await setupHarness({
         upstream: {

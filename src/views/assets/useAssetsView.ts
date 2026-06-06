@@ -78,6 +78,7 @@ const activeImageModel = ref<CivitaiModel | null>(null)
 const openDownloadMenuKey = ref('')
 const queuingDownloadKey = ref('')
 const downloadActionError = ref('')
+const downloadActionNotice = ref('')
 
 const {
   downloadByVersionId,
@@ -92,10 +93,15 @@ const {
   downloadStatusLabel,
   handleDownloadClick,
   hasDownloadedVersion,
+  isModelDownloadQueuing,
+  isVersionQueuing,
   queueAssetDownload,
+  queueMissingVersionsForModel,
+  queueableMissingVersionsForModel,
   versionDownloadButtonLabel,
 } = createAssetDownloadActions({
   downloadActionError,
+  downloadActionNotice,
   downloadByVersionId,
   openDownloadMenuKey,
   queueDownload,
@@ -385,6 +391,7 @@ onBeforeUnmount(() => {
     openDownloadMenuKey,
     queuingDownloadKey,
     downloadActionError,
+    downloadActionNotice,
     visibleModels,
     hasRenderableState,
     creatorFilterLabel,
@@ -419,7 +426,11 @@ onBeforeUnmount(() => {
     downloadButtonLabel,
     canQueueVersion,
     versionDownloadButtonLabel,
+    isModelDownloadQueuing,
+    isVersionQueuing,
     queueAssetDownload,
+    queueMissingVersionsForModel,
+    queueableMissingVersionsForModel,
     deleteAssetDownload,
     handleDownloadClick,
     modelUrl,

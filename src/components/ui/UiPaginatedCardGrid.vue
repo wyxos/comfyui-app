@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import UiPaginationBar from './UiPaginationBar.vue'
 
 defineOptions({
@@ -38,6 +39,11 @@ const emit = defineEmits<{
   'go-to-page': [page: number]
 }>()
 
+const MOUSE_PAGINATION_DEDUP_MS = 400
+const contentElement = ref<HTMLElement | null>(null)
+let lastPaginationButton: number | null = null
+let lastPaginationTimestamp = 0
+
 function canGoPreviousPage() {
   return props.canGoPrevious ?? props.currentPage > 1
 }
@@ -57,6 +63,25 @@ function preventMousePaginationDefault(event: MouseEvent) {
 
   event.preventDefault()
   event.stopPropagation()
+  event.stopImmediatePropagation()
+}
+
+function shouldPaginateFromMouse(event: MouseEvent) {
+  if (event.type !== 'mousedown' && event.type !== 'auxclick') {
+    return false
+  }
+
+  const timestamp = event.timeStamp || Date.now()
+  if (
+    lastPaginationButton === event.button
+    && timestamp - lastPaginationTimestamp < MOUSE_PAGINATION_DEDUP_MS
+  ) {
+    return false
+  }
+
+  lastPaginationButton = event.button
+  lastPaginationTimestamp = timestamp
+  return true
 }
 
 function handleMousePagination(event: MouseEvent) {
@@ -65,21 +90,48 @@ function handleMousePagination(event: MouseEvent) {
   }
 
   preventMousePaginationDefault(event)
+  if (!shouldPaginateFromMouse(event)) {
+    return
+  }
+
   if (event.button === 3 && canGoPreviousPage()) {
     emit('go-to-page', props.currentPage - 1)
   } else if (event.button === 4 && canGoNextPage()) {
     emit('go-to-page', props.currentPage + 1)
   }
 }
+
+function eventTargetsContent(event: MouseEvent) {
+  return event.target instanceof Node && contentElement.value?.contains(event.target)
+}
+
+function handleWindowMousePagination(event: MouseEvent) {
+  if (eventTargetsContent(event)) {
+    handleMousePagination(event)
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('mousedown', handleWindowMousePagination, true)
+  window.addEventListener('mouseup', handleWindowMousePagination, true)
+  window.addEventListener('auxclick', handleWindowMousePagination, true)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('mousedown', handleWindowMousePagination, true)
+  window.removeEventListener('mouseup', handleWindowMousePagination, true)
+  window.removeEventListener('auxclick', handleWindowMousePagination, true)
+})
 </script>
 
 <template>
   <section
+    ref="contentElement"
     v-bind="$attrs"
     :class="contentClass"
     @mousedown.capture="handleMousePagination"
     @mouseup.capture="preventMousePaginationDefault"
-    @auxclick.capture="preventMousePaginationDefault"
+    @auxclick.capture="handleMousePagination"
   >
     <div
       v-if="itemsPresent"

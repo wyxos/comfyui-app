@@ -14,28 +14,51 @@ export async function readModelSidecar(rootPath, modelName) {
     return null
   }
 
-  const candidates = [
-    `${resolvedModelPath}.companion.info`,
+  const basePath = resolvedModelPath.slice(0, -extname(resolvedModelPath).length)
+  const providerCandidates = [
     `${resolvedModelPath}.civitai.info`,
     `${resolvedModelPath}.cm-info.json`,
     `${resolvedModelPath}.json`,
-    `${resolvedModelPath.slice(0, -extname(resolvedModelPath).length)}.companion.info`,
-    `${resolvedModelPath.slice(0, -extname(resolvedModelPath).length)}.civitai.info`,
-    `${resolvedModelPath.slice(0, -extname(resolvedModelPath).length)}.cm-info.json`,
-    `${resolvedModelPath.slice(0, -extname(resolvedModelPath).length)}.json`,
+    `${basePath}.civitai.info`,
+    `${basePath}.cm-info.json`,
+    `${basePath}.json`,
   ]
+  const manualCandidates = [
+    `${resolvedModelPath}.companion.info`,
+    `${basePath}.companion.info`,
+  ]
+  const payloads = []
 
-  for (const candidate of candidates) {
+  for (const candidate of [...providerCandidates, ...manualCandidates]) {
     const payload = await readJsonFileIfExists(candidate)
     if (payload) {
-      return {
-        path: candidate,
-        payload,
-      }
+      payloads.push({ path: candidate, payload })
     }
   }
 
-  return null
+  if (!payloads.length) {
+    return null
+  }
+
+  return {
+    path: payloads[payloads.length - 1].path,
+    payload: payloads.reduce((merged, item) => ({
+      ...merged,
+      ...item.payload,
+      model: {
+        ...(merged.model ?? {}),
+        ...(item.payload.model ?? {}),
+      },
+      modelMetadata: {
+        ...(merged.modelMetadata ?? {}),
+        ...(item.payload.modelMetadata ?? {}),
+      },
+      metadata: {
+        ...(merged.metadata ?? {}),
+        ...(item.payload.metadata ?? {}),
+      },
+    }), {}),
+  }
 }
 
 export async function findModelPreviewPath(rootPath, modelName) {
@@ -131,7 +154,8 @@ function mergeCompatibilityMetadata(primary, fallback) {
     modelName: safeTrim(primary?.modelName) || safeTrim(fallback?.modelName),
     versionName: safeTrim(primary?.versionName) || safeTrim(fallback?.versionName),
     modelType: safeTrim(primary?.modelType) || safeTrim(fallback?.modelType) || null,
-    modelNsfw: primary?.modelNsfw ?? fallback?.modelNsfw ?? null,
+    modelNsfw: primary?.modelNsfwOverride ?? primary?.modelNsfw ?? fallback?.modelNsfwOverride ?? fallback?.modelNsfw ?? null,
+    modelNsfwOverride: primary?.modelNsfwOverride ?? fallback?.modelNsfwOverride ?? null,
     baseModel,
     baseModelKey,
     trainedWords: mergeStringList(primary?.trainedWords, fallback?.trainedWords),
@@ -203,6 +227,16 @@ function mergeDownloadMetadata(compatibility, download) {
     ? mergeCompatibilityMetadata(compatibility, downloadCompatibility)
     : compatibility
   const modelNsfw = downloadModelNsfw(download)
+  if (mergedCompatibility.modelNsfwOverride !== null && mergedCompatibility.modelNsfwOverride !== undefined) {
+    return {
+      compatibility: {
+        ...mergedCompatibility,
+        modelNsfw: mergedCompatibility.modelNsfwOverride,
+      },
+      modelNsfw: mergedCompatibility.modelNsfwOverride,
+    }
+  }
+
   if (modelNsfw === null) {
     return {
       compatibility: mergedCompatibility,

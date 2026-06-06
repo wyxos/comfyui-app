@@ -11,10 +11,13 @@ import {
 } from 'lucide-vue-next'
 import type { AssetDownloadItem, AssetDownloadState } from '../../composables/useAssetDownloads'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   item: AssetDownloadItem
   actionKey: string
-}>()
+  blurNsfwPreview?: boolean
+}>(), {
+  blurNsfwPreview: false,
+})
 
 const emit = defineEmits<{
   pause: [item: AssetDownloadItem]
@@ -91,6 +94,27 @@ function isVideoPreview(item: AssetDownloadItem) {
   return item.previewPaths?.some((preview) => preview.url === previewFor(item) && preview.mediaType === 'video') ?? false
 }
 
+function isNsfwValue(value: unknown) {
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'number') {
+    return value > 0
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    return Boolean(normalized && !['false', '0', 'no', 'n', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized))
+  }
+
+  return false
+}
+
+function shouldBlurPreview(item: AssetDownloadItem) {
+  return props.blurNsfwPreview && isNsfwValue(item.modelNsfw ?? item.modelMetadata?.nsfw)
+}
+
 function formatFileSize(item: AssetDownloadItem) {
   const bytes = item.fileSizeKb ? item.fileSizeKb * 1024 : item.totalBytes || item.bytesDownloaded || 0
   if (!bytes) {
@@ -142,6 +166,7 @@ function isBusy(action: DownloadAction) {
           <video
             v-if="previewFor(item) && isVideoPreview(item)"
             class="h-full w-full object-cover"
+            :class="shouldBlurPreview(item) ? 'scale-110 blur-sm saturate-50' : ''"
             :src="previewFor(item)"
             muted
             playsinline
@@ -149,6 +174,7 @@ function isBusy(action: DownloadAction) {
           <img
             v-else-if="previewFor(item)"
             class="h-full w-full object-cover"
+            :class="shouldBlurPreview(item) ? 'scale-110 blur-sm saturate-50' : ''"
             :src="previewFor(item)"
             :alt="`${item.modelName} preview`"
             loading="lazy"

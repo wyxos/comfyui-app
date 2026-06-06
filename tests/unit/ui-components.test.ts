@@ -148,7 +148,9 @@ describe('UiPaginatedCardGrid', () => {
     })
 
     const content = wrapper.get('section')
-    await content.trigger('mousedown', { button: 4 })
+    const forwardEvent = new MouseEvent('auxclick', { button: 4, bubbles: true, cancelable: true })
+    content.element.dispatchEvent(forwardEvent)
+    await nextTick()
     await content.trigger('mousedown', { button: 3 })
 
     const pageInput = wrapper.get('input[aria-label="Page number"]')
@@ -156,6 +158,7 @@ describe('UiPaginatedCardGrid', () => {
     await pageInput.trigger('input')
     await pageInput.trigger('keydown', { key: 'Enter' })
 
+    expect(forwardEvent.defaultPrevented).toBe(true)
     expect(wrapper.emitted('go-to-page')).toEqual([[4], [2], [5]])
   })
 })
@@ -328,6 +331,82 @@ describe('AssetPreviewModal', () => {
     expect(deleteAssetDownload).toHaveBeenCalledWith(download, version)
   })
 
+  it('emits manual safety override changes from the asset preview modal', async () => {
+    const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
+    const wrapper = mount(AssetPreviewModal, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        model: {
+          id: 101,
+          name: 'Local checkpoint',
+          type: 'Checkpoint',
+          modelVersions: [],
+        },
+        modelType: 'Checkpoint',
+        fileName: 'local.safetensors',
+        editableSafety: true,
+        compatibility: {
+          modelNsfw: false,
+          modelNsfwOverride: null,
+        },
+      },
+    })
+
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Safety')
+    await wrapper.get('[aria-label="Safety override"]').setValue('nsfw')
+    await wrapper.get('button[aria-label="Save safety override"]').trigger('click')
+
+    expect(wrapper.emitted('save-safety')).toEqual([
+      [{ modelNsfw: true, modelNsfwOverride: true }],
+    ])
+  })
+
+  it('filters model versions by base model groups when metadata is available', async () => {
+    const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
+    const wrapper = mount(AssetPreviewModal, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        model: {
+          id: 101,
+          name: 'Grouped version model',
+          type: 'Checkpoint',
+          modelVersions: [
+            {
+              id: 201,
+              name: 'niTratto [ANIMA]',
+              baseModel: 'Anima',
+              files: [{ name: 'trattoNero_nitrattoANIMA.safetensors', type: 'Model', primary: true }],
+              images: [{ url: 'https://example.test/anima.jpg', type: 'image', nsfw: false }],
+            },
+            {
+              id: 202,
+              name: 'Holbein',
+              baseModel: 'Illustrious',
+              files: [{ name: 'trattoNero_holbein.safetensors', type: 'Model', primary: true }],
+              images: [{ url: 'https://example.test/illustrious.jpg', type: 'image', nsfw: false }],
+            },
+          ],
+        },
+      },
+    })
+
+    await nextTick()
+
+    expect(wrapper.find('button[aria-label="Show Anima versions"]').exists()).toBe(true)
+    expect(wrapper.find('button[aria-label="Show Illustrious versions"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('trattoNero_nitrattoANIMA.safetensors')
+
+    await wrapper.get('button[aria-label="Show Illustrious versions"]').trigger('click')
+    await nextTick()
+
+    expect(wrapper.text()).toContain('trattoNero_holbein.safetensors')
+    expect(wrapper.text()).not.toContain('trattoNero_nitrattoANIMA.safetensors')
+  })
+
   it('cycles preview images with mouse back and forward buttons while open', async () => {
     const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
     mount(AssetPreviewModal, {
@@ -363,12 +442,29 @@ describe('AssetPreviewModal', () => {
     expect(forwardEvent.defaultPrevented).toBe(true)
     expect(document.body.textContent).toContain('2 / 2')
 
+    const forwardMouseup = new MouseEvent('mouseup', { button: 4, bubbles: true, cancelable: true })
+    window.dispatchEvent(forwardMouseup)
+    const forwardAuxclick = new MouseEvent('auxclick', { button: 4, bubbles: true, cancelable: true })
+    window.dispatchEvent(forwardAuxclick)
+    await nextTick()
+
+    expect(forwardMouseup.defaultPrevented).toBe(true)
+    expect(forwardAuxclick.defaultPrevented).toBe(true)
+    expect(document.body.textContent).toContain('2 / 2')
+
     const backEvent = new MouseEvent('mousedown', { button: 3, bubbles: true, cancelable: true })
     window.dispatchEvent(backEvent)
     await nextTick()
 
     expect(backEvent.defaultPrevented).toBe(true)
     expect(document.body.textContent).toContain('1 / 2')
+
+    const auxOnlyForwardEvent = new MouseEvent('auxclick', { button: 4, bubbles: true, cancelable: true })
+    window.dispatchEvent(auxOnlyForwardEvent)
+    await nextTick()
+
+    expect(auxOnlyForwardEvent.defaultPrevented).toBe(true)
+    expect(document.body.textContent).toContain('2 / 2')
   })
 })
 

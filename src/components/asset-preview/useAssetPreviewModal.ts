@@ -26,6 +26,7 @@ import type {
   CivitaiModelVersion,
   PreviewSlide,
 } from './assetPreviewTypes'
+import { useAssetPreviewNavigationEvents } from './useAssetPreviewNavigationEvents'
 
 export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, emitClose: () => void) {
   const fetchedModel = ref<CivitaiModel | null>(null)
@@ -323,26 +324,6 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     void props.deleteAssetDownload(download, version)
   }
 
-  function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape') {
-      close()
-    } else if (event.key === 'ArrowLeft') {
-      showPreviousImage()
-    } else if (event.key === 'ArrowRight') {
-      showNextImage()
-    }
-  }
-
-  function handleMouseNavigation(event: MouseEvent) {
-    if (event.button !== 3 && event.button !== 4) {
-      return
-    }
-
-    event.preventDefault()
-    event.stopPropagation()
-    ;(event.button === 3 ? showPreviousImage : showNextImage)()
-  }
-
   watch(
     () => [props.open, props.model?.id ?? null, normalizedModelId.value, normalizedVersionId.value],
     () => {
@@ -431,25 +412,11 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     { immediate: true },
   )
 
-  watch(
-    () => props.open,
-    (open) => {
-      if (open) {
-        window.addEventListener('keydown', handleKeydown)
-        window.addEventListener('mousedown', handleMouseNavigation, true)
-      } else {
-        window.removeEventListener('keydown', handleKeydown)
-        window.removeEventListener('mousedown', handleMouseNavigation, true)
-      }
-    },
-    { immediate: true },
-  )
+  useAssetPreviewNavigationEvents(() => props.open, { close, showNextImage, showPreviousImage })
 
   onBeforeUnmount(() => {
     civitaiController?.abort()
     imageDetailsController?.abort()
-    window.removeEventListener('keydown', handleKeydown)
-    window.removeEventListener('mousedown', handleMouseNavigation, true)
   })
 
   return {

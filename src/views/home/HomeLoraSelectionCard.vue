@@ -37,6 +37,7 @@ const {
   removeCheckpointLora,
   assetPreviewDownloadActions,
   applyGenerationMetadataFromSource,
+  saveModelSafetyOverride,
 } = useProvidedHomeView()
 const {
   queuingDownloadKey,
@@ -50,6 +51,8 @@ const {
 } = assetPreviewDownloadActions
 
 const isLoraPreviewOpen = ref(false)
+const savingSafety = ref(false)
+const safetyError = ref('')
 const loraPreviewUrl = computed(() => getLoraPreviewUrl(props.lora.name))
 const loraPreviewMediaType = computed(() => getLoraPreviewMediaType(props.lora.name))
 const loraPreviewIsVideo = computed(() =>
@@ -75,7 +78,28 @@ function updateStrength(event: Event) {
 
 function openLoraPreview() {
   if (canOpenLoraPreview.value) {
+    safetyError.value = ''
     isLoraPreviewOpen.value = true
+  }
+}
+
+async function saveLoraSafety(payload: { modelNsfwOverride: boolean | null }) {
+  if (savingSafety.value) {
+    return
+  }
+
+  savingSafety.value = true
+  safetyError.value = ''
+  try {
+    await saveModelSafetyOverride({
+      modelName: props.lora.name,
+      modelType: 'lora',
+      modelNsfwOverride: payload.modelNsfwOverride,
+    })
+  } catch (error) {
+    safetyError.value = error instanceof Error ? error.message : 'Could not save safety override.'
+  } finally {
+    savingSafety.value = false
   }
 }
 
@@ -313,6 +337,10 @@ onBeforeUnmount(() => {
       :base-model="loraCompatibility?.baseModel ?? null"
       :trained-words="loraTriggerWords"
       :file-name="lora.name"
+      :compatibility="loraCompatibility"
+      :editable-safety="true"
+      :saving-safety="savingSafety"
+      :safety-error="safetyError"
       :queuing-download-key="queuingDownloadKey"
       :download-for-version="downloadForVersion"
       :download-status-label="downloadStatusLabel"
@@ -324,6 +352,7 @@ onBeforeUnmount(() => {
       kind-label="LoRA preview"
       show-download-actions
       @close="isLoraPreviewOpen = false"
+      @save-safety="saveLoraSafety"
     />
   </div>
 </template>

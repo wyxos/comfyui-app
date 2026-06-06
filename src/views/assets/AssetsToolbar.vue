@@ -19,6 +19,7 @@ const {
   selectedBaseModels,
   hasStoredCivitaiApiKey,
   downloadActionError,
+  downloadActionNotice,
   creatorFilterLabel,
   selectedBaseModelSet,
   selectedBaseModelLabel,
@@ -151,6 +152,12 @@ const {
           >
             {{ downloadActionError }}
           </span>
+          <span
+            v-else-if="downloadActionNotice"
+            class="rounded-sm border border-secondary/35 bg-secondary/10 px-2 py-1 text-secondary"
+          >
+            {{ downloadActionNotice }}
+          </span>
         </div>
       </div>
 
@@ -175,8 +182,8 @@ const {
         <span class="shrink-0 px-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
           Base
         </span>
-        <div class="min-w-0 flex-1 overflow-x-auto">
-          <div class="flex w-max items-center gap-2 pr-2">
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-2 pr-2">
             <button
               v-for="option in BASE_MODEL_OPTIONS"
               :key="option.value"

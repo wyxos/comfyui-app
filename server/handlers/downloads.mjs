@@ -5,7 +5,6 @@ import {
   createDownloadsPanelResponse,
   createDownloadsSummaryResponse,
   ensureDownloadsLoaded,
-  filterDownloadsForNsfwSetting,
   scheduleDownloadsPersist,
   serializeDownload,
   serializeDownloadPanelItem,
@@ -21,30 +20,21 @@ import {
 import { markCivitaiDownloadComplete } from '../downloads/transfer.mjs'
 import { enqueueCivitaiDownload, processDownloadQueue } from '../downloads/queue.mjs'
 import { parseInteger } from '../civitai-query.mjs'
-import { getAppSettings } from '../settings.mjs'
-
-async function visibleDownloadsForAppSettings() {
-  try {
-    return filterDownloadsForNsfwSetting(civitaiDownloads.values(), (await getAppSettings()).includeNsfw)
-  } catch {
-    return filterDownloadsForNsfwSetting(civitaiDownloads.values(), false)
-  }
-}
 
 export async function handleDownloadsList(response) {
   await ensureDownloadsLoaded()
   refreshMissingDownloadModelMetadataInBackground(civitaiDownloads.values())
-  return sendJson(response, 200, serializeDownloadsResponse(await visibleDownloadsForAppSettings()))
+  return sendJson(response, 200, serializeDownloadsResponse())
 }
 
 export async function handleDownloadsSummary(response) {
   await ensureDownloadsLoaded()
-  return sendJson(response, 200, createDownloadsSummaryResponse(await visibleDownloadsForAppSettings()))
+  return sendJson(response, 200, createDownloadsSummaryResponse(civitaiDownloads.values()))
 }
 
 export async function handleDownloadsPanel(response) {
   await ensureDownloadsLoaded()
-  return sendJson(response, 200, createDownloadsPanelResponse(await visibleDownloadsForAppSettings()))
+  return sendJson(response, 200, createDownloadsPanelResponse(civitaiDownloads.values()))
 }
 
 export async function handleDownloadStatus(url, response) {
@@ -109,8 +99,8 @@ export async function handleClearDownloads(response, { compact = false } = {}) {
     ok: true,
     cleared,
     ...(compact
-      ? createDownloadsPanelResponse(await visibleDownloadsForAppSettings())
-      : serializeDownloadsResponse(await visibleDownloadsForAppSettings())),
+      ? createDownloadsPanelResponse(civitaiDownloads.values())
+      : serializeDownloadsResponse()),
   })
 }
 

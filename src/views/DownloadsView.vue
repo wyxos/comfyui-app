@@ -7,7 +7,8 @@ import {
   LoaderCircle,
   Search,
 } from 'lucide-vue-next'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { fetchAppSettings } from '../composables/useAppSettings'
 import { useAssetDownloads, type AssetDownloadItem } from '../composables/useAssetDownloads'
 import DownloadsTableRow from './downloads/DownloadsTableRow.vue'
 
@@ -50,6 +51,7 @@ const statusFilter = ref<DownloadStatusFilter>('all')
 const currentPage = ref(1)
 const actionKey = ref('')
 const actionError = ref('')
+const includeNsfwPreviews = ref(false)
 
 const modelDownloads = computed(() => {
   return downloads.value
@@ -170,6 +172,18 @@ async function runDownloadAction(item: AssetDownloadItem, action: DownloadAction
 function goToPage(page: number) {
   currentPage.value = Math.max(1, Math.min(page, pageCount.value))
 }
+
+async function loadAppSettingsDefaults() {
+  try {
+    includeNsfwPreviews.value = (await fetchAppSettings()).includeNsfw
+  } catch {
+    includeNsfwPreviews.value = false
+  }
+}
+
+onMounted(() => {
+  void loadAppSettingsDefaults()
+})
 </script>
 
 <template>
@@ -287,6 +301,7 @@ function goToPage(page: number) {
               :key="item.id"
               :item="item"
               :action-key="actionKey"
+              :blur-nsfw-preview="!includeNsfwPreviews"
               @pause="runDownloadAction($event, 'pause', pauseDownload)"
               @resume="runDownloadAction($event, 'resume', resumeDownload)"
               @cancel="runDownloadAction($event, 'cancel', cancelDownload)"

@@ -12,6 +12,7 @@ import {
 import { formatNumber } from './assetPreviewHelpers'
 import AssetPreviewCompatibilityEditor from './AssetPreviewCompatibilityEditor.vue'
 import AssetPreviewFileDetails from './AssetPreviewFileDetails.vue'
+import AssetPreviewSafetyEditor from './AssetPreviewSafetyEditor.vue'
 import AssetPreviewVersionList from './AssetPreviewVersionList.vue'
 import type { AssetPreviewModalProps } from './assetPreviewTypes'
 import { useAssetPreviewModal } from './useAssetPreviewModal'
@@ -34,8 +35,11 @@ const props = withDefaults(
     fileName: null,
     compatibility: null,
     editableCompatibility: false,
+    editableSafety: false,
     savingCompatibility: false,
+    savingSafety: false,
     compatibilityError: '',
+    safetyError: '',
     showDownloadActions: false,
     queuingDownloadKey: '',
     downloadForVersion: undefined,
@@ -53,6 +57,10 @@ const emit = defineEmits<{
     compatibleBaseModels: string[]
     controlType: string
     loaderType: string
+  }]
+  'save-safety': [payload: {
+    modelNsfw: boolean | null
+    modelNsfwOverride: boolean | null
   }]
 }>()
 
@@ -306,6 +314,15 @@ async function handleActiveImageMetadataAction() {
               </div>
             </dl>
           </section>
+
+          <AssetPreviewSafetyEditor
+            v-if="props.editableSafety"
+            :model-nsfw="props.compatibility?.modelNsfw ?? null"
+            :model-nsfw-override="props.compatibility?.modelNsfwOverride ?? null"
+            :error="props.safetyError"
+            :saving="props.savingSafety"
+            @save="emit('save-safety', $event)"
+          />
 
           <AssetPreviewCompatibilityEditor
             v-if="props.editableCompatibility"

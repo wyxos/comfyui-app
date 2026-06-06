@@ -53,6 +53,7 @@ export type ModelCompatibilityMetadata = {
   versionName?: string
   modelType?: string | null
   modelNsfw?: boolean | null
+  modelNsfwOverride?: boolean | null
   baseModel?: string
   baseModelKey?: string
   trainedWords?: string[]

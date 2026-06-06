@@ -329,12 +329,15 @@ describe('DownloadsView', () => {
         modelId: 1,
         modelName: 'Complete checkpoint',
         modelType: 'Checkpoint',
+        modelNsfw: true,
+        modelMetadata: { nsfw: true },
         versionId: 2,
         versionName: 'v1',
         fileName: 'complete.safetensors',
         fileSizeKb: 1024,
         targetPath: 'C:\\models\\checkpoints\\complete.safetensors',
         progressPercent: 100,
+        previewUrl: '/api/civitai/downloads/complete-download/preview',
         updatedAt: 10,
       },
       {
@@ -383,6 +386,9 @@ describe('DownloadsView', () => {
         redownloadDownload,
       }),
     }))
+    vi.doMock('../../src/composables/useAppSettings', () => ({
+      fetchAppSettings: vi.fn().mockResolvedValue({ includeNsfw: false }),
+    }))
 
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const { default: DownloadsView } = await import('../../src/views/DownloadsView.vue')
@@ -391,6 +397,7 @@ describe('DownloadsView', () => {
     expect(wrapper.text()).toContain('Complete checkpoint')
     expect(wrapper.text()).toContain('Deleted lora')
     expect(wrapper.text()).not.toContain('Ignored embedding')
+    expect(wrapper.get('img[alt="Complete checkpoint preview"]').classes()).toContain('blur-sm')
 
     await wrapper.get('[aria-label="Redownload Complete checkpoint"]').trigger('click')
     await wrapper.get('[aria-label="Delete Complete checkpoint from disk"]').trigger('click')

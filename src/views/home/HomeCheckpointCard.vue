@@ -18,6 +18,7 @@ const {
   toggleSelectedCheckpoint,
   assetPreviewDownloadActions,
   applyGenerationMetadataFromSource,
+  saveModelSafetyOverride,
 } = useProvidedHomeView()
 const {
   queuingDownloadKey,
@@ -31,6 +32,8 @@ const {
 } = assetPreviewDownloadActions
 
 const isCheckpointPreviewOpen = ref(false)
+const savingSafety = ref(false)
+const safetyError = ref('')
 const checkpointPreviewIsVideo = computed(() =>
   isVideoPreview(props.checkpoint.previewUrl, props.checkpoint.previewMediaType),
 )
@@ -45,7 +48,28 @@ const canOpenCheckpointPreview = computed(() => Boolean(props.checkpoint.preview
 
 function openCheckpointPreview() {
   if (canOpenCheckpointPreview.value) {
+    safetyError.value = ''
     isCheckpointPreviewOpen.value = true
+  }
+}
+
+async function saveCheckpointSafety(payload: { modelNsfwOverride: boolean | null }) {
+  if (savingSafety.value) {
+    return
+  }
+
+  savingSafety.value = true
+  safetyError.value = ''
+  try {
+    await saveModelSafetyOverride({
+      modelName: props.checkpoint.name,
+      modelType: 'checkpoint',
+      modelNsfwOverride: payload.modelNsfwOverride,
+    })
+  } catch (error) {
+    safetyError.value = error instanceof Error ? error.message : 'Could not save safety override.'
+  } finally {
+    savingSafety.value = false
   }
 }
 
@@ -182,6 +206,10 @@ onBeforeUnmount(() => {
       :base-model="checkpoint.compatibility?.baseModel ?? null"
       :trained-words="checkpoint.compatibility?.trainedWords ?? []"
       :file-name="checkpoint.name"
+      :compatibility="checkpoint.compatibility"
+      :editable-safety="true"
+      :saving-safety="savingSafety"
+      :safety-error="safetyError"
       :queuing-download-key="queuingDownloadKey"
       :download-for-version="downloadForVersion"
       :download-status-label="downloadStatusLabel"
@@ -193,6 +221,7 @@ onBeforeUnmount(() => {
       kind-label="Checkpoint preview"
       show-download-actions
       @close="isCheckpointPreviewOpen = false"
+      @save-safety="saveCheckpointSafety"
     />
   </div>
 </template>
