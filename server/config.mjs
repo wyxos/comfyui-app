@@ -30,6 +30,7 @@ export let configDir = normalize(
 )
 export let settingsPath = join(configDir, 'settings.json')
 export let downloadsPath = join(configDir, 'downloads.json')
+export let watchedDownloadsPath = join(configDir, 'watched-downloads.json')
 export let jobsDatabasePath = join(configDir, 'jobs.sqlite')
 export const downloadsPersistRenameAttempts = 8
 export const downloadsPersistRenameDelayMs = 50
@@ -184,6 +185,7 @@ export function refreshConfigFromEnv() {
   configDir = normalize(resolve(process.env.COMFY_COMPANION_CONFIG_DIR || join(userConfigRoot, 'comfyui-companion-app')))
   settingsPath = join(configDir, 'settings.json')
   downloadsPath = join(configDir, 'downloads.json')
+  watchedDownloadsPath = join(configDir, 'watched-downloads.json')
   jobsDatabasePath = join(configDir, 'jobs.sqlite')
   civitaiDownloadSegmentCount = Math.max(
     1,

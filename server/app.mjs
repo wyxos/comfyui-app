@@ -23,6 +23,12 @@ import {
   handlePostDownload,
   handleRepairDownloadPreviews,
 } from './handlers/downloads.mjs'
+import {
+  handleCancelWatchedDownload,
+  handleCheckWatchedDownloads,
+  handlePostWatchedDownload,
+  handleWatchedDownloadsList,
+} from './handlers/watched-downloads.mjs'
 import { handleGenerationOptions } from './handlers/generation-options.mjs'
 import {
   handleDeleteCivitaiSettings,
@@ -45,6 +51,7 @@ import {
 } from './handlers/jobs-files.mjs'
 import { resetDownloadsRuntimeState } from './downloads/state.mjs'
 import { resetDownloadQueueRuntimeState } from './downloads/queue.mjs'
+import { resetWatchedDownloadsRuntimeState, startWatchedDownloadPoller, stopWatchedDownloadPoller } from './downloads/watched.mjs'
 import { resetComfyModelDirsFromEnv } from './model-paths.mjs'
 import { resetModelMetadataRuntimeState } from './model-metadata.mjs'
 import { resetJobStoreRuntimeState } from './job-store.mjs'
@@ -123,6 +130,23 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
 
   if (url.pathname === '/api/civitai/downloads/status' && request.method === 'GET') {
     return handleDownloadStatus(url, response)
+  }
+
+  if (url.pathname === '/api/civitai/watched-downloads' && request.method === 'GET') {
+    return handleWatchedDownloadsList(response)
+  }
+
+  if (url.pathname === '/api/civitai/watched-downloads' && request.method === 'POST') {
+    return handlePostWatchedDownload(request, response)
+  }
+
+  if (url.pathname === '/api/civitai/watched-downloads/check' && request.method === 'POST') {
+    return handleCheckWatchedDownloads(request, response)
+  }
+
+  if (url.pathname.startsWith('/api/civitai/watched-downloads/') && request.method === 'DELETE') {
+    const downloadId = decodeURIComponent(url.pathname.slice('/api/civitai/watched-downloads/'.length))
+    return handleCancelWatchedDownload(downloadId, response)
   }
 
   if (url.pathname === '/api/civitai/downloads' && request.method === 'POST') {
@@ -246,6 +270,7 @@ export function configureCompanionServerForTests(adapters = {}) {
   resetComfyModelDirsFromEnv()
   resetDownloadsRuntimeState()
   resetDownloadQueueRuntimeState()
+  resetWatchedDownloadsRuntimeState()
   resetComfySocketRuntimeState()
   resetModelMetadataRuntimeState()
   Object.assign(runtimeAdapters, adapters)
@@ -259,6 +284,8 @@ export function startCompanionServer(options = {}) {
   const server = createCompanionServer(options)
   server.listen(port, host, () => {
     console.log(`Comfy Companion listening on http://${host}:${port}`)
+    startWatchedDownloadPoller()
   })
+  server.once('close', stopWatchedDownloadPoller)
   return server
 }

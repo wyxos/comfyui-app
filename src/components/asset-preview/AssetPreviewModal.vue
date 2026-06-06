@@ -44,6 +44,8 @@ const props = withDefaults(
     queuingDownloadKey: '',
     downloadForVersion: undefined,
     downloadStatusLabel: undefined,
+    canQueueVersion: undefined,
+    versionDownloadButtonLabel: undefined,
     queueAssetDownload: undefined,
     deleteAssetDownload: undefined,
     modelDownloadKey: undefined,

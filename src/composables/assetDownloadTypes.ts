@@ -1,4 +1,5 @@
 export type AssetDownloadState = 'queued' | 'downloading' | 'paused' | 'complete' | 'error' | 'cancelled' | 'deleted'
+export type WatchedAssetDownloadState = 'watching' | 'attention' | 'queued' | 'cancelled'
 
 export type AssetDownloadItem = {
   id: string
@@ -43,6 +44,38 @@ export type DownloadsResponse = {
   message?: string
 }
 
+export type WatchedAssetDownloadItem = {
+  id: string
+  state: WatchedAssetDownloadState
+  modelId: number
+  modelName: string
+  modelType: string
+  modelNsfw?: boolean | null
+  modelMetadata?: Record<string, unknown> | null
+  versionId: number
+  versionName: string
+  baseModel?: string | null
+  fileId?: string | number | null
+  fileName: string
+  file?: Record<string, unknown> | null
+  trainedWords?: string[]
+  previewImage?: Record<string, unknown> | null
+  previewImages?: Array<Record<string, unknown>>
+  createdAt?: number | null
+  updatedAt?: number | null
+  lastCheckedAt?: number | null
+  nextCheckAt?: number | null
+  queuedDownloadId?: string | null
+  lastStatus?: string
+  lastError?: string | null
+}
+
+export type WatchedDownloadsResponse = {
+  ok: boolean
+  items?: WatchedAssetDownloadItem[]
+  message?: string
+}
+
 export type DownloadCounts = {
   queued: number
   downloading: number
@@ -76,4 +109,8 @@ export type QueueDownloadPayload = {
   previewImage?: Record<string, unknown> | null
   previewImages?: Array<Record<string, unknown>>
   force?: boolean
+}
+
+export type WatchDownloadPayload = Omit<QueueDownloadPayload, 'force'> & {
+  file: Record<string, unknown>
 }

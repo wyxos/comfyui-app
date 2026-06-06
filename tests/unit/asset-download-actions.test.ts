@@ -73,6 +73,63 @@ describe('createAssetDownloadActions', () => {
     }))
     expect(downloadActionNotice.value).toBe('Queued 2 versions for Multi version checkpoint.')
   })
+
+  it('watches early access versions instead of rejecting them as unavailable downloads', async () => {
+    const queueDownload = vi.fn()
+    const watchDownload = vi.fn().mockResolvedValue({
+      ok: true,
+      item: {
+        state: 'watching',
+        fileName: 'locked-v1.safetensors',
+      },
+    })
+    const downloadActionNotice = ref('')
+    const downloadActionError = ref('')
+    const { createAssetDownloadActions } = await import('../../src/views/assets/assetDownloadActions')
+    const actions = createAssetDownloadActions({
+      downloadByVersionId: computed(() => new Map()),
+      downloadActionError,
+      downloadActionNotice,
+      openDownloadMenuKey: ref(''),
+      queuingDownloadKey: ref(''),
+      queueDownload,
+      watchDownload,
+      watchedByVersionId: computed(() => new Map()),
+    } as never)
+    const lockedVersion = {
+      ...modelVersion(201, 'locked-v1.safetensors'),
+      availability: 'EarlyAccess',
+      covered: false,
+      files: [{
+        id: 301,
+        name: 'locked-v1.safetensors',
+        type: 'Model',
+        primary: true,
+      }],
+    }
+
+    expect(actions.versionDownloadButtonLabel(lockedVersion)).toBe('Watch')
+
+    await actions.queueAssetDownload({
+      id: 101,
+      name: 'Locked LoRA',
+      type: 'LORA',
+      nsfw: false,
+      modelVersions: [lockedVersion],
+    }, lockedVersion)
+
+    expect(queueDownload).not.toHaveBeenCalled()
+    expect(watchDownload).toHaveBeenCalledWith(expect.objectContaining({
+      modelId: 101,
+      versionId: 201,
+      file: expect.objectContaining({
+        id: 301,
+        name: 'locked-v1.safetensors',
+      }),
+    }))
+    expect(downloadActionError.value).toBe('')
+    expect(downloadActionNotice.value).toBe('Watching locked-v1.safetensors.')
+  })
 })
 
 function modelVersion(id: number, fileName: string) {

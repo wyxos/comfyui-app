@@ -21,7 +21,6 @@ import {
   type ModelTypeFilter,
 } from './assetViewTypes'
 import {
-  canQueueVersion,
   creatorLabel,
   favoriteCountFor,
   fileSizeFor,
@@ -82,12 +81,16 @@ const downloadActionNotice = ref('')
 
 const {
   downloadByVersionId,
+  watchedByVersionId,
   queueDownload,
+  watchDownload,
+  unwatchDownload,
   deleteDownloadedFile,
-} = useAssetDownloads()
+} = useAssetDownloads({ includeWatched: true })
 
 const {
   activeDownloadForModel,
+  canQueueVersion: canActOnVersionDownload,
   downloadButtonLabel,
   downloadForVersion,
   downloadStatusLabel,
@@ -105,7 +108,10 @@ const {
   downloadByVersionId,
   openDownloadMenuKey,
   queueDownload,
+  unwatchDownload,
   queuingDownloadKey,
+  watchedByVersionId,
+  watchDownload,
 })
 
 const blacklistedModelIdSet = computed(() => new Set(blacklistedModelIds.value))
@@ -424,7 +430,7 @@ onBeforeUnmount(() => {
     activeDownloadForModel,
     downloadStatusLabel,
     downloadButtonLabel,
-    canQueueVersion,
+    canQueueVersion: canActOnVersionDownload,
     versionDownloadButtonLabel,
     isModelDownloadQueuing,
     isVersionQueuing,

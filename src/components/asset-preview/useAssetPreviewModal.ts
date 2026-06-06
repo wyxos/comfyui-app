@@ -281,6 +281,10 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
   }
 
   function canQueueVersion(version: CivitaiModelVersion) {
+    if (props.canQueueVersion) {
+      return props.canQueueVersion(version)
+    }
+
     const file = primaryFileForVersion(version)
     return Boolean(props.queueAssetDownload && file?.downloadUrl && file.name && !versionDownloadUnavailableLabel(version))
   }
@@ -291,6 +295,10 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
   }
 
   function versionDownloadButtonLabel(version: CivitaiModelVersion) {
+    if (props.versionDownloadButtonLabel) {
+      return props.versionDownloadButtonLabel(version)
+    }
+
     const unavailableLabel = versionDownloadUnavailableLabel(version)
     if (unavailableLabel) {
       return unavailableLabel

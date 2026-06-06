@@ -48,7 +48,8 @@ export function isVersionDownloadable(version: CivitaiModelVersion | null | unde
 }
 
 export function versionDownloadUnavailableLabel(version: CivitaiModelVersion | null | undefined) {
-  if (!primaryFileForVersion(version)?.downloadUrl) {
+  const file = primaryFileForVersion(version)
+  if (!file?.name) {
     return 'No file'
   }
 
@@ -56,6 +57,10 @@ export function versionDownloadUnavailableLabel(version: CivitaiModelVersion | n
     return normalizedAvailability(version?.availability) === 'earlyaccess'
       ? 'Early access locked'
       : 'Unavailable'
+  }
+
+  if (!file.downloadUrl) {
+    return 'No file'
   }
 
   return ''

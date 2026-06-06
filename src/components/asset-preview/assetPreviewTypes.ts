@@ -131,6 +131,8 @@ export type AssetPreviewModalProps = {
   queuingDownloadKey?: string
   downloadForVersion?: (version: CivitaiModelVersion | null | undefined) => AssetPreviewDownload | null
   downloadStatusLabel?: (download: AssetPreviewDownload | null) => string
+  canQueueVersion?: (version: CivitaiModelVersion) => boolean
+  versionDownloadButtonLabel?: (version: CivitaiModelVersion) => string
   queueAssetDownload?: (model: CivitaiModel, version: CivitaiModelVersion) => void | Promise<unknown>
   deleteAssetDownload?: (download: AssetPreviewDownload, version: CivitaiModelVersion) => void | Promise<void>
   modelDownloadKey?: (model: CivitaiModel, version: CivitaiModelVersion) => string

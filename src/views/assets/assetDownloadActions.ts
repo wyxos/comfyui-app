@@ -1,8 +1,13 @@
 import type { ComputedRef, Ref } from 'vue'
 import { versionDownloadUnavailableLabel } from '../../components/asset-preview/assetPreviewHelpers'
-import type { AssetDownloadItem, QueueDownloadPayload } from '../../composables/useAssetDownloads'
+import type {
+  AssetDownloadItem,
+  QueueDownloadPayload,
+  WatchDownloadPayload,
+  WatchedAssetDownloadItem,
+} from '../../composables/useAssetDownloads'
 import {
-  canQueueVersion,
+  canQueueVersion as canQueueCivitaiVersion,
   modelDownloadKey,
   previewImageForVersion,
   previewImagesForVersion,
@@ -13,11 +18,14 @@ import type { CivitaiModel, CivitaiModelVersion } from './assetViewTypes'
 
 type DownloadActionState = {
   downloadByVersionId: ComputedRef<Map<number, AssetDownloadItem[]>>
+  watchedByVersionId?: ComputedRef<Map<number, WatchedAssetDownloadItem[]>>
   downloadActionError: Ref<string>
   downloadActionNotice: Ref<string>
   openDownloadMenuKey: Ref<string>
   queuingDownloadKey: Ref<string>
   queueDownload: (payload: QueueDownloadPayload) => Promise<unknown>
+  watchDownload?: (payload: WatchDownloadPayload) => Promise<unknown>
+  unwatchDownload?: (id: string) => Promise<unknown>
 }
 
 type QueueAssetDownloadOptions = {
@@ -36,6 +44,41 @@ export function createAssetDownloadActions(state: DownloadActionState) {
 
   function downloadForVersion(version: CivitaiModelVersion | null | undefined) {
     return downloadsForVersion(version)[0] ?? null
+  }
+
+  function watchedDownloadsForVersion(version: CivitaiModelVersion | null | undefined) {
+    if (!version) {
+      return []
+    }
+
+    return state.watchedByVersionId?.value.get(version.id) ?? []
+  }
+
+  function watchedDownloadForVersion(version: CivitaiModelVersion | null | undefined) {
+    return watchedDownloadsForVersion(version)
+      .find((item) => item.state !== 'cancelled') ?? null
+  }
+
+  function canWatchVersion(version: CivitaiModelVersion | null | undefined) {
+    const file = primaryFileForVersion(version)
+    return Boolean(
+      state.watchDownload &&
+      file?.name &&
+      versionDownloadUnavailableLabel(version) === 'Early access locked',
+    )
+  }
+
+  function canUnwatchVersion(version: CivitaiModelVersion | null | undefined) {
+    const watchedDownload = watchedDownloadForVersion(version)
+    return Boolean(
+      state.unwatchDownload &&
+      watchedDownload?.id &&
+      (watchedDownload.state === 'watching' || watchedDownload.state === 'attention'),
+    )
+  }
+
+  function canActOnVersionDownload(version: CivitaiModelVersion | null | undefined) {
+    return canQueueCivitaiVersion(version) || canWatchVersion(version) || canUnwatchVersion(version)
   }
 
   function hasDownloadedVersion(model: CivitaiModel) {
@@ -85,12 +128,34 @@ export function createAssetDownloadActions(state: DownloadActionState) {
   }
 
   function versionDownloadButtonLabel(version: CivitaiModelVersion | null | undefined) {
+    const download = downloadForVersion(version)
+    if (download) {
+      return download.state === 'complete' ? 'Re-download' : downloadStatusLabel(download)
+    }
+
+    const watchedDownload = watchedDownloadForVersion(version)
+    if (watchedDownload) {
+      if (watchedDownload.state === 'queued') {
+        return 'Queued'
+      }
+
+      if (watchedDownload.state === 'attention') {
+        return 'Retry watch'
+      }
+
+      return 'Watching'
+    }
+
     const unavailableLabel = versionDownloadUnavailableLabel(version)
+    if (unavailableLabel === 'Early access locked' && canWatchVersion(version)) {
+      return 'Watch'
+    }
+
     if (unavailableLabel) {
       return unavailableLabel
     }
 
-    return downloadStatusLabel(downloadForVersion(version)) || 'Download'
+    return 'Download'
   }
 
   function downloadButtonLabel(model: CivitaiModel) {
@@ -99,7 +164,7 @@ export function createAssetDownloadActions(state: DownloadActionState) {
       return downloadStatusLabel(activeDownload)
     }
 
-    if (versionsForModel(model).length === 1 && !canQueueVersion(versionsForModel(model)[0])) {
+    if (versionsForModel(model).length === 1 && !canActOnVersionDownload(versionsForModel(model)[0])) {
       return versionDownloadButtonLabel(versionsForModel(model)[0])
     }
 
@@ -111,7 +176,7 @@ export function createAssetDownloadActions(state: DownloadActionState) {
   }
 
   function canQueueMissingVersion(version: CivitaiModelVersion | null | undefined) {
-    if (!canQueueVersion(version)) {
+    if (!canQueueCivitaiVersion(version)) {
       return false
     }
 
@@ -148,6 +213,123 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     return `Queued ${fileName}.`
   }
 
+  function watchedDownloadNotice(payload: unknown, fallbackFileName: string) {
+    const item = typeof payload === 'object' && payload !== null && 'item' in payload
+      ? (payload as { item?: Partial<WatchedAssetDownloadItem> }).item
+      : null
+    const fileName = item?.fileName || fallbackFileName
+
+    if (item?.state === 'queued') {
+      return `Queued ${fileName}.`
+    }
+
+    return `Watching ${fileName}.`
+  }
+
+  function downloadPayloadForVersion(
+    model: CivitaiModel,
+    version: CivitaiModelVersion,
+    file: ReturnType<typeof primaryFileForVersion>,
+  ): WatchDownloadPayload {
+    return {
+      modelId: model.id,
+      modelName: model.name,
+      modelType: model.type,
+      modelNsfw: model.nsfw ?? null,
+      modelMetadata: {
+        id: model.id,
+        name: model.name,
+        type: model.type,
+        nsfw: model.nsfw ?? null,
+        creator: model.creator ?? null,
+        stats: model.stats ?? null,
+        tags: model.tags ?? [],
+      },
+      versionId: version.id,
+      versionName: version.name ?? `Version ${version.id}`,
+      baseModel: version.baseModel,
+      file: (file ?? {}) as Record<string, unknown>,
+      trainedWords: version.trainedWords ?? [],
+      previewImage: previewImageForVersion(version),
+      previewImages: previewImagesForVersion(version),
+    }
+  }
+
+  async function watchAssetDownload(
+    model: CivitaiModel,
+    version: CivitaiModelVersion,
+    file: ReturnType<typeof primaryFileForVersion>,
+    key: string,
+    { closeMenu = true, showNotice = true }: QueueAssetDownloadOptions = {},
+  ) {
+    if (!state.watchDownload) {
+      state.downloadActionError.value = 'This Civitai version is early access and is not covered by the saved account API key.'
+      clearDownloadActionNotice()
+      return false
+    }
+
+    state.queuingDownloadKey.value = key
+    clearDownloadActionError()
+    if (showNotice) {
+      clearDownloadActionNotice()
+    }
+
+    try {
+      const payload = await state.watchDownload(downloadPayloadForVersion(model, version, file))
+      if (closeMenu) {
+        state.openDownloadMenuKey.value = ''
+      }
+      if (showNotice) {
+        state.downloadActionNotice.value = watchedDownloadNotice(payload, file?.name ?? version.name ?? `Version ${version.id}`)
+      }
+      return true
+    } catch (caughtError) {
+      state.downloadActionError.value = caughtError instanceof Error ? caughtError.message : 'Could not watch download.'
+      clearDownloadActionNotice()
+      return false
+    } finally {
+      if (state.queuingDownloadKey.value === key) {
+        state.queuingDownloadKey.value = ''
+      }
+    }
+  }
+
+  async function unwatchAssetDownload(
+    version: CivitaiModelVersion,
+    watchedDownload: WatchedAssetDownloadItem,
+    key: string,
+    { closeMenu = true, showNotice = true }: QueueAssetDownloadOptions = {},
+  ) {
+    if (!state.unwatchDownload) {
+      return false
+    }
+
+    state.queuingDownloadKey.value = key
+    clearDownloadActionError()
+    if (showNotice) {
+      clearDownloadActionNotice()
+    }
+
+    try {
+      await state.unwatchDownload(watchedDownload.id)
+      if (closeMenu) {
+        state.openDownloadMenuKey.value = ''
+      }
+      if (showNotice) {
+        state.downloadActionNotice.value = `Stopped watching ${watchedDownload.fileName || version.name || `Version ${version.id}`}.`
+      }
+      return true
+    } catch (caughtError) {
+      state.downloadActionError.value = caughtError instanceof Error ? caughtError.message : 'Could not stop watching download.'
+      clearDownloadActionNotice()
+      return false
+    } finally {
+      if (state.queuingDownloadKey.value === key) {
+        state.queuingDownloadKey.value = ''
+      }
+    }
+  }
+
   async function queueAssetDownload(
     model: CivitaiModel,
     version: CivitaiModelVersion,
@@ -155,17 +337,34 @@ export function createAssetDownloadActions(state: DownloadActionState) {
   ) {
     const file = primaryFileForVersion(version)
     const key = modelDownloadKey(model, version)
-    if (!file?.downloadUrl || !file.name) {
+    if (!file?.name) {
+      state.downloadActionError.value = 'No model file listed.'
+      clearDownloadActionNotice()
+      return false
+    }
+
+    const watchedDownload = watchedDownloadForVersion(version)
+    if (
+      watchedDownload &&
+      (watchedDownload.state === 'watching' || watchedDownload.state === 'attention') &&
+      state.unwatchDownload
+    ) {
+      return unwatchAssetDownload(version, watchedDownload, key, { closeMenu, showNotice })
+    }
+
+    const unavailableLabel = versionDownloadUnavailableLabel(version)
+    if (unavailableLabel === 'Early access locked') {
+      return watchAssetDownload(model, version, file, key, { closeMenu, showNotice })
+    }
+
+    if (!file.downloadUrl) {
       state.downloadActionError.value = 'No downloadable model file listed.'
       clearDownloadActionNotice()
       return false
     }
 
-    const unavailableLabel = versionDownloadUnavailableLabel(version)
     if (unavailableLabel) {
-      state.downloadActionError.value = unavailableLabel === 'Early access locked'
-        ? 'This Civitai version is early access and is not covered by the saved account API key.'
-        : `This Civitai version is not downloadable: ${unavailableLabel}.`
+      state.downloadActionError.value = `This Civitai version is not downloadable: ${unavailableLabel}.`
       clearDownloadActionNotice()
       return false
     }
@@ -178,26 +377,7 @@ export function createAssetDownloadActions(state: DownloadActionState) {
 
     try {
       const payload = await state.queueDownload({
-        modelId: model.id,
-        modelName: model.name,
-        modelType: model.type,
-        modelNsfw: model.nsfw ?? null,
-        modelMetadata: {
-          id: model.id,
-          name: model.name,
-          type: model.type,
-          nsfw: model.nsfw ?? null,
-          creator: model.creator ?? null,
-          stats: model.stats ?? null,
-          tags: model.tags ?? [],
-        },
-        versionId: version.id,
-        versionName: version.name ?? `Version ${version.id}`,
-        baseModel: version.baseModel,
-        file,
-        trainedWords: version.trainedWords ?? [],
-        previewImage: previewImageForVersion(version),
-        previewImages: previewImagesForVersion(version),
+        ...downloadPayloadForVersion(model, version, file),
         force: downloadForVersion(version)?.state === 'complete',
       })
       if (closeMenu) {
@@ -264,6 +444,8 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     hasDownloadedVersion,
     isModelDownloadQueuing,
     isVersionQueuing,
+    canQueueVersion: canActOnVersionDownload,
+    watchedDownloadForVersion,
     queueAssetDownload,
     queueMissingVersionsForModel,
     queueableMissingVersionsForModel,

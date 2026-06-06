@@ -5,11 +5,22 @@ import type {
   DownloadsResponse,
   DownloadsSummaryResponse,
   QueueDownloadPayload,
+  WatchDownloadPayload,
+  WatchedAssetDownloadItem,
+  WatchedDownloadsResponse,
 } from './assetDownloadTypes'
 
-export type { AssetDownloadItem, AssetDownloadState, QueueDownloadPayload } from './assetDownloadTypes'
+export type {
+  AssetDownloadItem,
+  AssetDownloadState,
+  QueueDownloadPayload,
+  WatchDownloadPayload,
+  WatchedAssetDownloadItem,
+  WatchedAssetDownloadState,
+} from './assetDownloadTypes'
 
 const downloads = ref<AssetDownloadItem[]>([])
+const watchedDownloads = ref<WatchedAssetDownloadItem[]>([])
 const panelDownloads = ref<AssetDownloadItem[]>([])
 const loading = ref(false)
 const error = ref('')
@@ -25,6 +36,7 @@ let subscribers = 0
 let panelSubscribers = 0
 let summarySubscribers = 0
 let refreshRequestId = 0
+let watchedRefreshRequestId = 0
 let panelRefreshRequestId = 0
 let summaryRefreshRequestId = 0
 
@@ -40,6 +52,16 @@ const panelRunningDownloads = computed(() => {
 })
 const panelCompletedDownloads = computed(() => panelDownloads.value.filter((item) => item.state === 'complete'))
 const downloadById = computed(() => new Map(downloads.value.map((item) => [item.id, item])))
+const watchedByVersionId = computed(() => {
+  const map = new Map<number, WatchedAssetDownloadItem[]>()
+  for (const item of watchedDownloads.value) {
+    const items = map.get(item.versionId) ?? []
+    items.push(item)
+    map.set(item.versionId, items)
+  }
+
+  return map
+})
 const downloadByVersionId = computed(() => {
   const map = new Map<number, AssetDownloadItem[]>()
   for (const item of downloads.value) {
@@ -70,6 +92,31 @@ function normalizeDownloadCounts(counts: Partial<DownloadCounts> | null | undefi
   return {
     ...emptyDownloadCounts(),
     ...(counts ?? {}),
+  }
+}
+
+async function refreshWatchedDownloads() {
+  const requestId = ++watchedRefreshRequestId
+
+  try {
+    const response = await fetch('/api/civitai/watched-downloads', {
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+    const payload = (await response.json()) as WatchedDownloadsResponse
+
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.message ?? `Watched downloads returned ${response.status}`)
+    }
+
+    if (requestId === watchedRefreshRequestId) {
+      watchedDownloads.value = Array.isArray(payload.items) ? payload.items : []
+    }
+  } catch {
+    if (requestId === watchedRefreshRequestId) {
+      watchedDownloads.value = []
+    }
   }
 }
 
@@ -305,6 +352,43 @@ async function queueDownload(payload: QueueDownloadPayload) {
   })
 }
 
+async function watchDownload(payload: WatchDownloadPayload) {
+  const response = await fetch('/api/civitai/watched-downloads', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json; charset=utf-8',
+    },
+    body: JSON.stringify(payload),
+  })
+  const responsePayload = await response.json().catch(() => null)
+
+  if (!response.ok || responsePayload?.ok === false) {
+    throw new Error(responsePayload?.message ?? `Watched download request returned ${response.status}`)
+  }
+
+  await refreshWatchedDownloads()
+  void refreshDownloads()
+  return responsePayload
+}
+
+async function unwatchDownload(id: string) {
+  const response = await fetch(`/api/civitai/watched-downloads/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+  const responsePayload = await response.json().catch(() => null)
+
+  if (!response.ok || responsePayload?.ok === false) {
+    throw new Error(responsePayload?.message ?? `Watched download request returned ${response.status}`)
+  }
+
+  await refreshWatchedDownloads()
+  return responsePayload
+}
+
 async function pauseDownload(id: string) {
   return postDownloadAction(`/api/civitai/downloads/${encodeURIComponent(id)}/pause`)
 }
@@ -345,7 +429,7 @@ async function clearPanelDownloads() {
   return postPanelDownloadAction('/api/civitai/downloads/clear')
 }
 
-export function useAssetDownloads(options: { autoStart?: boolean } = {}) {
+export function useAssetDownloads(options: { autoStart?: boolean; includeWatched?: boolean } = {}) {
   let subscribed = false
   const start = () => {
     if (subscribed) {
@@ -353,6 +437,9 @@ export function useAssetDownloads(options: { autoStart?: boolean } = {}) {
     }
 
     subscribeDownloads()
+    if (options.includeWatched) {
+      void refreshWatchedDownloads()
+    }
     subscribed = true
   }
   const stop = () => {
@@ -374,14 +461,19 @@ export function useAssetDownloads(options: { autoStart?: boolean } = {}) {
 
   return {
     downloads,
+    watchedDownloads,
     activeDownloads,
     completedDownloads,
     downloadById,
+    watchedByVersionId,
     downloadByVersionId,
     loading,
     error,
     refreshDownloads,
+    refreshWatchedDownloads,
     queueDownload,
+    watchDownload,
+    unwatchDownload,
     pauseDownload,
     resumeDownload,
     cancelDownload,

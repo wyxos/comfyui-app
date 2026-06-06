@@ -14,6 +14,8 @@ const {
   queuingDownloadKey,
   downloadForVersion,
   downloadStatusLabel,
+  canQueueVersion,
+  versionDownloadButtonLabel,
   queueAssetDownload,
   deleteAssetDownload,
   closeImageModal,
@@ -37,6 +39,8 @@ function assetPreviewDownloadStatusLabel(download: AssetPreviewDownload | null) 
     :queuing-download-key="queuingDownloadKey"
     :download-for-version="downloadForVersion"
     :download-status-label="assetPreviewDownloadStatusLabel"
+    :can-queue-version="canQueueVersion"
+    :version-download-button-label="versionDownloadButtonLabel"
     :queue-asset-download="queueAssetDownload"
     :delete-asset-download="deleteAssetDownload"
     :model-download-key="modelDownloadKey"
