@@ -159,20 +159,17 @@ export function createAssetDownloadActions(state: DownloadActionState) {
   }
 
   function downloadButtonLabel(model: CivitaiModel) {
+    const versions = versionsForModel(model)
     const activeDownload = activeDownloadForModel(model)
     if (activeDownload) {
       return downloadStatusLabel(activeDownload)
     }
 
-    if (versionsForModel(model).length === 1 && !canActOnVersionDownload(versionsForModel(model)[0])) {
-      return versionDownloadButtonLabel(versionsForModel(model)[0])
+    if (versions.length === 1 && versions[0]) {
+      return versionDownloadButtonLabel(versions[0])
     }
 
-    if (versionsForModel(model).length === 1 && hasDownloadedVersion(model)) {
-      return 'Re-download'
-    }
-
-    return versionsForModel(model).length > 1 ? 'Versions' : 'Download'
+    return versions.length > 1 ? 'Versions' : 'Download'
   }
 
   function canQueueMissingVersion(version: CivitaiModelVersion | null | undefined) {

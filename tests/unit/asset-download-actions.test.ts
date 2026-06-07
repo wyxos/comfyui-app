@@ -109,6 +109,13 @@ describe('createAssetDownloadActions', () => {
     }
 
     expect(actions.versionDownloadButtonLabel(lockedVersion)).toBe('Watch')
+    expect(actions.downloadButtonLabel({
+      id: 101,
+      name: 'Locked LoRA',
+      type: 'LORA',
+      nsfw: false,
+      modelVersions: [lockedVersion],
+    })).toBe('Watch')
 
     await actions.queueAssetDownload({
       id: 101,
@@ -129,6 +136,46 @@ describe('createAssetDownloadActions', () => {
     }))
     expect(downloadActionError.value).toBe('')
     expect(downloadActionNotice.value).toBe('Watching locked-v1.safetensors.')
+  })
+
+  it('shows watched early access state on single-version model cards', async () => {
+    const { createAssetDownloadActions } = await import('../../src/views/assets/assetDownloadActions')
+    const lockedVersion = {
+      ...modelVersion(201, 'locked-v1.safetensors'),
+      availability: 'EarlyAccess',
+      covered: false,
+      files: [{
+        id: 301,
+        name: 'locked-v1.safetensors',
+        type: 'Model',
+        primary: true,
+      }],
+    }
+    const actions = createAssetDownloadActions({
+      downloadByVersionId: computed(() => new Map()),
+      downloadActionError: ref(''),
+      downloadActionNotice: ref(''),
+      openDownloadMenuKey: ref(''),
+      queuingDownloadKey: ref(''),
+      queueDownload: vi.fn(),
+      watchDownload: vi.fn(),
+      watchedByVersionId: computed(() => new Map([
+        [201, [{
+          id: '101__201__301',
+          state: 'watching',
+          versionId: 201,
+          fileName: 'locked-v1.safetensors',
+        }]],
+      ])),
+    } as never)
+
+    expect(actions.downloadButtonLabel({
+      id: 101,
+      name: 'Locked LoRA',
+      type: 'LORA',
+      nsfw: false,
+      modelVersions: [lockedVersion],
+    })).toBe('Watching')
   })
 })
 
