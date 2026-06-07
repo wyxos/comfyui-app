@@ -26,6 +26,7 @@ import type {
   CivitaiModelVersion,
   PreviewSlide,
 } from './assetPreviewTypes'
+import { useAssetPreviewArchiveFallback } from './useAssetPreviewArchiveFallback'
 import { useAssetPreviewNavigationEvents } from './useAssetPreviewNavigationEvents'
 
 export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, emitClose: () => void) {
@@ -48,7 +49,10 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
   const normalizedModelId = computed(() => numberProp(props.modelId))
   const normalizedVersionId = computed(() => numberProp(props.versionId))
   const canLookupCivitai = computed(() => !props.model && normalizedModelId.value !== null)
-  const civitaiModel = computed(() => props.model ?? fetchedModel.value)
+  const { archiveModel, archiveStatus, canLookupArchive, fetchLocalArchive, resetArchive } =
+    useAssetPreviewArchiveFallback(props, setInitialVersion)
+  const civitaiModel = computed(() => props.model ?? fetchedModel.value ?? archiveModel.value)
+  const usingLocalArchive = computed(() => Boolean(archiveModel.value && civitaiModel.value === archiveModel.value))
   const modelVersions = computed(() => civitaiModel.value?.modelVersions ?? [])
   const selectedVersion = computed(() => selectedVersionFor(modelVersions, activeVersionId))
   const selectedVersionImages = computed(() => imagesForVersion(selectedVersion.value))
@@ -62,7 +66,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
       url: image.url ?? '',
       image,
       isVideo: isVideoPreview(image),
-      source: 'civitai' as const,
+      source: image.archiveSource === 'local' || image.remoteUrl ? 'archive' as const : 'civitai' as const,
     }))
 
     if (civitaiSlides.length) {
@@ -116,16 +120,19 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     return civitaiModel.value ? civitaiModelWebUrl(civitaiModel.value) : ''
   })
   const shouldRenderModal = computed(() => {
-    return props.open && (props.previewUrl || canLookupCivitai.value || Boolean(civitaiModel.value))
+    return props.open && (props.previewUrl || canLookupCivitai.value || canLookupArchive.value || Boolean(civitaiModel.value))
   })
   const hasDownloadActions = computed(() => props.showDownloadActions === true && Boolean(civitaiModel.value))
 
   async function fetchCivitaiModel() {
     civitaiController?.abort()
     fetchedModel.value = null
+    resetArchive()
     civitaiError.value = ''
 
     if (!canLookupCivitai.value || !props.open) {
+      civitaiLoading.value = canLookupArchive.value && props.open
+      await fetchLocalArchive()
       civitaiLoading.value = false
       return
     }
@@ -162,7 +169,10 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
       fetchedModel.value = nextModel
       setInitialVersion(nextModel)
       if (!nextModel) {
-        civitaiError.value = 'No Civitai model was returned for this local asset.'
+        const loadedArchive = await fetchLocalArchive()
+        if (civitaiController === controller && !loadedArchive) {
+          civitaiError.value = 'No Civitai model was returned for this local asset.'
+        }
       }
     } catch (caughtError) {
       if (caughtError instanceof DOMException && caughtError.name === 'AbortError') {
@@ -170,7 +180,10 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
       }
 
       if (civitaiController === controller) {
-        civitaiError.value = caughtError instanceof Error ? caughtError.message : 'Unable to load Civitai model data.'
+        const loadedArchive = await fetchLocalArchive()
+        if (civitaiController === controller && !loadedArchive) {
+          civitaiError.value = caughtError instanceof Error ? caughtError.message : 'Unable to load Civitai model data.'
+        }
       }
     } finally {
       if (civitaiController === controller) {
@@ -333,16 +346,18 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
   }
 
   watch(
-    () => [props.open, props.model?.id ?? null, normalizedModelId.value, normalizedVersionId.value],
+    () => [props.open, props.model?.id ?? null, normalizedModelId.value, normalizedVersionId.value, props.modelType, props.fileName],
     () => {
       if (props.open) {
         imageDetails.value = {}
         imageDetailsController?.abort()
+        resetArchive()
         imageMetaLoading.value = false
         imageMetaError.value = ''
 
         if (props.model) {
           civitaiController?.abort()
+          resetArchive()
           fetchedModel.value = null
           civitaiError.value = ''
           civitaiLoading.value = false
@@ -355,6 +370,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
       }
 
       civitaiController?.abort()
+      resetArchive()
       imageDetailsController?.abort()
       fetchedModel.value = null
       civitaiError.value = ''
@@ -411,7 +427,12 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
       imageMetaLoading.value = false
       imageMetaError.value = ''
 
-      if (imageId === undefined || imageId === null || imageDetails.value[String(imageId)]) {
+      if (
+        imageId === undefined ||
+        imageId === null ||
+        imageDetails.value[String(imageId)] ||
+        activeSlide.value?.source === 'archive'
+      ) {
         return
       }
 
@@ -424,6 +445,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
 
   onBeforeUnmount(() => {
     civitaiController?.abort()
+    resetArchive()
     imageDetailsController?.abort()
   })
 
@@ -431,6 +453,8 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     civitaiModel,
     civitaiLoading,
     civitaiError,
+    archiveStatus,
+    usingLocalArchive,
     imageMetaLoading,
     imageMetaError,
     activeImageIndex,

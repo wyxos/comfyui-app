@@ -21,6 +21,10 @@ export type CivitaiImage = {
   postId?: number
   username?: string
   modelVersionIds?: number[]
+  remoteUrl?: string | null
+  mediaType?: string | null
+  archiveSource?: string | null
+  mediaStatus?: string | null
 }
 
 export type CivitaiModelFile = {
@@ -90,7 +94,7 @@ export type PreviewSlide = {
   url: string
   image: CivitaiImage | null
   isVideo: boolean
-  source: 'civitai' | 'local'
+  source: 'civitai' | 'archive' | 'local'
 }
 
 export type NormalizedMetaRow = {

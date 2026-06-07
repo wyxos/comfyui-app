@@ -114,7 +114,9 @@ export function isVideoUrl(url: string | null | undefined) {
 }
 
 export function isVideoPreview(image: CivitaiImage | null | undefined) {
-  return (typeof image?.type === 'string' && image.type.toLowerCase().includes('video')) || isVideoUrl(image?.url)
+  return (typeof image?.mediaType === 'string' && image.mediaType.toLowerCase().includes('video')) ||
+    (typeof image?.type === 'string' && image.type.toLowerCase().includes('video')) ||
+    isVideoUrl(image?.url)
 }
 
 export function isImageNsfw(model: CivitaiModel | null, image: CivitaiImage | null | undefined) {

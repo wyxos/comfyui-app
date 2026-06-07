@@ -30,6 +30,7 @@ import {
   handleWatchedDownloadsList,
 } from './handlers/watched-downloads.mjs'
 import { handleGenerationOptions } from './handlers/generation-options.mjs'
+import { handleModelArchive, handleModelArchiveMedia } from './civitai-archive.mjs'
 import {
   handleDeleteCivitaiSettings,
   handleGetAppSettings,
@@ -114,6 +115,14 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
 
   if (url.pathname === '/api/civitai/images' && request.method === 'GET') {
     return handleCivitaiImagesProxy(url, response, request)
+  }
+
+  if (url.pathname === '/api/model-archive' && request.method === 'GET') {
+    return handleModelArchive(url, response)
+  }
+
+  if (url.pathname === '/api/model-archive-media' && request.method === 'GET') {
+    return handleModelArchiveMedia(url, response)
   }
 
   if (url.pathname === '/api/civitai/downloads' && request.method === 'GET') {

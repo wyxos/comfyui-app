@@ -389,7 +389,7 @@ async function handleActiveImageMetadataAction() {
               <div class="rounded-md border border-border bg-background p-3">
                 <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Source</dt>
                 <dd class="mt-1 font-semibold text-card-foreground">
-                  {{ activeSlide?.source === 'civitai' ? 'Civitai API' : 'Local preview file' }}
+                  {{ activeSlide?.source === 'archive' ? 'Offline archive' : activeSlide?.source === 'civitai' ? 'Civitai API' : 'Local preview file' }}
                 </dd>
               </div>
               <div class="rounded-md border border-border bg-background p-3">

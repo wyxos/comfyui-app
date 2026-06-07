@@ -179,10 +179,10 @@ export function serializeDownload(download) {
     serializedDownload.previewImage = serializeDownloadPreview(serializedDownload.previewImage)
   }
   if (Array.isArray(serializedDownload.previewImages)) {
-    serializedDownload.previewImages = serializedDownload.previewImages.map((image) => serializeDownloadPreview(image))
+    serializedDownload.previewImages = []
   }
   if (Array.isArray(serializedDownload.previewPaths)) {
-    serializedDownload.previewPaths = serializedDownload.previewPaths.map((image) => serializeDownloadPreview(image))
+    serializedDownload.previewPaths = serializedDownload.previewPaths.slice(0, 1).map((image) => serializeDownloadPreview(image))
   }
 
   return serializedDownload

@@ -248,6 +248,7 @@ export async function handleRepairDownloadPreviews(response) {
     await refreshCompletedDownloadPreviews(download)
     repaired.push(serializeDownload(download))
   }
+  scheduleDownloadsPersist(true)
 
   return sendJson(response, 200, {
     ok: true,
