@@ -1,9 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { civitaiModelVersionsUrl, configDir, watchedDownloadsPath } from '../config.mjs'
+import { configDir, watchedDownloadsPath } from '../config.mjs'
 import { parseInteger } from '../civitai-query.mjs'
-import { normalizeOptionalBoolean, safeTrim, tryParseJson } from '../shared.mjs'
+import { safeTrim } from '../shared.mjs'
 import {
-  buildCivitaiRequestHeaders,
   buildDownloadId,
   normalizeDownloadFile,
   normalizeDownloadModelMetadata,
@@ -12,8 +11,8 @@ import {
   safeUnlink,
   sanitizeModelFilename,
 } from './metadata.mjs'
-import { enqueueCivitaiDownload } from './queue.mjs'
 import { renameWithRetries } from './state.mjs'
+import { checkWatchedDownloadItem, normalizeModelType, pollIntervalMs } from './watched-checks.mjs'
 
 const watchedDownloads = new Map()
 let watchedDownloadsLoaded = false
@@ -36,32 +35,8 @@ export function resetWatchedDownloadsRuntimeState() {
   stopWatchedDownloadPoller()
 }
 
-function pollIntervalMs() {
-  return Math.max(
-    60_000,
-    Number.parseInt(process.env.CIVITAI_WATCHED_DOWNLOAD_POLL_INTERVAL_MS ?? `${60 * 60 * 1000}`, 10) || 60 * 60 * 1000,
-  )
-}
-
 function nextCheckAfter(now = Date.now()) {
   return now + pollIntervalMs()
-}
-
-function normalizeModelType(value) {
-  const normalized = safeTrim(value).toLowerCase()
-  if (normalized === 'checkpoint') {
-    return 'Checkpoint'
-  }
-
-  if (normalized === 'lora') {
-    return 'LORA'
-  }
-
-  if (normalized === 'controlnet' || normalized === 'control net' || normalized === 'control-net') {
-    return 'ControlNet'
-  }
-
-  return ''
 }
 
 function invalidWatchError(code, message) {
@@ -335,159 +310,6 @@ export async function cancelWatchedCivitaiDownload(id) {
   watchedDownloads.delete(id)
   scheduleWatchedDownloadsPersist(true)
   return item
-}
-
-function normalizedAvailability(value) {
-  return safeTrim(value).toLowerCase()
-}
-
-function isVersionDownloadable(version) {
-  const availability = normalizedAvailability(version?.availability)
-  return !availability || availability === 'public' || (availability === 'earlyaccess' && version?.covered === true)
-}
-
-function modelFileCandidates(version) {
-  return Array.isArray(version?.files) ? version.files.map((file) => normalizeDownloadFile(file)) : []
-}
-
-function chooseModelFile(version, watchedItem) {
-  const files = modelFileCandidates(version)
-  const watchedFileId = watchedItem?.fileId === null || watchedItem?.fileId === undefined
-    ? ''
-    : String(watchedItem.fileId)
-  const watchedFileName = safeTrim(watchedItem?.fileName)
-
-  return files.find((file) => watchedFileId && String(file.id) === watchedFileId)
-    ?? files.find((file) => watchedFileName && file.name === watchedFileName)
-    ?? files.find((file) => file.primary === true && file.type === 'Model')
-    ?? files.find((file) => file.type === 'Model')
-    ?? files.find((file) => file.primary === true)
-    ?? normalizeDownloadFile(watchedItem?.file)
-}
-
-function unavailableReason(version, file) {
-  if (!file?.name) {
-    return 'No primary model file is available yet.'
-  }
-
-  if (!isVersionDownloadable(version)) {
-    return normalizedAvailability(version?.availability) === 'earlyaccess'
-      ? 'Early access locked'
-      : 'Version unavailable'
-  }
-
-  if (!file.downloadUrl) {
-    return 'Download URL not available yet.'
-  }
-
-  return ''
-}
-
-async function fetchCivitaiVersion(versionId) {
-  const upstreamUrl = new URL(`${civitaiModelVersionsUrl.toString().replace(/\/$/, '')}/${versionId}`)
-  const response = await fetch(upstreamUrl, {
-    headers: await buildCivitaiRequestHeaders('application/json'),
-    redirect: 'follow',
-  })
-  const text = await response.text()
-  if (!response.ok) {
-    const error = new Error(`Civitai returned ${response.status}.`)
-    error.statusCode = response.status
-    error.payload = text ? tryParseJson(text) ?? text.slice(0, 1000) : null
-    throw error
-  }
-
-  const payload = tryParseJson(text)
-  if (!payload || typeof payload !== 'object') {
-    throw new Error('Civitai returned an invalid model version response.')
-  }
-
-  return payload
-}
-
-function enqueuePayloadForWatchedVersion(item, version, file) {
-  const model = version?.model && typeof version.model === 'object' ? version.model : null
-  const modelId = parseInteger(model?.id) ?? item.modelId
-  const modelType = normalizeModelType(model?.type) || item.modelType
-  const modelNsfw = normalizeOptionalBoolean(model?.nsfw) ?? item.modelNsfw ?? null
-  const modelName = safeTrim(model?.name) || item.modelName
-  const modelMetadata = normalizeDownloadModelMetadata(model ?? item.modelMetadata, {
-    modelId,
-    modelName,
-    modelType,
-    modelNsfw,
-    creator: item.modelMetadata?.creator,
-    stats: item.modelMetadata?.stats,
-    tags: item.modelMetadata?.tags,
-  })
-
-  return {
-    modelId,
-    modelName,
-    modelType,
-    modelNsfw,
-    modelMetadata,
-    versionId: parseInteger(version?.id) ?? item.versionId,
-    versionName: safeTrim(version?.name) || item.versionName,
-    baseModel: safeTrim(version?.baseModel) || item.baseModel,
-    file,
-    trainedWords: Array.isArray(version?.trainedWords) ? version.trainedWords.filter((word) => typeof word === 'string') : item.trainedWords,
-    previewImage: normalizePreviewImage(version?.images?.[0]) ?? item.previewImage,
-    previewImages: normalizePreviewImages([
-      ...(Array.isArray(version?.images) ? version.images : []),
-      ...(Array.isArray(item.previewImages) ? item.previewImages : []),
-      item.previewImage,
-    ]),
-  }
-}
-
-async function checkWatchedDownloadItem(item, now) {
-  item.lastCheckedAt = now
-  item.updatedAt = now
-  item.lastError = null
-
-  let version
-  try {
-    version = await fetchCivitaiVersion(item.versionId)
-  } catch (error) {
-    item.state = 'watching'
-    item.lastError = error instanceof Error ? error.message : 'Could not refresh Civitai version.'
-    item.lastStatus = 'Waiting for Civitai.'
-    item.nextCheckAt = nextCheckAfter(now)
-    return { item, queued: false }
-  }
-
-  const file = chooseModelFile(version, item)
-  const reason = unavailableReason(version, file)
-  if (reason) {
-    item.state = 'watching'
-    item.lastStatus = reason
-    item.nextCheckAt = nextCheckAfter(now)
-    item.file = file
-    item.fileId = file.id
-    item.fileName = sanitizeModelFilename(file.name) ?? item.fileName
-    return { item, queued: false }
-  }
-
-  try {
-    const download = await enqueueCivitaiDownload(enqueuePayloadForWatchedVersion(item, version, file))
-    item.state = 'queued'
-    item.queuedDownloadId = download.id
-    item.lastStatus = 'Queued after Civitai released the file.'
-    item.nextCheckAt = null
-    item.updatedAt = Date.now()
-    item.file = file
-    item.fileId = file.id
-    item.fileName = sanitizeModelFilename(file.name) ?? item.fileName
-    return { item, queued: true }
-  } catch (error) {
-    item.state = 'attention'
-    item.lastError = error instanceof Error ? error.message : 'Could not queue watched download.'
-    item.lastStatus = 'Queue failed.'
-    item.nextCheckAt = nextCheckAfter(now)
-    item.updatedAt = Date.now()
-    return { item, queued: false }
-  }
 }
 
 export async function checkWatchedDownloads({ force = false } = {}) {

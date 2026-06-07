@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, ref } from 'vue'
 import type {
   AssetDownloadItem,
   DownloadCounts,
@@ -9,6 +9,8 @@ import type {
   WatchedAssetDownloadItem,
   WatchedDownloadsResponse,
 } from './assetDownloadTypes'
+import { emptyDownloadCounts, normalizeDownloadCounts } from './assetDownloadCounts'
+import { useAssetDownloadSubscription } from './useAssetDownloadSubscription'
 
 export type {
   AssetDownloadItem,
@@ -72,28 +74,6 @@ const downloadByVersionId = computed(() => {
 
   return map
 })
-
-function emptyDownloadCounts(): DownloadCounts {
-  return {
-    queued: 0,
-    downloading: 0,
-    paused: 0,
-    complete: 0,
-    error: 0,
-    cancelled: 0,
-    deleted: 0,
-    active: 0,
-    attention: 0,
-    visibleComplete: 0,
-  }
-}
-
-function normalizeDownloadCounts(counts: Partial<DownloadCounts> | null | undefined): DownloadCounts {
-  return {
-    ...emptyDownloadCounts(),
-    ...(counts ?? {}),
-  }
-}
 
 async function refreshWatchedDownloads() {
   const requestId = ++watchedRefreshRequestId
@@ -430,34 +410,14 @@ async function clearPanelDownloads() {
 }
 
 export function useAssetDownloads(options: { autoStart?: boolean; includeWatched?: boolean } = {}) {
-  let subscribed = false
-  const start = () => {
-    if (subscribed) {
-      return
-    }
-
+  const subscription = useAssetDownloadSubscription(() => {
     subscribeDownloads()
     if (options.includeWatched) {
       void refreshWatchedDownloads()
     }
-    subscribed = true
-  }
-  const stop = () => {
-    if (!subscribed) {
-      return
-    }
-
+  }, () => {
     unsubscribeDownloads()
-    subscribed = false
-  }
-
-  if (options.autoStart !== false) {
-    start()
-  }
-
-  onBeforeUnmount(() => {
-    stop()
-  })
+  }, { autoStart: options.autoStart !== false })
 
   return {
     downloads,
@@ -480,32 +440,16 @@ export function useAssetDownloads(options: { autoStart?: boolean; includeWatched
     deleteDownloadedFile,
     redownloadDownload,
     clearDownloads,
-    startPolling: start,
-    stopPolling: stop,
+    startPolling: subscription.start,
+    stopPolling: subscription.stop,
   }
 }
 
 export function useAssetDownloadPanel() {
-  let subscribed = false
-  const start = () => {
-    if (subscribed) {
-      return
-    }
-
+  const subscription = useAssetDownloadSubscription(() => {
     subscribeDownloadPanel()
-    subscribed = true
-  }
-  const stop = () => {
-    if (!subscribed) {
-      return
-    }
-
+  }, () => {
     unsubscribeDownloadPanel()
-    subscribed = false
-  }
-
-  onBeforeUnmount(() => {
-    stop()
   })
 
   return {
@@ -519,20 +463,20 @@ export function useAssetDownloadPanel() {
     resumeDownload: resumePanelDownload,
     cancelDownload: cancelPanelDownload,
     clearDownloads: clearPanelDownloads,
-    startPolling: start,
-    stopPolling: stop,
+    startPolling: subscription.start,
+    stopPolling: subscription.stop,
   }
 }
 
 export function useAssetDownloadSummary() {
-  summarySubscribers += 1
-  if (summarySubscribers === 1) {
-    startSummaryPolling()
-  } else {
-    void refreshDownloadSummary()
-  }
-
-  onBeforeUnmount(() => {
+  useAssetDownloadSubscription(() => {
+    summarySubscribers += 1
+    if (summarySubscribers === 1) {
+      startSummaryPolling()
+    } else {
+      void refreshDownloadSummary()
+    }
+  }, () => {
     summarySubscribers = Math.max(0, summarySubscribers - 1)
     if (summarySubscribers === 0) {
       stopSummaryPolling()
