@@ -10,11 +10,27 @@ type AssetPickerOption = {
   value: string
   previewUrl?: string | null
   previewMediaType?: 'image' | 'video' | string | null
+  family?: string | null
+  baseModel?: string | null
+  baseModelKey?: string | null
+  compatibleBaseModels?: string[] | null
+  compatibleBaseModelKeys?: string[] | null
   modelNsfw?: boolean | number | string | null
   modelMetadata?: {
     nsfw?: boolean | number | string | null
+    family?: string | null
+    baseModel?: string | null
+    baseModelKey?: string | null
+    compatibleBaseModels?: string[] | null
+    compatibleBaseModelKeys?: string[] | null
   } | null
   typeLabel?: string | null
+}
+
+type BaseModelFilterOption = {
+  key: string
+  label: string
+  count: number
 }
 
 const props = withDefaults(
@@ -45,13 +61,14 @@ const emit = defineEmits<{
 const searchInput = ref<HTMLInputElement | null>(null)
 const searchQuery = ref('')
 const includeNsfw = ref(false)
+const selectedBaseModelFilter = ref('')
 const currentPage = ref(1)
 let previousBodyOverflow: string | null = null
 let openLoadToken = 0
 let includeNsfwTouched = false
 
 const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase())
-const filteredOptions = computed(() => {
+const searchAndSafetyFilteredOptions = computed(() => {
   const query = normalizedSearchQuery.value
   return props.options.filter((option) => {
     if (!includeNsfw.value && optionHasNsfw(option)) {
@@ -64,6 +81,38 @@ const filteredOptions = computed(() => {
 
     return option.label.toLowerCase().includes(query) || option.value.toLowerCase().includes(query)
   })
+})
+const baseModelFilterOptions = computed<BaseModelFilterOption[]>(() => {
+  const filters = new Map<string, BaseModelFilterOption>()
+
+  for (const option of searchAndSafetyFilteredOptions.value) {
+    for (const label of optionBaseModelLabels(option)) {
+      const key = normalizeBaseModelFilterKey(label)
+      if (!key) {
+        continue
+      }
+
+      const existing = filters.get(key)
+      if (existing) {
+        existing.count += 1
+        continue
+      }
+
+      filters.set(key, { key, label, count: 1 })
+    }
+  }
+
+  return Array.from(filters.values()).sort((first, second) => first.label.localeCompare(second.label))
+})
+const hasBaseModelFilters = computed(() => baseModelFilterOptions.value.length > 0)
+const filteredOptions = computed(() => {
+  if (!selectedBaseModelFilter.value) {
+    return searchAndSafetyFilteredOptions.value
+  }
+
+  return searchAndSafetyFilteredOptions.value.filter((option) =>
+    optionBaseModelLabels(option).some((label) => normalizeBaseModelFilterKey(label) === selectedBaseModelFilter.value),
+  )
 })
 const pageCount = computed(() => Math.max(1, Math.ceil(filteredOptions.value.length / props.pageSize)))
 const pageStartIndex = computed(() => (currentPage.value - 1) * props.pageSize)
@@ -105,6 +154,55 @@ function isNsfwValue(value: unknown) {
 
 function optionHasNsfw(option: AssetPickerOption) {
   return isNsfwValue(option.modelNsfw ?? option.modelMetadata?.nsfw)
+}
+
+function normalizeBaseModelFilterKey(value: unknown) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+function addBaseModelLabel(labels: Map<string, string>, value: unknown) {
+  const label = String(value ?? '').trim()
+  const key = normalizeBaseModelFilterKey(label)
+  if (key && !labels.has(key)) {
+    labels.set(key, label)
+  }
+}
+
+function optionBaseModelLabels(option: AssetPickerOption) {
+  const labels = new Map<string, string>()
+  const metadata = option.modelMetadata
+
+  addBaseModelLabel(labels, option.baseModel)
+  addBaseModelLabel(labels, metadata?.baseModel)
+
+  for (const baseModel of option.compatibleBaseModels ?? []) {
+    addBaseModelLabel(labels, baseModel)
+  }
+
+  for (const baseModel of metadata?.compatibleBaseModels ?? []) {
+    addBaseModelLabel(labels, baseModel)
+  }
+
+  if (!labels.size) {
+    addBaseModelLabel(labels, option.family)
+    addBaseModelLabel(labels, metadata?.family)
+    addBaseModelLabel(labels, option.baseModelKey)
+    addBaseModelLabel(labels, metadata?.baseModelKey)
+
+    for (const baseModelKey of option.compatibleBaseModelKeys ?? []) {
+      addBaseModelLabel(labels, baseModelKey)
+    }
+
+    for (const baseModelKey of metadata?.compatibleBaseModelKeys ?? []) {
+      addBaseModelLabel(labels, baseModelKey)
+    }
+  }
+
+  return Array.from(labels.values())
 }
 
 function optionTypeLabel(option: AssetPickerOption) {
@@ -155,6 +253,10 @@ function markIncludeNsfwTouched() {
   includeNsfwTouched = true
 }
 
+function applyBaseModelFilter(baseModelKey: string) {
+  selectedBaseModelFilter.value = baseModelKey
+}
+
 async function loadOpenDefaults(token: number) {
   try {
     const settings = await fetchAppSettings()
@@ -168,9 +270,18 @@ async function loadOpenDefaults(token: number) {
   }
 }
 
-watch([normalizedSearchQuery, includeNsfw, () => props.options], () => {
+watch([normalizedSearchQuery, includeNsfw, selectedBaseModelFilter, () => props.options], () => {
   currentPage.value = 1
 })
+
+watch(
+  () => baseModelFilterOptions.value.map((option) => option.key).join('|'),
+  () => {
+    if (!baseModelFilterOptions.value.some((option) => option.key === selectedBaseModelFilter.value)) {
+      selectedBaseModelFilter.value = ''
+    }
+  },
+)
 
 watch(pageCount, (count) => {
   currentPage.value = Math.min(currentPage.value, count)
@@ -184,6 +295,7 @@ watch(
       openLoadToken = token
       searchQuery.value = ''
       includeNsfw.value = false
+      selectedBaseModelFilter.value = ''
       includeNsfwTouched = false
       currentPage.value = 1
       lockBodyScroll()
@@ -268,6 +380,37 @@ onBeforeUnmount(() => {
           />
           NSFW
         </label>
+      </div>
+
+      <div
+        v-if="hasBaseModelFilters"
+        class="mt-2 flex flex-wrap gap-1.5"
+        aria-label="Filter assets by base model"
+      >
+        <button
+          class="inline-flex h-7 items-center gap-1 rounded-sm border px-2 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-ring/25"
+          :class="!selectedBaseModelFilter ? 'border-secondary bg-secondary text-secondary-foreground' : 'border-border bg-background text-muted-foreground hover:border-secondary hover:text-secondary'"
+          type="button"
+          aria-label="Show all base model assets"
+          :aria-pressed="!selectedBaseModelFilter"
+          @click="applyBaseModelFilter('')"
+        >
+          All
+          <span class="text-current/70">{{ searchAndSafetyFilteredOptions.length }}</span>
+        </button>
+        <button
+          v-for="option in baseModelFilterOptions"
+          :key="option.key"
+          class="inline-flex h-7 items-center gap-1 rounded-sm border px-2 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-ring/25"
+          :class="selectedBaseModelFilter === option.key ? 'border-secondary bg-secondary text-secondary-foreground' : 'border-border bg-background text-muted-foreground hover:border-secondary hover:text-secondary'"
+          type="button"
+          :aria-label="`Show ${option.label} assets`"
+          :aria-pressed="selectedBaseModelFilter === option.key"
+          @click="applyBaseModelFilter(option.key)"
+        >
+          {{ option.label }}
+          <span class="text-current/70">{{ option.count }}</span>
+        </button>
       </div>
     </header>
 

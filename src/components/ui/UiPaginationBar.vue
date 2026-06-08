@@ -8,6 +8,7 @@ const props = withDefaults(
     currentPage: number
     pageCount: number
     pageText?: string
+    pageCountExact?: boolean | null
     canGoPrevious?: boolean | null
     canGoNext?: boolean | null
     previousLabel?: string
@@ -17,6 +18,7 @@ const props = withDefaults(
   {
     canGoPrevious: null,
     canGoNext: null,
+    pageCountExact: null,
     pageText: '',
     previousLabel: 'Previous page',
     nextLabel: 'Next page',
@@ -29,12 +31,9 @@ const emit = defineEmits<{
 }>()
 
 const pageDraft = ref(String(props.currentPage))
-const maxPageInput = computed(() => Math.max(
-  1,
-  props.pageCount,
-  props.currentPage,
-  props.canGoNext ? props.currentPage + 1 : 1,
-))
+const hasExactPageCount = computed(() => props.pageCountExact ?? props.canGoNext === null)
+const visiblePageLimit = computed(() => Math.max(1, props.pageCount, props.currentPage))
+const pageLimitLabel = computed(() => hasExactPageCount.value ? String(visiblePageLimit.value) : `${visiblePageLimit.value}+`)
 
 watch(
   () => props.currentPage,
@@ -44,7 +43,8 @@ watch(
 )
 
 function clampPage(page: number) {
-  return Math.min(Math.max(page, 1), maxPageInput.value)
+  const minimumPage = Math.max(page, 1)
+  return hasExactPageCount.value ? Math.min(minimumPage, visiblePageLimit.value) : minimumPage
 }
 
 function goToPage(page: number) {
@@ -90,12 +90,12 @@ function submitPageDraft() {
           type="number"
           inputmode="numeric"
           min="1"
-          :max="maxPageInput"
+          :max="hasExactPageCount ? visiblePageLimit : undefined"
           aria-label="Page number"
           @change="submitPageDraft"
           @keydown.enter.prevent="submitPageDraft"
         >
-        <span class="text-muted-foreground">/ {{ maxPageInput }}</span>
+        <span class="text-muted-foreground">/ {{ pageLimitLabel }}</span>
       </label>
       <button
         class="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-border text-muted-foreground transition hover:border-secondary/60 hover:text-secondary disabled:cursor-not-allowed disabled:opacity-50"

@@ -6,56 +6,30 @@ import {
 } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import AssetPreviewModal from '../components/asset-preview/AssetPreviewModal.vue'
-import { isVideoUrl } from '../components/asset-preview/assetPreviewHelpers'
 import { useAssetPreviewDownloadActions } from '../components/asset-preview/useAssetPreviewDownloadActions'
 import UiPaginatedCardGrid from '../components/ui/UiPaginatedCardGrid.vue'
 import UiPreviewCard from '../components/ui/UiPreviewCard.vue'
 import { fetchAppSettings } from '../composables/useAppSettings'
-import { useAssetDownloads, type AssetDownloadItem } from '../composables/useAssetDownloads'
-import type { ModelCompatibilityMetadata } from './home/homeTypes'
+import { useAssetDownloads } from '../composables/useAssetDownloads'
+import {
+  compatibilityForDownload,
+  controlNetBaseModelLabel,
+  controlNetDisplayName,
+  isCheckpointOrLora,
+  isVideoPreview,
+  modelHasNsfw,
+  modelTypeLabel,
+  normalizedModelType,
+  previewFor,
+  typeFilters,
+  type ControlNetLibraryItem,
+  type ControlNetResponse,
+  type LibraryModelItem,
+  type LibraryTypeFilter,
+} from './library/libraryModelHelpers'
+import { useLibrarySafetyOverrides } from './library/useLibrarySafetyOverrides'
 
 const PAGE_SIZE = 40
-
-const typeFilters = [
-  { label: 'All', value: 'all' },
-  { label: 'Checkpoints', value: 'checkpoint' },
-  { label: 'LoRAs', value: 'lora' },
-  { label: 'ControlNets', value: 'controlnet' },
-] as const
-
-type LibraryTypeFilter = (typeof typeFilters)[number]['value']
-type LibraryItemKind = Exclude<LibraryTypeFilter, 'all'>
-type ControlNetLibraryItem = {
-  id: string
-  itemKind: 'controlnet'
-  modelName: string
-  modelType: 'ControlNet'
-  modelId: number | null
-  versionId: number | null
-  versionName: string
-  baseModel: string
-  fileName: string
-  updatedAt: number
-  previewUrl: null
-  previewPaths: []
-  compatibility: ModelCompatibilityMetadata | null
-  controlType: string
-  loaderType: string
-}
-type LibraryModelItem =
-  | (AssetDownloadItem & { itemKind: 'checkpoint' | 'lora'; compatibility?: ModelCompatibilityMetadata | null })
-  | ControlNetLibraryItem
-type ControlNetResponse = {
-  ok: boolean
-  controlNets?: Array<{
-    name: string
-    displayName?: string
-    compatibility?: ModelCompatibilityMetadata | null
-    controlType?: string
-    loaderType?: string
-  }>
-  message?: string
-}
 
 const {
   completedDownloads,
@@ -69,6 +43,7 @@ const {
   downloadStatusLabel,
   queueAssetDownload,
   deleteAssetDownload,
+  repairDownloadPreviews,
   modelDownloadKey,
 } = useAssetPreviewDownloadActions()
 
@@ -81,6 +56,20 @@ const controlNetModels = ref<ControlNetLibraryItem[]>([])
 const controlNetLoadingError = ref('')
 const savingCompatibility = ref(false)
 const compatibilitySaveError = ref('')
+const {
+  savingSafety,
+  safetyError,
+  savingImageSafety,
+  imageSafetyError,
+  canEditSelectedModelSafety,
+  resetSafetyErrors,
+  saveSelectedModelSafety,
+  saveSelectedModelImageSafety,
+} = useLibrarySafetyOverrides({
+  selectedModel,
+  refreshDownloads,
+  refreshControlNets,
+})
 
 const downloadedModels = computed<LibraryModelItem[]>(() => {
   return completedDownloads.value
@@ -88,7 +77,7 @@ const downloadedModels = computed<LibraryModelItem[]>(() => {
     .map((item) => ({
       ...item,
       itemKind: normalizedModelType(item) as 'checkpoint' | 'lora',
-      compatibility: null,
+      compatibility: compatibilityForDownload(item),
     }))
     .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
 })
@@ -143,7 +132,6 @@ const typeCounts = computed(() => ({
   lora: libraryModels.value.filter((item) => item.itemKind === 'lora').length,
   controlnet: libraryModels.value.filter((item) => item.itemKind === 'controlnet').length,
 }))
-
 watch([query, typeFilter, includeNsfw], () => {
   currentPage.value = 1
 })
@@ -160,80 +148,20 @@ watch(controlNetModels, () => {
   selectedModel.value = controlNetModels.value.find((item) => item.fileName === selectedModel.value?.fileName) ?? selectedModel.value
 })
 
-function normalizedModelType(item: AssetDownloadItem): LibraryItemKind | '' {
-  const normalized = item.modelType.trim().toLowerCase()
-  if (normalized === 'checkpoint') {
-    return 'checkpoint'
-  }
-
-  if (normalized === 'lora') {
-    return 'lora'
-  }
-
-  if (normalized === 'controlnet' || normalized === 'control net') {
-    return 'controlnet'
-  }
-
-  return ''
-}
-
-function isCheckpointOrLora(item: AssetDownloadItem) {
-  return Boolean(normalizedModelType(item))
-}
-
-function modelTypeLabel(item: LibraryModelItem) {
-  if (item.itemKind === 'controlnet') {
-    return 'ControlNet'
-  }
-
-  return item.itemKind === 'lora' ? 'LoRA' : 'Checkpoint'
-}
-
-function primaryPreviewPath(item: LibraryModelItem) {
-  return item.previewPaths?.find((preview) => preview.url) ?? null
-}
-
-function previewFor(item: LibraryModelItem) {
-  return item.previewUrl ?? primaryPreviewPath(item)?.url ?? ''
-}
-
-function isVideoPreview(item: LibraryModelItem) {
-  const previewUrl = previewFor(item)
-  return primaryPreviewPath(item)?.mediaType === 'video' || isVideoUrl(previewUrl)
-}
-
-function isNsfwValue(value: unknown) {
-  if (typeof value === 'boolean') {
-    return value
-  }
-
-  if (typeof value === 'number') {
-    return value > 0
-  }
-
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase()
-    return Boolean(normalized && !['false', '0', 'no', 'none', 'safe'].includes(normalized))
-  }
-
-  return false
-}
-
-function modelHasNsfw(item: LibraryModelItem) {
-  return 'modelNsfw' in item ? isNsfwValue(item.modelNsfw ?? item.modelMetadata?.nsfw) : false
-}
-
 function goToPage(page: number) {
   currentPage.value = Math.max(1, Math.min(page, pageCount.value))
 }
 
 function openModelPreview(item: LibraryModelItem) {
   compatibilitySaveError.value = ''
+  resetSafetyErrors()
   selectedModel.value = item
 }
 
 function closeModelPreview() {
   selectedModel.value = null
+  compatibilitySaveError.value = ''
+  resetSafetyErrors()
 }
 
 async function loadAppSettingsDefaults() {
@@ -242,15 +170,6 @@ async function loadAppSettingsDefaults() {
   } catch {
     includeNsfw.value = false
   }
-}
-
-function controlNetBaseModelLabel(compatibility: ModelCompatibilityMetadata | null | undefined) {
-  const bases = compatibility?.compatibleBaseModels ?? []
-  return bases.length ? bases.join(', ') : compatibility?.baseModel ?? ''
-}
-
-function controlNetDisplayName(controlNet: NonNullable<ControlNetResponse['controlNets']>[number]) {
-  return controlNet.displayName ?? controlNet.name
 }
 
 async function refreshControlNets() {
@@ -487,14 +406,22 @@ onMounted(() => {
       :download-status-label="downloadStatusLabel"
       :queue-asset-download="queueAssetDownload"
       :delete-asset-download="deleteAssetDownload"
+      :repair-download-previews="repairDownloadPreviews"
       :model-download-key="modelDownloadKey"
       :compatibility="selectedModel?.compatibility ?? null"
       :editable-compatibility="selectedModel?.itemKind === 'controlnet'"
+      :editable-safety="canEditSelectedModelSafety"
       :saving-compatibility="savingCompatibility"
+      :saving-safety="savingSafety"
+      :saving-image-safety="savingImageSafety"
       :compatibility-error="compatibilitySaveError"
+      :safety-error="safetyError"
+      :image-safety-error="imageSafetyError"
       show-download-actions
       @close="closeModelPreview"
       @save-compatibility="saveControlNetCompatibility"
+      @save-safety="saveSelectedModelSafety"
+      @save-image-safety="saveSelectedModelImageSafety"
     />
   </main>
 </template>

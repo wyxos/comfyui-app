@@ -74,6 +74,7 @@ function mountCheckpointCard(contextOverrides: Record<string, unknown> = {}) {
     },
     applyGenerationMetadataFromSource: vi.fn(),
     saveModelSafetyOverride: vi.fn(),
+    loadingCheckpoints: ref(false),
     ...contextOverrides,
   }
   const Wrapper = defineComponent({
@@ -150,5 +151,17 @@ describe('Home checkpoint card', () => {
 
     expect(wrapper.text()).not.toContain('Enabled')
     expect(wrapper.text()).not.toContain('Downloaded')
+  })
+
+  it('keeps the checkpoint thumbnail slot occupied while checkpoint metadata loads', () => {
+    const { wrapper } = mountCheckpointCard({
+      loadingCheckpoints: ref(true),
+    })
+
+    const placeholder = wrapper.get('[aria-label="Loading waiIllustriousSDXL_v160.safetensors preview"]')
+
+    expect(placeholder.attributes('role')).toBe('status')
+    expect(placeholder.classes()).toContain('h-14')
+    expect(placeholder.classes()).toContain('w-14')
   })
 })

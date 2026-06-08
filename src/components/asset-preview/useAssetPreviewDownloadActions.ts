@@ -16,6 +16,7 @@ export function useAssetPreviewDownloadActions(options: { autoStart?: boolean } 
     downloadByVersionId,
     queueDownload,
     deleteDownloadedFile,
+    repairDownloadPreviews: postRepairDownloadPreviews,
     startPolling,
     stopPolling,
   } = useAssetDownloads(options)
@@ -131,6 +132,20 @@ export function useAssetPreviewDownloadActions(options: { autoStart?: boolean } 
     }
   }
 
+  async function repairDownloadPreviews(download: AssetPreviewDownload) {
+    if (!download.id) {
+      downloadActionError.value = 'No download record was found for this file.'
+      return
+    }
+
+    downloadActionError.value = ''
+    try {
+      await postRepairDownloadPreviews(download.id)
+    } catch (caughtError) {
+      downloadActionError.value = caughtError instanceof Error ? caughtError.message : 'Could not backfill previews.'
+    }
+  }
+
   return {
     queuingDownloadKey,
     downloadActionError,
@@ -138,6 +153,7 @@ export function useAssetPreviewDownloadActions(options: { autoStart?: boolean } 
     downloadStatusLabel,
     queueAssetDownload,
     deleteAssetDownload,
+    repairDownloadPreviews,
     modelDownloadKey,
     startPolling,
     stopPolling,

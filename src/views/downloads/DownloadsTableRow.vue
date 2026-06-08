@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   Check,
+  ExternalLink,
   FileDown,
   LoaderCircle,
   Pause,
@@ -152,6 +153,20 @@ function canDeleteFile(item: AssetDownloadItem) {
 
 function canRedownload(item: AssetDownloadItem) {
   return item.state !== 'downloading' && item.state !== 'queued'
+}
+
+function civitaiModelUrl(item: AssetDownloadItem) {
+  if (!item.modelId) {
+    return ''
+  }
+
+  const params = new URLSearchParams()
+  if (item.versionId) {
+    params.set('modelVersionId', String(item.versionId))
+  }
+
+  const query = params.toString()
+  return `https://civitai.com/models/${item.modelId}${query ? `?${query}` : ''}`
 }
 
 function isBusy(action: DownloadAction) {
@@ -313,6 +328,18 @@ function isBusy(action: DownloadAction) {
             class="h-4 w-4"
           />
         </button>
+
+        <a
+          v-if="civitaiModelUrl(item)"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-border text-muted-foreground transition hover:border-secondary/60 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25"
+          :href="civitaiModelUrl(item)"
+          target="_blank"
+          rel="noopener noreferrer"
+          :aria-label="`Open ${item.modelName} on Civitai`"
+          :title="`Open ${item.fileName} on Civitai`"
+        >
+          <ExternalLink class="h-4 w-4" />
+        </a>
 
         <button
           v-if="canRedownload(item)"

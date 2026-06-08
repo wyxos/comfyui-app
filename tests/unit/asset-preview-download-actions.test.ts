@@ -99,4 +99,28 @@ describe('useAssetPreviewDownloadActions', () => {
     wrapper.unmount()
     confirmSpy.mockRestore()
   })
+
+  it('posts a single-download preview repair action', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true, items: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { useAssetPreviewDownloadActions } = await import('../../src/components/asset-preview/useAssetPreviewDownloadActions')
+    let actions: ReturnType<typeof useAssetPreviewDownloadActions> | null = null
+    const Consumer = defineComponent({
+      setup() {
+        actions = useAssetPreviewDownloadActions({ autoStart: false })
+        return () => h('div')
+      },
+    })
+
+    const wrapper = mount(Consumer)
+    await actions?.repairDownloadPreviews({ id: 'download-1', state: 'complete', fileName: 'model.safetensors' })
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/civitai/downloads/download-1/repair-previews', expect.objectContaining({
+      method: 'POST',
+    }))
+
+    wrapper.unmount()
+  })
 })

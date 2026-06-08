@@ -1,11 +1,40 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { computed, defineComponent, h, ref } from 'vue'
+import { describe, expect, it, vi } from 'vitest'
 
+import HomePromptTab from '../../src/views/home/HomePromptTab.vue'
+import { PROMPT_SECTION_DEFINITIONS } from '../../src/views/home/homeConstants'
 import { createHomePromptModeActions } from '../../src/views/home/homePromptModeActions'
 import { createHomePromptTagActions } from '../../src/views/home/homePromptTagActions'
 import { createHomeSelectionComputed } from '../../src/views/home/homeSelectionComputed'
 import { createHomeState } from '../../src/views/home/homeState'
+import { provideHomeView } from '../../src/views/home/homeViewContext'
+
+function mountPromptTab() {
+  const state = createHomeState()
+  const promptActions = createHomePromptTagActions(state)
+  const context = {
+    ...state,
+    formTab: ref('prompt'),
+    promptSectionDefinitions: PROMPT_SECTION_DEFINITIONS,
+    compiledPrompt: computed(() => ''),
+    compiledNegativePrompt: computed(() => ''),
+    setPromptMode: vi.fn(),
+    handlePromptWeightKeydown: vi.fn(),
+    ...promptActions,
+  }
+  const Wrapper = defineComponent({
+    setup() {
+      provideHomeView(context as never)
+
+      return () => h(HomePromptTab)
+    },
+  })
+
+  return mount(Wrapper)
+}
 
 describe('home prompt tags', () => {
   it('splits prompt section drafts into tags as soon as a delimiter appears', () => {
@@ -213,6 +242,23 @@ describe('home prompt tags', () => {
     expect(actions.buildPromptFromSections(state.promptSections.value)).toBe('blue hair, (red eyes:1.2)')
   })
 
+  it('separates non-empty prompt sections with regional prompter BREAK markers', () => {
+    const state = createHomeState()
+    const actions = createHomePromptTagActions(state)
+
+    state.promptSections.value.subject = [
+      { text: 'blue hair', strength: '1' },
+      { text: 'red eyes', strength: '1.2' },
+    ]
+    state.promptSections.value.details = [{ text: 'disabled detail', strength: '1', enabled: false }]
+    state.promptSectionDrafts.value.environment = 'rainy neon greenhouse'
+    state.promptSections.value.quality = [{ text: 'sharp focus', strength: '1' }]
+
+    expect(actions.buildPromptFromSections(state.promptSections.value, state.promptSectionDrafts.value)).toBe(
+      'blue hair, (red eyes:1.2) BREAK rainy neon greenhouse BREAK sharp focus',
+    )
+  })
+
   it('does not move or rename tags into duplicates', () => {
     const state = createHomeState()
     const actions = createHomePromptTagActions(state)
@@ -280,5 +326,14 @@ describe('home prompt tags', () => {
     expect(state.promptSections.value.subject).toEqual([])
     expect(state.promptSections.value.others.map((tag) => tag.text)).toEqual(['edited prompt', 'rooftop sign'])
     expect(state.negativePromptTags.value.map((tag) => tag.text)).toEqual(['lowres', 'bad hands'])
+  })
+
+  it('uses paler placeholder text on prompt tag inputs', () => {
+    const wrapper = mountPromptTab()
+    const subjectInput = wrapper.get('input[aria-label="Subject"]')
+    const negativePromptInput = wrapper.get('input[aria-label="Negative prompt"]')
+
+    expect(subjectInput.classes()).toContain('placeholder:text-muted-foreground/75')
+    expect(negativePromptInput.classes()).toContain('placeholder:text-muted-foreground/75')
   })
 })

@@ -156,6 +156,10 @@ function mergeCompatibilityMetadata(primary, fallback) {
     modelType: safeTrim(primary?.modelType) || safeTrim(fallback?.modelType) || null,
     modelNsfw: primary?.modelNsfwOverride ?? primary?.modelNsfw ?? fallback?.modelNsfwOverride ?? fallback?.modelNsfw ?? null,
     modelNsfwOverride: primary?.modelNsfwOverride ?? fallback?.modelNsfwOverride ?? null,
+    imageSafetyOverrides: {
+      ...(fallback?.imageSafetyOverrides ?? {}),
+      ...(primary?.imageSafetyOverrides ?? {}),
+    },
     baseModel,
     baseModelKey,
     trainedWords: mergeStringList(primary?.trainedWords, fallback?.trainedWords),

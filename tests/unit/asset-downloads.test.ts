@@ -398,6 +398,10 @@ describe('DownloadsView', () => {
     expect(wrapper.text()).toContain('Deleted lora')
     expect(wrapper.text()).not.toContain('Ignored embedding')
     expect(wrapper.get('img[alt="Complete checkpoint preview"]').classes()).toContain('blur-sm')
+    const civitaiLink = wrapper.get('a[aria-label="Open Complete checkpoint on Civitai"]')
+    expect(civitaiLink.attributes('href')).toBe('https://civitai.com/models/1?modelVersionId=2')
+    expect(civitaiLink.attributes('target')).toBe('_blank')
+    expect(civitaiLink.attributes('rel')).toContain('noreferrer')
 
     await wrapper.get('[aria-label="Redownload Complete checkpoint"]').trigger('click')
     await wrapper.get('[aria-label="Delete Complete checkpoint from disk"]').trigger('click')
@@ -483,12 +487,9 @@ describe('LibraryView', () => {
     expect(refreshDownloads).toHaveBeenCalled()
 
     await wrapper.get('[aria-label="Next library page"]').trigger('click')
-
     expect(wrapper.text()).toContain('41-45 of 45')
     expect(wrapper.text()).toContain('Library model 41')
-
     await wrapper.get('[aria-label="Include NSFW library models"]').setValue(true)
-
     expect(wrapper.text()).toContain('1-40 of 46')
     await wrapper.get('[aria-label="Next library page"]').trigger('click')
     expect(wrapper.text()).toContain('41-46 of 46')

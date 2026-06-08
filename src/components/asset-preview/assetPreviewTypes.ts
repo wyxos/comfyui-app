@@ -89,6 +89,11 @@ export type AssetPreviewDownload = {
   fileName?: string | null
 }
 
+export type ImageSafetyOverride = {
+  imageNsfw?: boolean | null
+  imageNsfwOverride?: boolean | null
+}
+
 export type PreviewSlide = {
   key: string
   url: string
@@ -121,6 +126,7 @@ export type AssetPreviewModalProps = {
     compatibleBaseModels?: string[]
     modelNsfw?: boolean | null
     modelNsfwOverride?: boolean | null
+    imageSafetyOverrides?: Record<string, ImageSafetyOverride>
     controlType?: string
     loaderType?: string
     status?: string
@@ -129,8 +135,10 @@ export type AssetPreviewModalProps = {
   editableSafety?: boolean
   savingCompatibility?: boolean
   savingSafety?: boolean
+  savingImageSafety?: boolean
   compatibilityError?: string
   safetyError?: string
+  imageSafetyError?: string
   showDownloadActions?: boolean
   queuingDownloadKey?: string
   downloadForVersion?: (version: CivitaiModelVersion | null | undefined) => AssetPreviewDownload | null
@@ -139,6 +147,7 @@ export type AssetPreviewModalProps = {
   versionDownloadButtonLabel?: (version: CivitaiModelVersion) => string
   queueAssetDownload?: (model: CivitaiModel, version: CivitaiModelVersion) => void | Promise<unknown>
   deleteAssetDownload?: (download: AssetPreviewDownload, version: CivitaiModelVersion) => void | Promise<void>
+  repairDownloadPreviews?: (download: AssetPreviewDownload) => void | Promise<void>
   modelDownloadKey?: (model: CivitaiModel, version: CivitaiModelVersion) => string
   applyGenerationMetadata?: (metadata: Record<string, unknown>) => void | Promise<void>
 }

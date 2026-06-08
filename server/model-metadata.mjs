@@ -3,6 +3,12 @@ import { createReadStream } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { configDir } from './config.mjs'
+import {
+  normalizeBaseModelList,
+  normalizeHashes,
+  normalizeImageSafetyOverrides,
+  normalizeStringList,
+} from './model-metadata-normalizers.mjs'
 import { resolveModelPath } from './model-paths.mjs'
 import { readJsonFileIfExists } from './model-trigger-words.mjs'
 import { normalizeOptionalBoolean, safeTrim } from './shared.mjs'
@@ -16,61 +22,6 @@ function normalizeInteger(value) {
 
   const parsed = Number.parseInt(safeTrim(value), 10)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
-}
-
-function normalizeStringList(value) {
-  const values = Array.isArray(value)
-    ? value.flatMap((entry) => (Array.isArray(entry) ? entry : [entry]))
-    : typeof value === 'string'
-      ? value.split(/[\r\n,|]+/g)
-      : []
-  const seen = new Set()
-  const normalized = []
-
-  for (const entry of values) {
-    const text = safeTrim(entry)
-    const key = text.toLowerCase()
-    if (!text || seen.has(key)) {
-      continue
-    }
-
-    seen.add(key)
-    normalized.push(text)
-  }
-
-  return normalized
-}
-
-function normalizeHashes(...values) {
-  const hashes = {}
-
-  for (const value of values) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      continue
-    }
-
-    for (const [algorithm, hash] of Object.entries(value)) {
-      const normalizedAlgorithm = safeTrim(algorithm).toUpperCase()
-      const normalizedHash = safeTrim(hash)
-      if (normalizedAlgorithm && normalizedHash) {
-        hashes[normalizedAlgorithm] = normalizedHash
-      }
-    }
-  }
-
-  return hashes
-}
-
-function normalizeBaseModelList(...values) {
-  return normalizeStringList(values.flatMap((value) => {
-    if (Array.isArray(value)) {
-      return value
-    }
-    if (typeof value === 'string') {
-      return value.split(/[\r\n,|]+/g)
-    }
-    return []
-  }))
 }
 
 export function normalizeBaseModelKey(value) {
@@ -172,6 +123,7 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
       modelType: normalizeModelType(null, options.modelType),
       modelNsfw: null,
       modelNsfwOverride: null,
+      imageSafetyOverrides: {},
       baseModel: '',
       baseModelKey: '',
       trainedWords: [],
@@ -192,6 +144,9 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
   const baseModel = safeTrim(payload.baseModel ?? version.baseModel ?? payload.metadata?.baseModel)
   const modelNsfw = normalizeOptionalBoolean(payload.modelNsfw ?? payload.nsfw ?? model.nsfw ?? payload.modelMetadata?.nsfw)
   const modelNsfwOverride = normalizeOptionalBoolean(payload.modelNsfwOverride ?? payload.localModelNsfw ?? payload.metadata?.modelNsfwOverride) ?? (payload.source === 'manual' && modelNsfw !== null ? modelNsfw : null)
+  const imageSafetyOverrides = normalizeImageSafetyOverrides(
+    payload.imageSafetyOverrides ?? payload.metadata?.imageSafetyOverrides,
+  )
   const trainedWords = normalizeStringList([
     ...normalizeStringList(payload.trainedWords),
     ...normalizeStringList(version.trainedWords),
@@ -220,6 +175,7 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
     modelType: normalizeModelType(payload.modelType ?? model.type ?? payload.type, options.modelType),
     modelNsfw,
     modelNsfwOverride,
+    imageSafetyOverrides,
     baseModel,
     baseModelKey: normalizeBaseModelKey(baseModel),
     trainedWords,
@@ -336,9 +292,17 @@ export async function writeManualModelCompatibilityMetadata({ rootPath, modelNam
     throw error
   }
 
+  const sidecarPath = `${modelPath}.companion.info`
+  const existingPayload = await readJsonFileIfExists(sidecarPath) ?? {}
+  const normalizedPayload = payload && typeof payload === 'object' ? payload : {}
   const normalized = normalizeModelCompatibilityMetadata(
     {
-      ...(payload && typeof payload === 'object' ? payload : {}),
+      ...existingPayload,
+      ...normalizedPayload,
+      imageSafetyOverrides: {
+        ...normalizeImageSafetyOverrides(existingPayload.imageSafetyOverrides),
+        ...normalizeImageSafetyOverrides(normalizedPayload.imageSafetyOverrides ?? normalizedPayload.metadata?.imageSafetyOverrides),
+      },
       modelName,
       modelType,
       source: 'manual',
@@ -350,7 +314,6 @@ export async function writeManualModelCompatibilityMetadata({ rootPath, modelNam
       status: 'ready',
     },
   )
-  const sidecarPath = `${modelPath}.companion.info`
   await writeFile(sidecarPath, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8')
   return {
     path: sidecarPath,

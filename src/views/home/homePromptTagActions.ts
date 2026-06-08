@@ -32,13 +32,17 @@ function buildPromptFromSections(
   sections: PromptSectionsState,
   drafts: Partial<Record<PromptSectionId, string>> = {},
 ) {
-  return PROMPT_SECTION_DEFINITIONS.flatMap((section) => [
-    ...(sections[section.id] ?? []),
-    ...splitPromptDraft(drafts[section.id] ?? ''),
-  ])
-    .map(formatCompiledPromptTag)
+  return PROMPT_SECTION_DEFINITIONS.map((section) =>
+    [
+      ...(sections[section.id] ?? []),
+      ...splitPromptDraft(drafts[section.id] ?? ''),
+    ]
+      .map(formatCompiledPromptTag)
+      .filter(Boolean)
+      .join(', '),
+  )
     .filter(Boolean)
-    .join(', ')
+    .join(' BREAK ')
 }
 
 function buildNegativePromptFromTags(includeDraft = false) {

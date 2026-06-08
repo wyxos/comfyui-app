@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { ChevronDown, X } from 'lucide-vue-next'
+import { ChevronDown, LoaderCircle, X } from 'lucide-vue-next'
 import AssetPreviewModal from '../../components/asset-preview/AssetPreviewModal.vue'
 import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
@@ -20,6 +20,8 @@ const {
   assetPreviewDownloadActions,
   applyGenerationMetadataFromSource,
   saveModelSafetyOverride,
+  saveModelImageSafetyOverride,
+  loadingCheckpoints,
 } = useProvidedHomeView()
 const {
   queuingDownloadKey,
@@ -27,6 +29,7 @@ const {
   downloadStatusLabel,
   queueAssetDownload,
   deleteAssetDownload,
+  repairDownloadPreviews,
   modelDownloadKey,
   startPolling,
   stopPolling,
@@ -36,6 +39,8 @@ const isCheckpointPreviewOpen = ref(false)
 const isAssetsExpanded = ref(true)
 const savingSafety = ref(false)
 const safetyError = ref('')
+const savingImageSafety = ref(false)
+const imageSafetyError = ref('')
 const loraCount = computed(() => props.checkpoint.loras.length)
 const controlNetCount = computed(() => props.checkpoint.controlNets?.length ?? 0)
 const checkpointPreviewIsVideo = computed(() =>
@@ -58,6 +63,7 @@ function assetCountLabel(count: number, singular: string) {
 function openCheckpointPreview() {
   if (canOpenCheckpointPreview.value) {
     safetyError.value = ''
+    imageSafetyError.value = ''
     isCheckpointPreviewOpen.value = true
   }
 }
@@ -79,6 +85,27 @@ async function saveCheckpointSafety(payload: { modelNsfwOverride: boolean | null
     safetyError.value = error instanceof Error ? error.message : 'Could not save safety override.'
   } finally {
     savingSafety.value = false
+  }
+}
+
+async function saveCheckpointImageSafety(payload: { imageKey: string; imageNsfwOverride: boolean | null }) {
+  if (savingImageSafety.value) {
+    return
+  }
+
+  savingImageSafety.value = true
+  imageSafetyError.value = ''
+  try {
+    await saveModelImageSafetyOverride({
+      modelName: props.checkpoint.name,
+      modelType: 'checkpoint',
+      imageKey: payload.imageKey,
+      imageNsfwOverride: payload.imageNsfwOverride,
+    })
+  } catch (error) {
+    imageSafetyError.value = error instanceof Error ? error.message : 'Could not save image safety override.'
+  } finally {
+    savingImageSafety.value = false
   }
 }
 
@@ -132,6 +159,14 @@ onBeforeUnmount(() => {
           :loading="checkpointPreviewIsVideo ? undefined : 'lazy'"
         />
       </button>
+      <div
+        v-else-if="loadingCheckpoints"
+        role="status"
+        :aria-label="`Loading ${checkpoint.name} preview`"
+        class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-primary-foreground/12 bg-primary-foreground/6 text-primary-foreground/64"
+      >
+        <LoaderCircle class="h-4 w-4 animate-spin text-secondary" />
+      </div>
 
       <div class="min-w-0 flex-1">
         <button
@@ -234,12 +269,15 @@ onBeforeUnmount(() => {
       :compatibility="checkpoint.compatibility"
       :editable-safety="true"
       :saving-safety="savingSafety"
+      :saving-image-safety="savingImageSafety"
       :safety-error="safetyError"
+      :image-safety-error="imageSafetyError"
       :queuing-download-key="queuingDownloadKey"
       :download-for-version="downloadForVersion"
       :download-status-label="downloadStatusLabel"
       :queue-asset-download="queueAssetDownload"
       :delete-asset-download="deleteAssetDownload"
+      :repair-download-previews="repairDownloadPreviews"
       :model-download-key="modelDownloadKey"
       :apply-generation-metadata="applyGenerationMetadataFromSource"
       model-type="Checkpoint"
@@ -247,6 +285,7 @@ onBeforeUnmount(() => {
       show-download-actions
       @close="isCheckpointPreviewOpen = false"
       @save-safety="saveCheckpointSafety"
+      @save-image-safety="saveCheckpointImageSafety"
     />
   </div>
 </template>

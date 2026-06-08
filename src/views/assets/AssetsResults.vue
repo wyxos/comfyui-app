@@ -19,6 +19,7 @@ const {
   canGoPrevious,
   canGoNext,
   pageCount,
+  pageCountExact,
   pageLabel,
   goToPage,
 } = useProvidedAssetsView()
@@ -90,6 +91,7 @@ const {
       :range-label="resultSummary || pageLabel"
       :current-page="currentPage"
       :page-count="pageCount"
+      :page-count-exact="pageCountExact"
       :page-text="pageLabel || `Page ${currentPage}`"
       :can-go-previous="canGoPrevious"
       :can-go-next="canGoNext"

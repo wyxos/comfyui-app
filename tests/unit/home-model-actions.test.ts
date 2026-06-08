@@ -51,7 +51,7 @@ function createActionsHarness() {
     },
   ]
 
-  return { modelActions, state }
+  return { modelActions, selection, state }
 }
 
 describe('home model actions', () => {
@@ -114,5 +114,17 @@ describe('home model actions', () => {
 
     expect(state.selectedCheckpoints.value[0].loras).toEqual([])
     expect(state.selectedCheckpoints.value[1].loras).toEqual([])
+  })
+
+  it('keeps LoRA base-model metadata on picker options for modal filtering', () => {
+    const { modelActions, selection } = createActionsHarness()
+    modelActions.addSelectedCheckpoint('illustrious-a.safetensors')
+
+    const [option] = modelActions.getCheckpointLoraOptions(selection.selectedCheckpointEntries.value[0])
+
+    expect(option.modelMetadata).toMatchObject({
+      baseModel: 'Illustrious',
+      baseModelKey: 'illustrious',
+    })
   })
 })

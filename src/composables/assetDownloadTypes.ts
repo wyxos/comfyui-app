@@ -8,11 +8,21 @@ export type AssetDownloadItem = {
   modelName: string
   modelType: string
   modelNsfw?: boolean | null
+  modelNsfwOverride?: boolean | null
+  imageSafetyOverrides?: Record<string, {
+    imageNsfw?: boolean | null
+    imageNsfwOverride?: boolean | null
+  }>
   modelMetadata?: {
     id?: number | null
     name?: string | null
     type?: string | null
     nsfw?: boolean | null
+    modelNsfwOverride?: boolean | null
+    imageSafetyOverrides?: Record<string, {
+      imageNsfw?: boolean | null
+      imageNsfwOverride?: boolean | null
+    }>
     creator?: { username?: string | null } | null
     stats?: Record<string, unknown> | null
     tags?: string[]

@@ -13,6 +13,7 @@ const props = withDefaults(
     currentPage: number
     pageCount: number
     pageText?: string
+    pageCountExact?: boolean | null
     canGoPrevious?: boolean | null
     canGoNext?: boolean | null
     previousLabel?: string
@@ -25,6 +26,7 @@ const props = withDefaults(
   {
     canGoPrevious: null,
     canGoNext: null,
+    pageCountExact: null,
     pageText: '',
     previousLabel: 'Previous page',
     nextLabel: 'Next page',
@@ -156,6 +158,7 @@ onBeforeUnmount(() => {
     :current-page="currentPage"
     :page-count="pageCount"
     :page-text="pageText"
+    :page-count-exact="pageCountExact"
     :can-go-previous="canGoPrevious"
     :can-go-next="canGoNext"
     :previous-label="previousLabel"

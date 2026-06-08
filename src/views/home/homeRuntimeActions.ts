@@ -371,6 +371,39 @@ async function saveModelSafetyOverride({
   await loadLoras()
 }
 
+async function saveModelImageSafetyOverride({
+  modelName,
+  modelType,
+  imageKey,
+  imageNsfwOverride,
+}: {
+  modelName: string
+  modelType: 'checkpoint' | 'lora'
+  imageKey: string
+  imageNsfwOverride: boolean | null
+}) {
+  await apiJson(`/api/model-metadata?type=${encodeURIComponent(modelType)}&name=${encodeURIComponent(modelName)}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      metadata: {
+        imageSafetyOverrides: {
+          [imageKey]: {
+            imageNsfw: imageNsfwOverride,
+            imageNsfwOverride,
+          },
+        },
+      },
+    }),
+  })
+
+  if (modelType === 'checkpoint') {
+    await loadCheckpoints()
+    return
+  }
+
+  await loadLoras()
+}
+
 async function loadControlNets() {
   loadingControlNets.value = true
   controlNetLoadingError.value = ''
@@ -439,6 +472,7 @@ return {
   loadCheckpoints,
   loadLoras,
   saveModelSafetyOverride,
+  saveModelImageSafetyOverride,
   loadControlNets,
   loadGenerationOptions,
 }

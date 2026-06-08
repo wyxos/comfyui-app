@@ -247,7 +247,7 @@ const {
                     <input
                       v-model="promptSectionDrafts[section.id]"
                       :aria-label="section.label"
-                      class="min-h-7 min-w-[9rem] flex-1 bg-transparent text-sm text-card-foreground outline-none placeholder:text-muted-foreground"
+                      class="min-h-7 min-w-[9rem] flex-1 bg-transparent text-sm text-card-foreground outline-none placeholder:text-muted-foreground/75"
                       :placeholder="section.placeholder"
                       @input="handlePromptSectionTagInput(section.id)"
                       @keydown="handlePromptSectionTagKeydown($event, section.id)"
@@ -365,7 +365,7 @@ const {
                 <input
                   v-model="negativePromptDraft"
                   aria-label="Negative prompt"
-                  class="min-h-7 min-w-[9rem] flex-1 bg-transparent text-sm text-card-foreground outline-none placeholder:text-muted-foreground"
+                  class="min-h-7 min-w-[9rem] flex-1 bg-transparent text-sm text-card-foreground outline-none placeholder:text-muted-foreground/75"
                   placeholder="blur, bad hands, text"
                   @input="handleNegativePromptTagInput"
                   @keydown="handleNegativePromptTagKeydown"

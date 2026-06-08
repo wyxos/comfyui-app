@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
 import {
-  Clipboard,
-  ClipboardPaste,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -12,12 +9,14 @@ import {
 import { formatNumber } from './assetPreviewHelpers'
 import AssetPreviewCompatibilityEditor from './AssetPreviewCompatibilityEditor.vue'
 import AssetPreviewFileDetails from './AssetPreviewFileDetails.vue'
+import AssetPreviewImageMetadataSection from './AssetPreviewImageMetadataSection.vue'
+import AssetPreviewImageSafetyEditor from './AssetPreviewImageSafetyEditor.vue'
+import AssetPreviewPreviewRepairAction from './AssetPreviewPreviewRepairAction.vue'
 import AssetPreviewSafetyEditor from './AssetPreviewSafetyEditor.vue'
 import AssetPreviewVersionList from './AssetPreviewVersionList.vue'
 import type { AssetPreviewModalProps } from './assetPreviewTypes'
 import { useAssetPreviewModal } from './useAssetPreviewModal'
 import UiPreloadedMedia from '../ui/UiPreloadedMedia.vue'
-import { serializeGenerationMetadataClipboard } from '../../lib/generationMetadata'
 
 const props = withDefaults(
   defineProps<AssetPreviewModalProps>(),
@@ -39,8 +38,10 @@ const props = withDefaults(
     editableSafety: false,
     savingCompatibility: false,
     savingSafety: false,
+    savingImageSafety: false,
     compatibilityError: '',
     safetyError: '',
+    imageSafetyError: '',
     showDownloadActions: false,
     queuingDownloadKey: '',
     downloadForVersion: undefined,
@@ -49,6 +50,7 @@ const props = withDefaults(
     versionDownloadButtonLabel: undefined,
     queueAssetDownload: undefined,
     deleteAssetDownload: undefined,
+    repairDownloadPreviews: undefined,
     modelDownloadKey: undefined,
     applyGenerationMetadata: undefined,
   },
@@ -64,6 +66,11 @@ const emit = defineEmits<{
   'save-safety': [payload: {
     modelNsfw: boolean | null
     modelNsfwOverride: boolean | null
+  }]
+  'save-image-safety': [payload: {
+    imageKey: string
+    imageNsfw: boolean | null
+    imageNsfwOverride: boolean | null
   }]
 }>()
 
@@ -81,6 +88,11 @@ const {
   previewSlides,
   activeSlide,
   activeImage,
+  activeImageSafetyKey,
+  activeImageNsfwOverride,
+  activeImageDetectedNsfw,
+  activeImageIsNsfw,
+  activeImageSafetyLabel,
   activeImageMetaSource,
   activeImageMeta,
   normalizedImageMetaRows,
@@ -109,45 +121,8 @@ const {
   queueVersionDownload,
   deleteVersionDownload,
   imageDimensions,
-  imageNsfwLabel,
-  isImageNsfw,
 } = useAssetPreviewModal(props, () => emit('close'))
 
-const metadataActionNotice = ref('')
-const metadataActionError = ref('')
-const isHandlingMetadataAction = ref(false)
-const hasApplyGenerationMetadataAction = computed(() => typeof props.applyGenerationMetadata === 'function')
-
-async function handleActiveImageMetadataAction() {
-  if (isHandlingMetadataAction.value) {
-    return
-  }
-
-  metadataActionNotice.value = ''
-  metadataActionError.value = ''
-  isHandlingMetadataAction.value = true
-
-  try {
-    if (!activeImageMetaSource.value) {
-      throw new Error('No generation metadata is available for this image.')
-    }
-
-    if (hasApplyGenerationMetadataAction.value) {
-      await props.applyGenerationMetadata?.(activeImageMetaSource.value)
-      metadataActionNotice.value = 'Metadata applied.'
-      close()
-      return
-    }
-
-    await navigator.clipboard.writeText(serializeGenerationMetadataClipboard(activeImageMetaSource.value))
-    metadataActionNotice.value = 'Metadata copied.'
-  } catch (error) {
-    metadataActionError.value =
-      error instanceof Error ? error.message : 'Could not use generation metadata.'
-  } finally {
-    isHandlingMetadataAction.value = false
-  }
-}
 </script>
 
 <template>
@@ -167,7 +142,7 @@ async function handleActiveImageMetadataAction() {
             {{ modalTitle }}
           </span>
           <span
-            v-if="isImageNsfw(activeImage)"
+            v-if="activeImageIsNsfw"
             class="rounded-md border border-destructive/50 bg-destructive px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-destructive-foreground shadow-sm"
           >
             NSFW
@@ -279,6 +254,10 @@ async function handleActiveImageMetadataAction() {
             >
               {{ civitaiError }}
             </p>
+            <AssetPreviewPreviewRepairAction
+              :download="downloadForVersion(selectedVersion)"
+              :repair-download-previews="props.repairDownloadPreviews"
+            />
 
             <dl class="grid gap-2 text-sm">
               <div class="rounded-md border border-border bg-background p-3">
@@ -396,7 +375,7 @@ async function handleActiveImageMetadataAction() {
               </div>
               <div class="rounded-md border border-border bg-background p-3">
                 <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">NSFW</dt>
-                <dd class="mt-1 font-semibold text-card-foreground">{{ imageNsfwLabel(activeImage) }}</dd>
+                <dd class="mt-1 font-semibold text-card-foreground">{{ activeImageSafetyLabel }}</dd>
               </div>
               <div
                 v-if="activeImage?.id"
@@ -415,82 +394,25 @@ async function handleActiveImageMetadataAction() {
             </dl>
           </section>
 
-          <section
-            v-if="imageMetaLoading || imageMetaError || activeImageMeta || normalizedImageMetaRows.length"
-            class="space-y-3 border-t border-border pt-5"
-          >
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">
-                Image generation metadata
-              </p>
-              <button
-                v-if="activeImageMeta"
-                type="button"
-                class="inline-flex h-8 items-center gap-1.5 rounded-sm border border-border bg-card px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-card-foreground transition hover:border-secondary hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25"
-                :disabled="isHandlingMetadataAction"
-                @click="handleActiveImageMetadataAction"
-              >
-                <ClipboardPaste
-                  v-if="hasApplyGenerationMetadataAction"
-                  class="h-3.5 w-3.5"
-                />
-                <Clipboard
-                  v-else
-                  class="h-3.5 w-3.5"
-                />
-                {{ hasApplyGenerationMetadataAction ? 'Apply metadata' : 'Copy metadata' }}
-              </button>
-            </div>
-            <p
-              v-if="metadataActionError || metadataActionNotice"
-              class="text-xs font-semibold"
-              :class="metadataActionError ? 'text-destructive' : 'text-secondary'"
-            >
-              {{ metadataActionError || metadataActionNotice }}
-            </p>
-            <div class="rounded-md border border-accent/35 bg-background p-3">
-              <p
-                v-if="imageMetaLoading"
-                class="inline-flex items-center text-xs font-semibold text-muted-foreground"
-              >
-                <LoaderCircle class="mr-2 h-4 w-4 animate-spin text-secondary" />
-                Loading prompt metadata...
-              </p>
-              <p
-                v-else-if="imageMetaError && !activeImageMeta"
-                class="text-xs font-semibold text-destructive"
-              >
-                {{ imageMetaError }}
-              </p>
-              <dl
-                v-if="normalizedImageMetaRows.length"
-                class="grid gap-3 text-xs"
-              >
-                <div
-                  v-for="row in normalizedImageMetaRows"
-                  :key="row.label"
-                >
-                  <dt class="font-semibold uppercase tracking-[0.12em] text-muted-foreground">{{ row.label }}</dt>
-                  <dd
-                    class="mt-1 whitespace-pre-wrap break-words text-card-foreground"
-                    :class="row.mono ? 'font-mono leading-5' : 'font-semibold'"
-                  >
-                    {{ row.value }}
-                  </dd>
-                </div>
-              </dl>
-              <details
-                v-if="activeImageMeta"
-                class="mt-3"
-                :open="!normalizedImageMetaRows.length"
-              >
-                <summary class="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Raw meta
-                </summary>
-                <pre class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-sm bg-primary p-3 text-xs leading-5 text-primary-foreground/85">{{ activeImageMeta }}</pre>
-              </details>
-            </div>
-          </section>
+          <AssetPreviewImageSafetyEditor
+            :editable="props.editableSafety"
+            :image-key="activeImageSafetyKey"
+            :detected-nsfw="activeImageDetectedNsfw"
+            :override-nsfw="activeImageNsfwOverride"
+            :error="props.imageSafetyError"
+            :saving="props.savingImageSafety"
+            @save="emit('save-image-safety', $event)"
+          />
+
+          <AssetPreviewImageMetadataSection
+            :loading="imageMetaLoading"
+            :error="imageMetaError"
+            :metadata-text="activeImageMeta"
+            :rows="normalizedImageMetaRows"
+            :metadata-source="activeImageMetaSource"
+            :apply-generation-metadata="props.applyGenerationMetadata"
+            @applied="close"
+          />
         </div>
       </aside>
   </div>

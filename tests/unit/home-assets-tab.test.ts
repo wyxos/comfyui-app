@@ -215,6 +215,28 @@ describe('Home checkpoint asset pickers', () => {
     )
   })
 
+  it('keeps checkpoint LoRA bulk controls above the list and the Add LoRA button full width', () => {
+    const wrapper = mountWithHomeView(HomeCheckpointLoraPicker, {
+      loras: ref([{ name: 'another-lora.safetensors' }]),
+      loadingLoras: ref(false),
+      loraLoadingError: ref(''),
+      getCheckpointLoraOptions: () => [{ label: 'Another LoRA', value: 'another-lora.safetensors' }],
+      getCheckpointLoraPickerPlaceholder: () => 'Add LoRA',
+      addCheckpointLora: vi.fn(),
+      clearCheckpointLoras: vi.fn(),
+      setAllCheckpointLorasEnabled: vi.fn(),
+    }, { checkpoint }).findComponent(HomeCheckpointLoraPicker)
+
+    expect(wrapper.html().indexOf('All LoRAs')).toBeLessThan(
+      wrapper.html().indexOf('data-testid="lora-card"'),
+    )
+    expect(wrapper.get('button[aria-label="Disable all LoRAs for WAI Illustrious SDXL"]').exists()).toBe(true)
+    expect(wrapper.get('button[aria-label="Add LoRA for waiIllustriousSDXL_v160.safetensors"]').classes()).toContain(
+      'w-full',
+    )
+    expect(wrapper.get('[data-testid="checkpoint-lora-add-section"]').classes()).toContain('w-full')
+  })
+
   it('uses one switch for checkpoint LoRA bulk enable state', async () => {
     const setAllCheckpointLorasEnabled = vi.fn()
     const wrapper = mountWithHomeView(HomeCheckpointLoraPicker, {

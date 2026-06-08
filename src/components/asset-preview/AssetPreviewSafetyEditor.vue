@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { LoaderCircle, Save, ShieldAlert } from 'lucide-vue-next'
+import { LoaderCircle, Save } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
+import { Button } from '@/components/ui/button'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 const props = withDefaults(
   defineProps<{
@@ -8,12 +10,28 @@ const props = withDefaults(
     modelNsfwOverride?: boolean | null
     error?: string
     saving?: boolean
+    title?: string
+    overrideLabel?: string
+    groupLabel?: string
+    saveLabel?: string
+    saveAriaLabel?: string
+    originalAriaLabel?: string
+    safeAriaLabel?: string
+    nsfwAriaLabel?: string
   }>(),
   {
     modelNsfw: null,
     modelNsfwOverride: null,
     error: '',
     saving: false,
+    title: 'Safety',
+    overrideLabel: 'Local override',
+    groupLabel: 'Safety override',
+    saveLabel: 'Save',
+    saveAriaLabel: 'Save safety override',
+    originalAriaLabel: 'Use original safety metadata',
+    safeAriaLabel: 'Mark safe',
+    nsfwAriaLabel: 'Mark NSFW',
   },
 )
 
@@ -68,43 +86,63 @@ watch(
   <section class="space-y-3 border-t border-border pt-5">
     <div class="flex items-start justify-between gap-3">
       <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">Safety</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">{{ title }}</p>
         <p class="mt-1 text-xs text-muted-foreground">{{ detectedLabel }}</p>
       </div>
-      <button
+      <Button
         type="button"
-        aria-label="Save safety override"
-        class="inline-flex h-8 items-center gap-2 rounded-md border border-secondary/35 bg-secondary px-3 text-xs font-semibold uppercase tracking-[0.1em] text-secondary-foreground transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60"
+        variant="secondary"
+        size="sm"
+        :aria-label="saveAriaLabel"
         :disabled="saving"
         @click="saveSafety"
       >
         <LoaderCircle
           v-if="saving"
-          class="h-3.5 w-3.5 animate-spin"
+          data-icon="inline-start"
+          class="animate-spin"
         />
         <Save
           v-else
-          class="h-3.5 w-3.5"
+          data-icon="inline-start"
         />
-        Save
-      </button>
+        {{ saveLabel }}
+      </Button>
     </div>
 
-    <label class="grid gap-2">
-      <span class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Local override</span>
-      <span class="relative">
-        <ShieldAlert class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <select
-          v-model="safetyMode"
-          aria-label="Safety override"
-          class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm font-semibold text-card-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25"
+    <div class="grid gap-2">
+      <span class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{{ overrideLabel }}</span>
+      <ToggleGroup
+        v-model="safetyMode"
+        type="single"
+        variant="outline"
+        size="sm"
+        class="grid w-full grid-cols-3"
+        :aria-label="groupLabel"
+      >
+        <ToggleGroupItem
+          value="detected"
+          class="w-full"
+          :aria-label="originalAriaLabel"
         >
-          <option value="detected">Use detected</option>
-          <option value="safe">Mark safe</option>
-          <option value="nsfw">Mark NSFW</option>
-        </select>
-      </span>
-    </label>
+          Original
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="safe"
+          class="w-full"
+          :aria-label="safeAriaLabel"
+        >
+          Safe
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="nsfw"
+          class="w-full"
+          :aria-label="nsfwAriaLabel"
+        >
+          NSFW
+        </ToggleGroupItem>
+      </ToggleGroup>
+    </div>
 
     <p
       v-if="error"

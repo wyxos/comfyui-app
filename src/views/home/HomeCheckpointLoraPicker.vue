@@ -54,19 +54,7 @@ function toggleAllCheckpointLoras() {
     v-if="checkpoint.loras.length"
     class="mt-3 space-y-2"
   >
-    <HomeLoraSelectionCard
-      v-for="lora in checkpoint.loras"
-      :key="lora.name"
-      :checkpoint="checkpoint"
-      :lora="lora"
-    />
-  </div>
-
-  <div class="mt-3 flex flex-wrap items-end gap-3">
-    <div
-      v-if="checkpoint.loras.length"
-      class="flex flex-wrap items-center gap-2"
-    >
+    <div class="flex flex-wrap items-center gap-2">
       <div class="flex items-center gap-2 text-[11px] text-primary-foreground/60">
         <span>All LoRAs</span>
         <button
@@ -98,7 +86,19 @@ function toggleAllCheckpointLoras() {
       </button>
     </div>
 
-    <label class="min-w-[14rem] flex-1">
+    <HomeLoraSelectionCard
+      v-for="lora in checkpoint.loras"
+      :key="lora.name"
+      :checkpoint="checkpoint"
+      :lora="lora"
+    />
+  </div>
+
+  <div class="mt-3">
+    <label
+      data-testid="checkpoint-lora-add-section"
+      class="block w-full"
+    >
       <button
         type="button"
         class="flex min-h-12 w-full items-center justify-between gap-3 rounded-md border border-input bg-card px-3 py-2 text-left text-sm text-card-foreground outline-none transition hover:border-accent hover:bg-accent/8 focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-60"

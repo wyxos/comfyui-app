@@ -85,6 +85,8 @@ export function buildDownloadSidecarPayload(download) {
     modelName: download.modelName,
     modelType: download.modelType,
     modelNsfw: modelMetadata.nsfw,
+    modelNsfwOverride: modelMetadata.modelNsfwOverride,
+    imageSafetyOverrides: modelMetadata.imageSafetyOverrides,
     model: modelMetadata,
     modelMetadata,
     versionId: download.versionId,
@@ -106,12 +108,15 @@ export function normalizeDownloadModelMetadata(rawModel, fallback = {}) {
   const model = normalizePlainObject(rawModel)
   const creator = normalizePlainObject(model.creator ?? fallback.creator)
   const stats = normalizePlainObject(model.stats ?? fallback.stats)
+  const imageSafetyOverrides = normalizePlainObject(model.imageSafetyOverrides ?? fallback.imageSafetyOverrides)
 
   return {
     id: normalizeNumericField(model.id ?? fallback.modelId ?? fallback.id, null),
     name: safeTrim(model.name ?? fallback.modelName ?? fallback.name),
     type: safeTrim(model.type ?? fallback.modelType ?? fallback.type),
     nsfw: normalizeOptionalBoolean(model.nsfw ?? fallback.modelNsfw ?? fallback.nsfw),
+    modelNsfwOverride: normalizeOptionalBoolean(model.modelNsfwOverride ?? fallback.modelNsfwOverride),
+    imageSafetyOverrides,
     creator: creator.username ? { username: safeTrim(creator.username) } : null,
     stats: Object.keys(stats).length ? stats : null,
     tags: Array.isArray(model.tags ?? fallback.tags) ? (model.tags ?? fallback.tags).filter((tag) => typeof tag === 'string') : [],
@@ -124,11 +129,15 @@ export function applyDownloadModelMetadata(download, payload) {
     modelName: payload?.modelName ?? download.modelName,
     modelType: payload?.modelType ?? download.modelType,
     modelNsfw: payload?.modelNsfw ?? payload?.nsfw ?? download.modelNsfw,
+    modelNsfwOverride: payload?.modelNsfwOverride ?? download.modelNsfwOverride ?? download.modelMetadata?.modelNsfwOverride,
+    imageSafetyOverrides: payload?.imageSafetyOverrides ?? download.imageSafetyOverrides ?? download.modelMetadata?.imageSafetyOverrides,
     tags: payload?.tags ?? download.modelMetadata?.tags,
   })
 
   download.modelMetadata = modelMetadata
   download.modelNsfw = modelMetadata.nsfw
+  download.modelNsfwOverride = modelMetadata.modelNsfwOverride
+  download.imageSafetyOverrides = modelMetadata.imageSafetyOverrides
   return download
 }
 

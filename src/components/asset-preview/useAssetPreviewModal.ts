@@ -4,9 +4,7 @@ import {
   extractImageMeta,
   formatMeta,
   imageDimensions,
-  imageNsfwLabel,
   imagesForVersion,
-  isImageNsfw,
   isVideoPreview,
   modelVersionLabel,
   numberProp,
@@ -27,6 +25,7 @@ import type {
   PreviewSlide,
 } from './assetPreviewTypes'
 import { useAssetPreviewArchiveFallback } from './useAssetPreviewArchiveFallback'
+import { useAssetPreviewImageSafety } from './useAssetPreviewImageSafety'
 import { useAssetPreviewNavigationEvents } from './useAssetPreviewNavigationEvents'
 
 export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, emitClose: () => void) {
@@ -45,14 +44,12 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
   let imageDetailsController: AbortController | null = null
   let mediaLoadToken = 0
   let imageDetailsToken = 0
-
   const normalizedModelId = computed(() => numberProp(props.modelId))
   const normalizedVersionId = computed(() => numberProp(props.versionId))
   const canLookupCivitai = computed(() => !props.model && normalizedModelId.value !== null)
-  const { archiveModel, archiveStatus, canLookupArchive, fetchLocalArchive, resetArchive } =
+  const { archiveModel, canLookupArchive, fetchLocalArchive, resetArchive } =
     useAssetPreviewArchiveFallback(props, setInitialVersion)
   const civitaiModel = computed(() => props.model ?? fetchedModel.value ?? archiveModel.value)
-  const usingLocalArchive = computed(() => Boolean(archiveModel.value && civitaiModel.value === archiveModel.value))
   const modelVersions = computed(() => civitaiModel.value?.modelVersions ?? [])
   const selectedVersion = computed(() => selectedVersionFor(modelVersions, activeVersionId))
   const selectedVersionImages = computed(() => imagesForVersion(selectedVersion.value))
@@ -72,7 +69,6 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     if (civitaiSlides.length) {
       return civitaiSlides
     }
-
     return props.previewUrl
       ? [{
           key: `local:${props.previewUrl}`,
@@ -88,6 +84,13 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
   const activeDetailedImage = computed(() => {
     const id = activeImage.value?.id
     return id === undefined || id === null ? null : imageDetails.value[String(id)] ?? null
+  })
+  const imageSafety = useAssetPreviewImageSafety({
+    activeDetailedImage,
+    activeImage,
+    activeSlide,
+    civitaiModel,
+    props,
   })
   const activeImageMetaSource = computed(() => {
     return extractImageMeta(activeDetailedImage.value?.meta ?? activeImage.value?.meta)
@@ -129,14 +132,12 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     fetchedModel.value = null
     resetArchive()
     civitaiError.value = ''
-
     if (!canLookupCivitai.value || !props.open) {
       civitaiLoading.value = canLookupArchive.value && props.open
       await fetchLocalArchive()
       civitaiLoading.value = false
       return
     }
-
     const controller = new AbortController()
     civitaiController = controller
     civitaiLoading.value = true
@@ -146,7 +147,6 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
       limit: '1',
       nsfw: 'true',
     })
-
     try {
       const response = await fetch(`/api/civitai/models?${params.toString()}`, {
         headers: {
@@ -453,8 +453,6 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     civitaiModel,
     civitaiLoading,
     civitaiError,
-    archiveStatus,
-    usingLocalArchive,
     imageMetaLoading,
     imageMetaError,
     activeImageIndex,
@@ -465,6 +463,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     previewSlides,
     activeSlide,
     activeImage,
+    ...imageSafety,
     activeImageMetaSource,
     activeImageMeta,
     normalizedImageMetaRows,
@@ -493,7 +492,5 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     queueVersionDownload,
     deleteVersionDownload,
     imageDimensions,
-    imageNsfwLabel: (image: CivitaiImage | null | undefined) => imageNsfwLabel(civitaiModel.value, image),
-    isImageNsfw: (image: CivitaiImage | null | undefined) => isImageNsfw(civitaiModel.value, image),
   }
 }

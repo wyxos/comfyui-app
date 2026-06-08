@@ -124,21 +124,33 @@ export function isImageNsfw(model: CivitaiModel | null, image: CivitaiImage | nu
     return true
   }
 
+  return imageNsfwDetectedValue(image) === true
+}
+
+export function imageNsfwDetectedValue(image: CivitaiImage | null | undefined): boolean | null {
   if (typeof image?.nsfw === 'boolean') {
     return image.nsfw
   }
 
   if (typeof image?.nsfw === 'string') {
     const normalized = image.nsfw.trim().toLowerCase()
-    return Boolean(normalized && !['false', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized))
+    if (!normalized) {
+      return null
+    }
+
+    return !['false', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized)
   }
 
   if (typeof image?.nsfwLevel === 'string') {
     const normalized = image.nsfwLevel.trim().toLowerCase()
-    return Boolean(normalized && !['false', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized))
+    if (!normalized) {
+      return null
+    }
+
+    return !['false', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized)
   }
 
-  return false
+  return null
 }
 
 export function modelHasNsfwContent(
@@ -166,15 +178,29 @@ export function imageNsfwLabel(model: CivitaiModel | null, image: CivitaiImage |
     return 'Yes'
   }
 
+  const imageDetected = imageNsfwDetectedValue(image)
+  if (imageDetected === false) {
+    return 'No'
+  }
+
   if (typeof image?.nsfw === 'string' && image.nsfw.trim()) {
     return image.nsfw
   }
 
-  if (typeof image?.nsfw === 'boolean') {
-    return image.nsfw ? 'Yes' : 'No'
+  return 'Unknown'
+}
+
+export function imageSafetyKeyFor(image: CivitaiImage | null | undefined, fallbackUrl = '') {
+  if (image?.id !== undefined && image.id !== null) {
+    return `id:${image.id}`
   }
 
-  return 'Unknown'
+  if (image?.hash) {
+    return `hash:${image.hash}`
+  }
+
+  const url = image?.url ?? fallbackUrl
+  return url ? `url:${url}` : ''
 }
 
 export function imageDimensions(image: CivitaiImage | null | undefined) {

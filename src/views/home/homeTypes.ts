@@ -56,6 +56,10 @@ export type ModelCompatibilityMetadata = {
   modelType?: string | null
   modelNsfw?: boolean | null
   modelNsfwOverride?: boolean | null
+  imageSafetyOverrides?: Record<string, {
+    imageNsfw?: boolean | null
+    imageNsfwOverride?: boolean | null
+  }>
   baseModel?: string
   baseModelKey?: string
   trainedWords?: string[]

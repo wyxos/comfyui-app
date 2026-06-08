@@ -35,6 +35,7 @@ describe('HomeAssetPickerModal', () => {
     expect(wrapper.text()).toContain('1-40 of 45')
     expect(wrapper.text()).toContain('Asset 40')
     expect(wrapper.text()).not.toContain('Asset 41')
+    expect(wrapper.find('[aria-label="Filter assets by base model"]').exists()).toBe(false)
 
     await wrapper.get('button[aria-label="Next asset picker page"]').trigger('click')
 
@@ -100,6 +101,63 @@ describe('HomeAssetPickerModal', () => {
     expect(wrapper.text()).toContain('1-2 of 2')
     expect(wrapper.text()).toContain('NSFW LoRA')
     expect(wrapper.findAll('span').filter((span) => span.text().trim() === 'NSFW')).toHaveLength(1)
+  })
+
+  it('filters visible assets by available base model metadata', async () => {
+    const wrapper = mount(HomeAssetPickerModal, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        title: 'Select LoRA',
+        options: [
+          {
+            label: 'Pony detail LoRA',
+            value: 'pony-detail.safetensors',
+            modelMetadata: {
+              baseModel: 'Pony',
+            },
+            typeLabel: 'LoRA',
+          },
+          {
+            label: 'Pony texture LoRA',
+            value: 'pony-texture.safetensors',
+            modelMetadata: {
+              compatibleBaseModels: ['Pony'],
+            },
+            typeLabel: 'LoRA',
+          },
+          {
+            label: 'Anima glow LoRA',
+            value: 'anima-glow.safetensors',
+            modelMetadata: {
+              baseModel: 'Anima',
+            },
+            typeLabel: 'LoRA',
+          },
+        ],
+      },
+    })
+
+    const filterGroup = wrapper.get('[aria-label="Filter assets by base model"]')
+
+    expect(filterGroup.text()).toContain('All 3')
+    expect(filterGroup.text()).toContain('Pony 2')
+    expect(filterGroup.text()).toContain('Anima 1')
+    expect(wrapper.get('button[aria-label="Show all base model assets"]').attributes('aria-pressed')).toBe('true')
+
+    await wrapper.get('button[aria-label="Show Pony assets"]').trigger('click')
+
+    expect(wrapper.text()).toContain('2 available assets')
+    expect(wrapper.text()).toContain('1-2 of 2')
+    expect(wrapper.text()).toContain('Pony detail LoRA')
+    expect(wrapper.text()).toContain('Pony texture LoRA')
+    expect(wrapper.text()).not.toContain('Anima glow LoRA')
+    expect(wrapper.get('button[aria-label="Show Pony assets"]').attributes('aria-pressed')).toBe('true')
+
+    await wrapper.get('button[aria-label="Show all base model assets"]').trigger('click')
+
+    expect(wrapper.text()).toContain('3 available assets')
+    expect(wrapper.text()).toContain('Anima glow LoRA')
   })
 
   it('uses the saved NSFW default when opened', async () => {

@@ -292,6 +292,7 @@ const pageCount = computed(() => {
 
   return Math.max(1, currentPage.value)
 })
+const pageCountExact = computed(() => totalPages.value > 0)
 const pageLabel = computed(() => {
   if (!searched.value || !hasSearchInput.value) {
     return ''
@@ -424,8 +425,9 @@ onBeforeUnmount(() => {
     resultSummary,
     canGoPrevious,
     canGoNext,
-    pageCount,
-    pageLabel,
+  pageCount,
+  pageCountExact,
+  pageLabel,
     formatNumber,
     firstVersion,
     isVideoPreview,
