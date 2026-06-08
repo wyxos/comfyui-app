@@ -123,6 +123,7 @@ function buildLoraSelection(
   enabled = true,
   enabledTriggerWords?: string[],
   triggerWordWeights?: Record<string, unknown>,
+  mode: Pick<LoraSelection, 'applyToAllCompatible' | 'appliedByAllCompatible'> = {},
 ): LoraSelection {
   const normalizedTriggerWordWeights = normalizeTriggerWordWeights(triggerWordWeights)
   return {
@@ -133,6 +134,8 @@ function buildLoraSelection(
       ? { enabledTriggerWords: normalizeTriggerWords(enabledTriggerWords) }
       : {}),
     ...(normalizedTriggerWordWeights ? { triggerWordWeights: normalizedTriggerWordWeights } : {}),
+    ...(mode.applyToAllCompatible ? { applyToAllCompatible: true } : {}),
+    ...(mode.appliedByAllCompatible ? { appliedByAllCompatible: true } : {}),
   }
 }
 

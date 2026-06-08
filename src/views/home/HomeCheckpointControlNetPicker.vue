@@ -26,6 +26,12 @@ const isControlNetPickerOpen = ref(false)
 const checkpointControlNets = computed(() => props.checkpoint.controlNets ?? [])
 const controlNetOptions = computed(() => getCheckpointControlNetOptions(props.checkpoint))
 const controlNetPickerPlaceholder = computed(() => getCheckpointControlNetPickerPlaceholder(props.checkpoint))
+const areAllCheckpointControlNetsEnabled = computed(() => {
+  return (
+    checkpointControlNets.value.length > 0 &&
+    checkpointControlNets.value.every((controlNet) => controlNet.enabled)
+  )
+})
 const canOpenControlNetPicker = computed(() => {
   return !loadingControlNets.value && controlNets.value.length > 0 && controlNetOptions.value.length > 0
 })
@@ -39,11 +45,67 @@ function openControlNetPicker() {
 function selectControlNet(value: string) {
   addCheckpointControlNet(props.checkpoint.name, value)
 }
+
+function toggleAllCheckpointControlNets() {
+  setAllCheckpointControlNetsEnabled(
+    props.checkpoint.name,
+    !areAllCheckpointControlNetsEnabled.value,
+  )
+}
 </script>
 
 <template>
   <div class="mt-3 border-t border-primary-foreground/10 pt-3">
-    <div class="flex flex-wrap items-end gap-3">
+    <div
+      v-if="checkpointControlNets.length"
+      class="space-y-2"
+    >
+      <HomeControlNetInstanceCard
+        v-for="controlNet in checkpointControlNets"
+        :key="controlNet.id"
+        :checkpoint="checkpoint"
+        :checkpoint-name="checkpoint.name"
+        :control-net="controlNet"
+        :compatibility-label="getControlNetCompatibilityLabel(checkpoint, controlNet.model)"
+      />
+    </div>
+
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+      <div
+        v-if="checkpointControlNets.length"
+        class="flex flex-wrap items-center gap-2"
+      >
+        <div class="flex items-center gap-2 text-[11px] text-primary-foreground/60">
+          <span>All ControlNets</span>
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="areAllCheckpointControlNetsEnabled"
+            :aria-label="`${areAllCheckpointControlNetsEnabled ? 'Disable' : 'Enable'} all ControlNets for ${checkpoint.displayName}`"
+            class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-ring/25"
+            :class="
+              areAllCheckpointControlNetsEnabled
+                ? 'border-secondary bg-secondary'
+                : 'border-primary-foreground/12 bg-primary-foreground/8'
+            "
+            @click="toggleAllCheckpointControlNets"
+          >
+            <span
+              class="inline-block h-4 w-4 rounded-full bg-primary-foreground shadow-sm transition-transform"
+              :class="areAllCheckpointControlNetsEnabled ? 'translate-x-5' : 'translate-x-1'"
+            />
+          </button>
+        </div>
+        <button
+          type="button"
+          class="inline-flex h-6 items-center gap-1 rounded-sm border border-destructive/40 bg-destructive/10 px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-destructive transition hover:border-destructive hover:bg-destructive hover:text-destructive-foreground"
+          @click="clearCheckpointControlNets(checkpoint.name)"
+        >
+          <X class="h-3 w-3" />
+          Clear
+        </button>
+      </div>
+
       <label class="min-w-[14rem] flex-1">
         <button
           type="button"
@@ -61,48 +123,6 @@ function selectControlNet(value: string) {
           </span>
         </button>
       </label>
-
-      <div
-        v-if="checkpointControlNets.length"
-        class="flex flex-wrap items-center justify-end gap-2"
-      >
-        <button
-          type="button"
-          class="inline-flex h-6 items-center rounded-sm border border-secondary/35 bg-secondary/10 px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-secondary transition hover:border-secondary hover:bg-secondary/16"
-          @click="setAllCheckpointControlNetsEnabled(checkpoint.name, true)"
-        >
-          All on
-        </button>
-        <button
-          type="button"
-          class="inline-flex h-6 items-center rounded-sm border border-primary-foreground/12 bg-card px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-primary-foreground/56 transition hover:border-primary-foreground/28 hover:text-primary-foreground"
-          @click="setAllCheckpointControlNetsEnabled(checkpoint.name, false)"
-        >
-          All off
-        </button>
-        <button
-          type="button"
-          class="inline-flex h-6 items-center gap-1 rounded-sm border border-destructive/40 bg-destructive/10 px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-destructive transition hover:border-destructive hover:bg-destructive hover:text-destructive-foreground"
-          @click="clearCheckpointControlNets(checkpoint.name)"
-        >
-          <X class="h-3 w-3" />
-          Clear
-        </button>
-      </div>
-    </div>
-
-    <div
-      v-if="checkpointControlNets.length"
-      class="mt-3 space-y-2"
-    >
-      <HomeControlNetInstanceCard
-        v-for="controlNet in checkpointControlNets"
-        :key="controlNet.id"
-        :checkpoint="checkpoint"
-        :checkpoint-name="checkpoint.name"
-        :control-net="controlNet"
-        :compatibility-label="getControlNetCompatibilityLabel(checkpoint, controlNet.model)"
-      />
     </div>
 
     <p

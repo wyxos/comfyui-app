@@ -6,6 +6,7 @@ import {
   Upload,
   X,
 } from 'lucide-vue-next'
+import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
 import { useProvidedHomeView } from './homeViewContext'
 
@@ -148,11 +149,12 @@ onBeforeUnmount(() => {
                   @drop.prevent="handleImageDrop"
                   @paste="handleImagePaste"
                 >
-                  <img
+                  <UiPreloadedMedia
                     v-if="hasInputImage"
                     :src="selectedImagePreviewUrl ?? ''"
                     alt="Selected input preview"
-                    class="h-full w-full object-contain"
+                    media-class="h-full w-full object-contain"
+                    loading-class="bg-card/80 text-card-foreground"
                   />
 
                   <div

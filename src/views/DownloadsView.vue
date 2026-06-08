@@ -156,6 +156,13 @@ async function runDownloadAction(item: AssetDownloadItem, action: DownloadAction
     }
   }
 
+  if (action === 'redownload' && item.state === 'complete') {
+    const confirmed = window.confirm(`Re-download ${item.fileName}? This will replace the existing downloaded file.`)
+    if (!confirmed) {
+      return
+    }
+  }
+
   actionKey.value = `${action}:${item.id}`
   actionError.value = ''
   try {

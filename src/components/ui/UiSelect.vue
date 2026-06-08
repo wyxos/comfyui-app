@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Check, ChevronDown, Image as ImageIcon, Search } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import UiPreloadedMedia from './UiPreloadedMedia.vue'
 
 type SelectOption = {
   label: string
@@ -118,23 +119,22 @@ onBeforeUnmount(() => {
           v-if="optionSupportsPreview(selectedOption)"
           class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border bg-muted text-muted-foreground"
         >
-          <video
-            v-if="selectedOption?.previewUrl && optionHasVideoPreview(selectedOption)"
-            class="h-full w-full object-cover"
+          <UiPreloadedMedia
+            v-if="selectedOption?.previewUrl"
             :src="selectedOption.previewUrl"
+            :is-video="optionHasVideoPreview(selectedOption)"
+            :alt="`${selectedOption.label} preview`"
+            label=""
+            media-class="h-full w-full object-cover"
+            loading-class="bg-muted text-muted-foreground"
+            spinner-class="mr-0 h-4 w-4"
             muted
             loop
             autoplay
             playsinline
             preload="metadata"
-            :aria-label="`${selectedOption.label} video preview`"
-          />
-          <img
-            v-else-if="selectedOption?.previewUrl"
-            class="h-full w-full object-cover"
-            :src="selectedOption.previewUrl"
-            :alt="`${selectedOption.label} preview`"
-            loading="lazy"
+            :aria-label="optionHasVideoPreview(selectedOption) ? `${selectedOption.label} video preview` : undefined"
+            :loading="optionHasVideoPreview(selectedOption) ? undefined : 'lazy'"
           />
           <ImageIcon
             v-else
@@ -184,23 +184,22 @@ onBeforeUnmount(() => {
               v-if="optionSupportsPreview(option)"
               class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border bg-muted text-muted-foreground"
             >
-              <video
-                v-if="option.previewUrl && optionHasVideoPreview(option)"
-                class="h-full w-full object-cover"
+              <UiPreloadedMedia
+                v-if="option.previewUrl"
                 :src="option.previewUrl"
+                :is-video="optionHasVideoPreview(option)"
+                :alt="`${option.label} preview`"
+                label=""
+                media-class="h-full w-full object-cover"
+                loading-class="bg-muted text-muted-foreground"
+                spinner-class="mr-0 h-4 w-4"
                 muted
                 loop
                 autoplay
                 playsinline
                 preload="metadata"
-                :aria-label="`${option.label} video preview`"
-              />
-              <img
-                v-else-if="option.previewUrl"
-                class="h-full w-full object-cover"
-                :src="option.previewUrl"
-                :alt="`${option.label} preview`"
-                loading="lazy"
+                :aria-label="optionHasVideoPreview(option) ? `${option.label} video preview` : undefined"
+                :loading="optionHasVideoPreview(option) ? undefined : 'lazy'"
               />
               <ImageIcon
                 v-else

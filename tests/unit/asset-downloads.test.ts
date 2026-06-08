@@ -321,7 +321,7 @@ describe('DownloadsView', () => {
     vi.resetModules()
   })
 
-  it('renders model downloads and delegates delete and redownload actions', async () => {
+  it('confirms before deleting or redownloading downloaded models', async () => {
     const downloads = ref([
       {
         id: 'complete-download',
@@ -405,10 +405,12 @@ describe('DownloadsView', () => {
 
     expect(redownloadDownload).toHaveBeenCalledWith('complete-download')
     expect(deleteDownloadedFile).toHaveBeenCalledWith('complete-download')
-    expect(confirmSpy).toHaveBeenCalled()
+    expect(confirmSpy).toHaveBeenNthCalledWith(1, 'Re-download complete.safetensors? This will replace the existing downloaded file.')
+    expect(confirmSpy).toHaveBeenNthCalledWith(2, 'Delete complete.safetensors from disk? The download record will remain for redownload.')
 
     confirmSpy.mockRestore()
   })
+
 })
 
 describe('LibraryView', () => {

@@ -366,6 +366,16 @@ export function createAssetDownloadActions(state: DownloadActionState) {
       return false
     }
 
+    const existingDownload = downloadForVersion(version)
+    const forceRedownload = existingDownload?.state === 'complete'
+    if (forceRedownload) {
+      const fileName = existingDownload.fileName || file.name
+      const confirmed = window.confirm(`Re-download ${fileName}? This will replace the existing downloaded file.`)
+      if (!confirmed) {
+        return false
+      }
+    }
+
     state.queuingDownloadKey.value = key
     clearDownloadActionError()
     if (showNotice) {
@@ -375,7 +385,7 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     try {
       const payload = await state.queueDownload({
         ...downloadPayloadForVersion(model, version, file),
-        force: downloadForVersion(version)?.state === 'complete',
+        force: forceRedownload,
       })
       if (closeMenu) {
         state.openDownloadMenuKey.value = ''

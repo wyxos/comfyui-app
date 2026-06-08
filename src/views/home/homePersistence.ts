@@ -45,6 +45,7 @@ type HomePersistenceDeps = {
     enabled?: boolean,
     enabledTriggerWords?: string[],
     triggerWordWeights?: Record<string, unknown>,
+    mode?: Pick<LoraSelection, 'applyToAllCompatible' | 'appliedByAllCompatible'>,
   ) => LoraSelection
   buildStoredInputImagePreviewUrl: (inputImageName: string) => string
   captureLockedAspectRatioFromCurrentSize: () => void
@@ -203,6 +204,10 @@ function readPersistedFormState(): Partial<PersistedFormState> {
                       lora.enabled !== false,
                       Array.isArray(lora.enabledTriggerWords) ? lora.enabledTriggerWords : undefined,
                       isRecord(lora.triggerWordWeights) ? lora.triggerWordWeights : undefined,
+                      {
+                        applyToAllCompatible: lora.applyToAllCompatible === true,
+                        appliedByAllCompatible: lora.appliedByAllCompatible === true,
+                      },
                     )
                   })
                   .filter((lora): lora is LoraSelection => Boolean(lora))
@@ -289,6 +294,10 @@ function persistFormState() {
           lora.enabled,
           lora.enabledTriggerWords,
           lora.triggerWordWeights,
+          {
+            applyToAllCompatible: lora.applyToAllCompatible === true,
+            appliedByAllCompatible: lora.appliedByAllCompatible === true,
+          },
         ),
       ),
       controlNets: (selection.controlNets ?? []).map(serializePersistedControlNetSelection),

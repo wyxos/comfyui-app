@@ -22,6 +22,7 @@ type AssetSearchRouteQueryOptions = {
   cursor?: string
   modelId?: string
   modelVersionId?: string
+  tag?: string
   username?: string
   typeFilter?: ModelTypeFilter
   sort?: ModelSort
@@ -44,6 +45,10 @@ export function parseRoutePage(value: unknown) {
 }
 
 export function parseRouteCursor(value: unknown) {
+  return queryStringValue(firstQueryValue(value)).trim()
+}
+
+export function parseRouteTag(value: unknown) {
   return queryStringValue(firstQueryValue(value)).trim()
 }
 
@@ -139,6 +144,7 @@ export function buildAssetSearchRouteQuery(
     cursor = '',
     modelId = '',
     modelVersionId = '',
+    tag = '',
     username = '',
     typeFilter = '',
     sort = DEFAULT_SORT,
@@ -150,6 +156,7 @@ export function buildAssetSearchRouteQuery(
   const term = searchTerm.trim()
   const normalizedModelId = parseRouteCivitaiId(modelId)
   const normalizedModelVersionId = parseRouteCivitaiId(modelVersionId)
+  const normalizedTag = parseRouteTag(tag)
   const normalizedUsername = username.trim()
   const normalizedType = parseRouteType(typeFilter)
   const normalizedSort = parseRouteSort(sort)
@@ -164,6 +171,7 @@ export function buildAssetSearchRouteQuery(
     page > 1 ||
     Boolean(cursor) ||
     Boolean(normalizedModelId || normalizedModelVersionId) ||
+    Boolean(normalizedTag) ||
     normalizedSort !== DEFAULT_SORT ||
     normalizedPeriod !== DEFAULT_PERIOD ||
     !areSameBaseModels(normalizedBaseModels, DEFAULT_BASE_MODELS) ||
@@ -178,6 +186,7 @@ export function buildAssetSearchRouteQuery(
   delete nextQuery.modelId
   delete nextQuery.modelVersionId
   delete nextQuery.versionId
+  delete nextQuery.tag
   delete nextQuery.username
   delete nextQuery.types
   delete nextQuery.sort
@@ -198,6 +207,10 @@ export function buildAssetSearchRouteQuery(
 
   if (normalizedModelVersionId) {
     nextQuery.modelVersionId = normalizedModelVersionId
+  }
+
+  if (normalizedTag) {
+    nextQuery.tag = normalizedTag
   }
 
   if (normalizedUsername) {
@@ -265,6 +278,7 @@ export function makeSearchKey(
   baseModels: readonly string[] = DEFAULT_BASE_MODELS,
   modelId = '',
   modelVersionId = '',
+  tag = '',
 ) {
   const normalizedBaseModels = Array.isArray(baseModels) ? baseModels : DEFAULT_BASE_MODELS
 
@@ -277,6 +291,7 @@ export function makeSearchKey(
     normalizedBaseModels.join('|'),
     parseRouteCivitaiId(modelId),
     parseRouteCivitaiId(modelVersionId),
+    parseRouteTag(tag).toLowerCase(),
     cursor,
     nsfw ? 'nsfw' : 'safe',
     primaryFileOnly ? 'primary-file' : 'all-files',

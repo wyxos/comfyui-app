@@ -61,6 +61,28 @@ const seedModeClass = computed(() =>
     ? 'border-secondary/45 bg-secondary/10 text-secondary'
     : 'border-accent/35 bg-accent/10 text-accent',
 )
+const configFieldTooltips = {
+  size:
+    'Purpose: sets the generated image dimensions.\nImpact: larger values use more VRAM and time but can preserve more detail; smaller values render faster but reduce detail and crop room.',
+  scale:
+    'Purpose: scales width and height together while ratio lock is enabled.\nImpact: increasing makes the output larger at the same ratio; decreasing saves time and VRAM.',
+  seed:
+    'Purpose: controls the noise starting point.\nImpact: changing it changes composition; keeping it fixed helps reproduce or iterate a result.',
+  steps:
+    'Purpose: controls denoising passes.\nImpact: more steps can refine detail but slow generation; fewer steps are faster but may look unfinished.',
+  cfg:
+    'Purpose: controls prompt guidance strength.\nImpact: higher values follow text more strongly but can look harsh; lower values are freer but may ignore details.',
+  sampler:
+    'Purpose: chooses the sampling algorithm.\nImpact: switching can change texture, sharpness, speed, and how the same seed resolves.',
+  scheduler:
+    'Purpose: controls how denoising changes across steps.\nImpact: switching can change contrast, convergence, and detail balance even with the same seed.',
+  animaTemplate:
+    'Purpose: exposes Anima-specific workflow loaders.\nImpact: changing these assets alters the Anima pipeline; mismatches can fail generation or shift style.',
+  clipName:
+    'Purpose: selects the text encoder for Anima prompts.\nImpact: changing it alters prompt interpretation; incompatible files can break generation.',
+  vaeName:
+    'Purpose: selects the decoder for Anima outputs.\nImpact: changing it affects color and detail decoding; incompatible files can distort or fail output.',
+}
 
 function handleAspectRatioInput(event: Event) {
   const target = event.target
@@ -81,7 +103,15 @@ function defaultOptionLabel(value: string) {
   >
     <div class="flex flex-col gap-2">
       <div class="flex items-center justify-between gap-3">
-        <span class="field-label">Size</span>
+        <UiTooltip :content="configFieldTooltips.size">
+          <span
+            data-testid="config-field-label"
+            tabindex="0"
+            class="field-label cursor-help"
+          >
+            Size
+          </span>
+        </UiTooltip>
         <div class="flex items-center gap-2">
           <button
             type="button"
@@ -149,9 +179,15 @@ function defaultOptionLabel(value: string) {
 
       <div class="space-y-3 rounded-md border border-primary-foreground/10 bg-primary-foreground/4 p-3">
         <div class="flex items-center justify-between gap-3">
-          <span class="text-xs font-semibold uppercase tracking-[0.12em] text-primary-foreground/72">
-            Scale
-          </span>
+          <UiTooltip :content="configFieldTooltips.scale">
+            <span
+              data-testid="config-field-label"
+              tabindex="0"
+              class="text-xs font-semibold uppercase tracking-[0.12em] text-primary-foreground/72 cursor-help"
+            >
+              Scale
+            </span>
+          </UiTooltip>
           <div class="flex items-center gap-2">
             <label>
               <span class="sr-only">Aspect ratio scale</span>
@@ -217,7 +253,15 @@ function defaultOptionLabel(value: string) {
     <div class="grid gap-4 sm:grid-cols-3">
       <label class="flex flex-col gap-2">
         <span class="flex items-center justify-between gap-2">
-          <span class="field-label">Seed</span>
+          <UiTooltip :content="configFieldTooltips.seed">
+            <span
+              data-testid="config-field-label"
+              tabindex="0"
+              class="field-label cursor-help"
+            >
+              Seed
+            </span>
+          </UiTooltip>
           <span
             data-testid="seed-mode-label"
             class="inline-flex h-5 items-center rounded-sm border px-2 text-[10px] font-semibold uppercase tracking-[0.12em]"
@@ -253,7 +297,15 @@ function defaultOptionLabel(value: string) {
       </label>
 
       <label class="flex flex-col gap-2">
-        <span class="field-label">Steps</span>
+        <UiTooltip :content="configFieldTooltips.steps">
+          <span
+            data-testid="config-field-label"
+            tabindex="0"
+            class="field-label cursor-help"
+          >
+            Steps
+          </span>
+        </UiTooltip>
         <input
           v-model="steps"
           type="number"
@@ -266,7 +318,15 @@ function defaultOptionLabel(value: string) {
       </label>
 
       <label class="flex flex-col gap-2">
-        <span class="field-label">CFG</span>
+        <UiTooltip :content="configFieldTooltips.cfg">
+          <span
+            data-testid="config-field-label"
+            tabindex="0"
+            class="field-label cursor-help"
+          >
+            CFG
+          </span>
+        </UiTooltip>
         <input
           v-model="cfg"
           type="number"
@@ -280,7 +340,15 @@ function defaultOptionLabel(value: string) {
 
     <div class="grid gap-4 sm:grid-cols-2">
       <label class="flex flex-col gap-2">
-        <span class="field-label">Sampler</span>
+        <UiTooltip :content="configFieldTooltips.sampler">
+          <span
+            data-testid="config-field-label"
+            tabindex="0"
+            class="field-label cursor-help"
+          >
+            Sampler
+          </span>
+        </UiTooltip>
         <select
           v-model="samplerName"
           aria-label="Sampler"
@@ -299,7 +367,15 @@ function defaultOptionLabel(value: string) {
       </label>
 
       <label class="flex flex-col gap-2">
-        <span class="field-label">Scheduler</span>
+        <UiTooltip :content="configFieldTooltips.scheduler">
+          <span
+            data-testid="config-field-label"
+            tabindex="0"
+            class="field-label cursor-help"
+          >
+            Scheduler
+          </span>
+        </UiTooltip>
         <select
           v-model="scheduler"
           aria-label="Scheduler"
@@ -329,12 +405,26 @@ function defaultOptionLabel(value: string) {
       v-if="hasAnimaCheckpointSelected"
       class="space-y-3 rounded-md border border-primary-foreground/10 bg-primary-foreground/4 p-3"
     >
-      <span class="field-label">Anima template</span>
+      <UiTooltip :content="configFieldTooltips.animaTemplate">
+        <span
+          data-testid="config-field-label"
+          tabindex="0"
+          class="field-label cursor-help"
+        >
+          Anima template
+        </span>
+      </UiTooltip>
       <div class="grid gap-4 sm:grid-cols-2">
         <label class="flex flex-col gap-2">
-          <span class="text-xs font-semibold uppercase tracking-[0.12em] text-primary-foreground/72">
-            CLIP name
-          </span>
+          <UiTooltip :content="configFieldTooltips.clipName">
+            <span
+              data-testid="config-field-label"
+              tabindex="0"
+              class="text-xs font-semibold uppercase tracking-[0.12em] text-primary-foreground/72 cursor-help"
+            >
+              CLIP name
+            </span>
+          </UiTooltip>
           <select
             v-model="clipName"
             aria-label="CLIP name"
@@ -353,9 +443,15 @@ function defaultOptionLabel(value: string) {
         </label>
 
         <label class="flex flex-col gap-2">
-          <span class="text-xs font-semibold uppercase tracking-[0.12em] text-primary-foreground/72">
-            VAE name
-          </span>
+          <UiTooltip :content="configFieldTooltips.vaeName">
+            <span
+              data-testid="config-field-label"
+              tabindex="0"
+              class="text-xs font-semibold uppercase tracking-[0.12em] text-primary-foreground/72 cursor-help"
+            >
+              VAE name
+            </span>
+          </UiTooltip>
           <select
             v-model="vaeName"
             aria-label="VAE name"

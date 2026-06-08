@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Image as ImageIcon } from 'lucide-vue-next'
+import UiPreloadedMedia from './UiPreloadedMedia.vue'
 
 withDefaults(
   defineProps<{
@@ -49,24 +50,22 @@ const emit = defineEmits<{
   >
     <div :class="['relative shrink-0 border-b border-border bg-muted', mediaClass]">
       <div class="flex h-full w-full items-center justify-center overflow-hidden">
-        <video
-          v-if="previewUrl && isVideoPreview"
-          class="h-full w-auto max-w-none object-contain transition duration-300 group-hover:scale-[1.03]"
+        <UiPreloadedMedia
+          v-if="previewUrl"
           :src="previewUrl"
+          :is-video="isVideoPreview"
+          :alt="previewLabel"
+          :label="isVideoPreview ? 'Loading preview video...' : 'Loading preview image...'"
+          media-class="h-full w-auto max-w-none object-contain transition duration-300 group-hover:scale-[1.03]"
+          loading-class="bg-muted text-muted-foreground"
           muted
           loop
           autoplay
           playsinline
           preload="metadata"
-          :aria-label="previewLabel"
+          :aria-label="isVideoPreview ? previewLabel : undefined"
+          :loading="isVideoPreview ? undefined : 'lazy'"
         />
-        <img
-          v-else-if="previewUrl"
-          class="h-full w-auto max-w-none object-contain transition duration-300 group-hover:scale-[1.03]"
-          :src="previewUrl"
-          :alt="previewLabel"
-          loading="lazy"
-        >
         <div
           v-else
           class="flex h-full w-full flex-col items-center justify-center gap-2 bg-primary/70 px-4 text-center text-primary-foreground/58"

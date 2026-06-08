@@ -7,6 +7,7 @@ import {
   RotateCcw,
   X,
 } from 'lucide-vue-next'
+import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import { useProvidedHomeView } from './homeViewContext'
 
 const {
@@ -154,14 +155,15 @@ void [previewModalViewport, previewModalPanField]
             class="will-change-transform"
             :style="previewModalPanStyle"
           >
-            <img
+            <UiPreloadedMedia
               :src="selectedPreviewOutput.url"
               :alt="selectedPreviewItem?.variantLabel ?? 'Generation preview'"
-              class="block max-h-[100vh] max-w-[100vw] select-none object-contain transition-transform duration-150 ease-out"
+              media-class="block max-h-[100vh] max-w-[100vw] select-none object-contain transition-transform duration-150 ease-out"
+              loading-class="bg-primary/80 text-primary-foreground"
               :style="previewModalImageStyle"
               draggable="false"
               @contextmenu="openGeneratedOutputContextMenu($event, selectedPreviewOutput, selectedPreviewItem?.checkpointName ?? null)"
-            >
+            />
           </div>
         </div>
 
@@ -184,14 +186,17 @@ void [previewModalViewport, previewModalPanField]
               @click="setPreviewModalPreviewIndex(entry.index, true)"
             >
               <div class="aspect-square overflow-hidden rounded-sm bg-primary-foreground/8">
-                <img
+                <UiPreloadedMedia
                   v-if="entry.item?.output"
                   :src="entry.item.output.url"
                   :alt="entry.item.variantLabel ?? `Preview ${entry.index + 1}`"
-                  class="h-full w-full object-cover"
+                  label=""
+                  media-class="h-full w-full object-cover"
+                  loading-class="bg-primary/80 text-primary-foreground"
+                  spinner-class="mr-0 h-4 w-4"
                   draggable="false"
                   @contextmenu="openGeneratedOutputContextMenu($event, entry.item.output, entry.item.checkpointName)"
-                >
+                />
               </div>
 
               <p class="mt-2 truncate text-[11px] font-semibold text-primary-foreground">

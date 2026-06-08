@@ -10,6 +10,7 @@ import {
   XCircle,
 } from 'lucide-vue-next'
 import { computed } from 'vue'
+import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
 import { useProvidedHomeView } from './homeViewContext'
 
@@ -203,11 +204,14 @@ function confirmDeleteJobAndOutputs(entry: Parameters<typeof deleteJobEntry>[0])
                   :style="{ zIndex: getJobEntryPreviewVisibleOutputs(entry).length - index }"
                   @contextmenu="openGeneratedOutputContextMenu($event, output, null)"
                 >
-                  <img
+                  <UiPreloadedMedia
                     data-testid="job-output-preview"
                     :src="output.url"
                     alt=""
-                    class="h-full w-full object-cover"
+                    label=""
+                    media-class="h-full w-full object-cover"
+                    loading-class="bg-primary/80 text-primary-foreground"
+                    spinner-class="mr-0 h-4 w-4"
                   />
                 </span>
 

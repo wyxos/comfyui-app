@@ -7,6 +7,7 @@ import {
 } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { isVideoUrl, preloadImage } from './asset-preview/assetPreviewHelpers'
+import UiPreloadedMedia from './ui/UiPreloadedMedia.vue'
 import type { JobOutput, JobResponse } from '../views/home/homeTypes'
 
 const props = withDefaults(
@@ -272,24 +273,21 @@ onBeforeUnmount(() => {
           Loading output...
         </div>
 
-        <video
-          v-if="displayedUrl && isVideoOutput(activeOutput)"
-          class="max-h-full max-w-full object-contain"
+        <UiPreloadedMedia
+          v-if="displayedUrl"
           :src="displayedUrl"
+          :is-video="isVideoOutput(activeOutput)"
+          :alt="`${modalSubtitle} output image`"
+          label=""
+          media-class="max-h-full max-w-full object-contain"
+          loading-class="hidden"
           controls
           autoplay
           loop
           playsinline
           preload="auto"
-          @loadeddata="handleModalVideoReady(displayedUrl)"
-          @canplay="handleModalVideoReady(displayedUrl)"
+          @ready="handleModalVideoReady"
         />
-        <img
-          v-else-if="displayedUrl"
-          class="max-h-full max-w-full object-contain"
-          :src="displayedUrl"
-          :alt="`${modalSubtitle} output image`"
-        >
         <div
           v-else-if="!mediaLoading"
           class="rounded-md border border-primary-foreground/12 bg-primary/72 px-5 py-4 text-sm font-semibold text-primary-foreground/72"

@@ -85,7 +85,13 @@ export const BASE_MODEL_OPTIONS = [
 
 export type BaseModelFilter = (typeof BASE_MODEL_OPTIONS)[number]['value']
 
-export const DEFAULT_BASE_MODELS: BaseModelFilter[] = BASE_MODEL_OPTIONS.map((option) => option.value)
+export const VISIBLE_BASE_MODEL_OPTIONS = BASE_MODEL_OPTIONS.filter((option) => option.group !== 'Flux')
+
+export const DEFAULT_BASE_MODEL_LABEL = 'SDXL, Pony, Illustrious, Anima'
+
+export const DEFAULT_BASE_MODELS: BaseModelFilter[] = BASE_MODEL_OPTIONS
+  .filter((option) => option.group !== 'Flux')
+  .map((option) => option.value)
 
 export type CivitaiStats = {
   downloadCount?: number

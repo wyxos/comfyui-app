@@ -51,6 +51,71 @@ export function parseContentRangeTotal(contentRange) {
   return Number.isSafeInteger(totalBytes) && totalBytes > 0 ? totalBytes : null
 }
 
+function buildSegmentRanges(totalBytes, requestedSegmentCount = civitaiDownloadSegmentCount) {
+  const segmentCount = Math.min(requestedSegmentCount, Math.ceil(totalBytes / civitaiSegmentedDownloadMinBytes) + 1)
+  const segmentSize = Math.ceil(totalBytes / segmentCount)
+  const ranges = []
+  for (let index = 0; index < segmentCount; index += 1) {
+    const start = index * segmentSize
+    const end = Math.min(totalBytes - 1, start + segmentSize - 1)
+    if (start <= end) {
+      ranges.push({ index, start, end })
+    }
+  }
+
+  return ranges
+}
+
+function segmentLength(range) {
+  return range.end - range.start + 1
+}
+
+function parseSegmentedTransferCount(transferMode) {
+  const match = /^segmented-(\d+)$/i.exec(safeTrim(transferMode))
+  if (!match) {
+    return null
+  }
+
+  const count = Number.parseInt(match[1], 10)
+  return Number.isSafeInteger(count) && count > 0 ? count : null
+}
+
+function normalizedSegmentProgress(progress, ranges) {
+  if (!Array.isArray(progress) || progress.length !== ranges.length) {
+    return null
+  }
+
+  return ranges.map((range, index) => {
+    const value = Number.parseInt(progress[index], 10)
+    return Number.isSafeInteger(value) ? Math.max(0, Math.min(segmentLength(range), value)) : 0
+  })
+}
+
+function sumSegmentProgress(segmentProgress) {
+  return segmentProgress.reduce((sum, segmentBytes) => sum + segmentBytes, 0)
+}
+
+function getSegmentedResumeState(download, partialStats) {
+  const totalBytes = Number.parseInt(download.totalBytes, 10)
+  const segmentCount = parseSegmentedTransferCount(download.transferMode)
+  if (!partialStats || !totalBytes || !segmentCount || partialStats.size !== totalBytes) {
+    return null
+  }
+
+  const ranges = buildSegmentRanges(totalBytes, segmentCount)
+  const segmentProgress = normalizedSegmentProgress(download.segmentProgress, ranges)
+  if (!segmentProgress) {
+    return null
+  }
+
+  return {
+    ranges,
+    segmentProgress,
+    totalBytes,
+    complete: sumSegmentProgress(segmentProgress) >= totalBytes,
+  }
+}
+
 async function readCivitaiErrorMessage(response) {
   let text
   try {
@@ -236,7 +301,14 @@ export async function downloadCivitaiFileSingle(download, partialStats) {
 }
 
 export async function downloadCivitaiSegment(download, fileHandle, range, segmentProgress, totalBytes) {
-  const headers = await buildCivitaiDownloadHeaders(range.start, range.end)
+  const expectedLength = segmentLength(range)
+  const resumeOffset = Math.max(0, Math.min(expectedLength, segmentProgress[range.index] ?? 0))
+  if (resumeOffset >= expectedLength) {
+    return
+  }
+
+  const rangeStart = range.start + resumeOffset
+  const headers = await buildCivitaiDownloadHeaders(rangeStart, range.end)
   const response = await fetch(download.downloadUrl, {
     headers,
     signal: download.abortController.signal,
@@ -247,10 +319,9 @@ export async function downloadCivitaiSegment(download, fileHandle, range, segmen
     throw await createCivitaiDownloadError(response, `Civitai segment ${range.index + 1}`)
   }
 
-  const expectedLength = range.end - range.start + 1
   const reader = response.body.getReader()
-  let position = range.start
-  let bytesDownloaded = 0
+  let position = rangeStart
+  let bytesDownloaded = resumeOffset
   let lastProgressAt = 0
 
   while (true) {
@@ -280,6 +351,7 @@ export async function downloadCivitaiSegment(download, fileHandle, range, segmen
     position += chunk.length
     bytesDownloaded += chunk.length
     segmentProgress[range.index] = bytesDownloaded
+    download.segmentProgress = segmentProgress
 
     const now = Date.now()
     if (now - lastProgressAt > 250) {
@@ -294,29 +366,22 @@ export async function downloadCivitaiSegment(download, fileHandle, range, segmen
   }
 }
 
-export async function downloadCivitaiFileSegmented(download, totalBytes) {
-  const segmentCount = Math.min(civitaiDownloadSegmentCount, Math.ceil(totalBytes / civitaiSegmentedDownloadMinBytes) + 1)
-  const segmentSize = Math.ceil(totalBytes / segmentCount)
-  const ranges = []
-  for (let index = 0; index < segmentCount; index += 1) {
-    const start = index * segmentSize
-    const end = Math.min(totalBytes - 1, start + segmentSize - 1)
-    if (start <= end) {
-      ranges.push({ index, start, end })
-    }
-  }
-
+export async function downloadCivitaiFileSegmented(download, totalBytes, resumeState = null) {
+  const ranges = resumeState?.ranges ?? buildSegmentRanges(totalBytes)
+  const segmentProgress = resumeState?.segmentProgress ?? new Array(ranges.length).fill(0)
+  const resume = Boolean(resumeState)
   download.transferMode = `segmented-${ranges.length}`
   download.totalBytes = totalBytes
-  download.bytesDownloaded = 0
-  download.progressPercent = 0
+  download.segmentProgress = segmentProgress
+  updateDownloadProgress(download, sumSegmentProgress(segmentProgress), totalBytes)
   download.updatedAt = Date.now()
   scheduleDownloadsPersist(true)
 
   await mkdir(dirname(download.targetPath), { recursive: true })
-  await safeUnlink(download.partialPath)
-  const fileHandle = await open(download.partialPath, 'w')
-  const segmentProgress = new Array(ranges.length).fill(0)
+  if (!resume) {
+    await safeUnlink(download.partialPath)
+  }
+  const fileHandle = await open(download.partialPath, resume ? 'r+' : 'w')
   let completed = false
   let segmentError = null
 
@@ -343,7 +408,8 @@ export async function downloadCivitaiFileSegmented(download, totalBytes) {
     completed = true
   } finally {
     await fileHandle.close()
-    if (!completed) {
+    download.segmentProgress = segmentProgress
+    if (!completed && download.state === 'cancelled') {
       await safeUnlink(download.partialPath)
     }
   }
@@ -355,15 +421,18 @@ export async function downloadCivitaiFileSegmented(download, totalBytes) {
 
   updateDownloadProgress(download, totalBytes, totalBytes)
   await finishCivitaiDownload(download, totalBytes, totalBytes)
+  delete download.segmentProgress
 }
 
 export async function downloadCivitaiFile(download) {
   let partialStats = await statFileIfExists(download.partialPath)
-  if (partialStats && safeTrim(download.transferMode).startsWith('segmented-')) {
+  let segmentedResumeState = getSegmentedResumeState(download, partialStats)
+  if (partialStats && safeTrim(download.transferMode).startsWith('segmented-') && !segmentedResumeState) {
     await safeUnlink(download.partialPath)
     partialStats = null
     download.bytesDownloaded = 0
     download.progressPercent = 0
+    delete download.segmentProgress
   }
   const rangeStart = partialStats?.size ?? 0
 
@@ -374,6 +443,16 @@ export async function downloadCivitaiFile(download) {
   download.updatedAt = Date.now()
   download.bytesDownloaded = rangeStart
   scheduleDownloadsPersist(true)
+
+  if (segmentedResumeState?.complete) {
+    await finishCivitaiDownload(download, segmentedResumeState.totalBytes, segmentedResumeState.totalBytes)
+    return
+  }
+
+  if (segmentedResumeState) {
+    await downloadCivitaiFileSegmented(download, segmentedResumeState.totalBytes, segmentedResumeState)
+    return
+  }
 
   if (partialStats?.size > 0 && download.totalBytes > 0 && partialStats.size >= download.totalBytes) {
     await finishCivitaiDownload(download, download.totalBytes, partialStats.size)
@@ -391,13 +470,7 @@ export async function downloadCivitaiFile(download) {
           throw error
         }
 
-        console.warn(
-          `Segmented Civitai download failed for ${download.fileName}; falling back to single stream:`,
-          error instanceof Error ? error.message : error,
-        )
-        await safeUnlink(download.partialPath)
-        download.abortController = new AbortController()
-        partialStats = null
+        throw error
       }
     }
   }

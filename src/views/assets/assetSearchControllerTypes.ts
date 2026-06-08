@@ -12,6 +12,7 @@ export type AssetSearchState = {
   activeQuery: Ref<string>
   activeModelId: Ref<string>
   activeModelVersionId: Ref<string>
+  activeTag: Ref<string>
   activeUsername: Ref<string>
   blacklistedModelIdSet: ComputedRef<Set<number>>
   currentCursor: Ref<string>
@@ -33,6 +34,7 @@ export type AssetSearchState = {
   selectedPeriod: Ref<ModelPeriod>
   selectedSort: Ref<ModelSort>
   selectedType: Ref<ModelTypeFilter>
+  tagQuery: Ref<string>
   totalItems: Ref<number>
   totalPages: Ref<number>
 }

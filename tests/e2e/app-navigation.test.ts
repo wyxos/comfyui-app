@@ -63,7 +63,7 @@ describe('companion app e2e flows', () => {
     await vi.waitFor(() => {
       expect(router.currentRoute.value.query.tab).toBeUndefined()
     })
-    await expect.element(screen.getByText('Checkpoint', { exact: true })).toBeVisible()
+    await expect.element(screen.getByRole('button', { name: 'Add checkpoint' })).toBeVisible()
   })
 
   it('paginates generation jobs separately from the running queue panel', async () => {

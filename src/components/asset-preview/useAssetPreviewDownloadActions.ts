@@ -72,6 +72,16 @@ export function useAssetPreviewDownloadActions(options: { autoStart?: boolean } 
       return
     }
 
+    const existingDownload = downloadForVersion(version)
+    const forceRedownload = existingDownload?.state === 'complete'
+    if (forceRedownload) {
+      const fileName = existingDownload.fileName || file.name
+      const confirmed = window.confirm(`Re-download ${fileName}? This will replace the existing downloaded file.`)
+      if (!confirmed) {
+        return
+      }
+    }
+
     queuingDownloadKey.value = key
     downloadActionError.value = ''
 
@@ -96,7 +106,7 @@ export function useAssetPreviewDownloadActions(options: { autoStart?: boolean } 
         trainedWords: version.trainedWords ?? [],
         previewImage: (imagesForVersion(version)[0] ?? null) as Record<string, unknown> | null,
         previewImages: imagesForVersion(version) as Array<Record<string, unknown>>,
-        force: downloadForVersion(version)?.state === 'complete',
+        force: forceRedownload,
       })
     } catch (caughtError) {
       downloadActionError.value = caughtError instanceof Error ? caughtError.message : 'Could not queue download.'

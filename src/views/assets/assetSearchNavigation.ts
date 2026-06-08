@@ -25,6 +25,7 @@ export type ReplaceSearchUrl = (
   primaryFileOnly?: boolean,
   modelId?: string,
   modelVersionId?: string,
+  tag?: string,
 ) => Promise<void>
 
 export type SearchRouteHref = (
@@ -40,6 +41,7 @@ export type SearchRouteHref = (
   primaryFileOnly?: boolean,
   modelId?: string,
   modelVersionId?: string,
+  tag?: string,
 ) => string
 
 export function createAssetSearchNavigation(
@@ -59,6 +61,7 @@ export function createAssetSearchNavigation(
     primaryFileOnly = state.primaryFileOnly.value,
     modelId = state.modelIdQuery.value,
     modelVersionId = state.modelVersionIdQuery.value,
+    tag = state.tagQuery.value,
   ) {
     return buildAssetSearchRouteQuery(state.route.query, {
       searchTerm,
@@ -68,6 +71,7 @@ export function createAssetSearchNavigation(
       cursor,
       modelId,
       modelVersionId,
+      tag,
       username,
       typeFilter,
       sort,
@@ -91,6 +95,7 @@ export function createAssetSearchNavigation(
     primaryFileOnly = state.primaryFileOnly.value,
     modelId = state.modelIdQuery.value,
     modelVersionId = state.modelVersionIdQuery.value,
+    tag = state.tagQuery.value,
   ) => {
     await state.router[mode]({
       query: buildSearchRouteQuery(
@@ -106,6 +111,7 @@ export function createAssetSearchNavigation(
         primaryFileOnly,
         modelId,
         modelVersionId,
+        tag,
       ),
     })
   }
@@ -123,6 +129,7 @@ export function createAssetSearchNavigation(
     primaryFileOnly = state.primaryFileOnly.value,
     modelId = state.modelIdQuery.value,
     modelVersionId = state.modelVersionIdQuery.value,
+    tag = state.tagQuery.value,
   ) => state.router.resolve({
     path: '/assets',
     query: buildSearchRouteQuery(
@@ -138,6 +145,7 @@ export function createAssetSearchNavigation(
       primaryFileOnly,
       modelId,
       modelVersionId,
+      tag,
     ),
   }).href
 

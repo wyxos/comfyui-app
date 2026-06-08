@@ -177,6 +177,37 @@ describe('createAssetDownloadActions', () => {
       modelVersions: [lockedVersion],
     })).toBe('Watching')
   })
+
+  it('requires confirmation before redownloading a completed version from asset cards', async () => {
+    const queueDownload = vi.fn()
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const { createAssetDownloadActions } = await import('../../src/views/assets/assetDownloadActions')
+    const actions = createAssetDownloadActions({
+      downloadByVersionId: computed(() => new Map([
+        [201, [{ id: 'complete-version', state: 'complete', versionId: 201, fileName: 'v1.safetensors' }]],
+      ])),
+      downloadActionError: ref(''),
+      downloadActionNotice: ref(''),
+      openDownloadMenuKey: ref(''),
+      queuingDownloadKey: ref(''),
+      queueDownload,
+    } as never)
+
+    await actions.queueAssetDownload({
+      id: 101,
+      name: 'Single version LoRA',
+      type: 'LORA',
+      nsfw: false,
+      modelVersions: [modelVersion(201, 'v1.safetensors')],
+    }, modelVersion(201, 'v1.safetensors'))
+
+    expect(queueDownload).not.toHaveBeenCalled()
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'Re-download v1.safetensors? This will replace the existing downloaded file.',
+    )
+
+    confirmSpy.mockRestore()
+  })
 })
 
 function modelVersion(id: number, fileName: string) {

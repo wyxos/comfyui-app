@@ -24,6 +24,7 @@ type HomeRuntimeActionDeps = {
     enabled?: boolean,
     enabledTriggerWords?: string[],
     triggerWordWeights?: Record<string, unknown>,
+    mode?: Pick<LoraSelection, 'applyToAllCompatible' | 'appliedByAllCompatible'>,
   ) => LoraSelection
   canResetForm: HomeSelectionComputed['canResetForm']
   clearControlNetInstances: () => void
@@ -325,6 +326,10 @@ async function loadLoras() {
             selection.enabled,
             selection.enabledTriggerWords,
             selection.triggerWordWeights,
+            {
+              applyToAllCompatible: selection.applyToAllCompatible === true,
+              appliedByAllCompatible: selection.appliedByAllCompatible === true,
+            },
           ),
         ),
     }))

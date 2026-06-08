@@ -13,6 +13,7 @@ import { extractCheckpointList, extractControlNetList, extractDefaultLoraStrengt
 import { serializeControlNetPreprocessors } from '../controlnet-options.mjs'
 import { comfySocketConnected } from '../comfy-socket.mjs'
 import { handleCivitaiImagesProxyWithFallback } from '../civitai-image-page.mjs'
+import { modelFromCivitaiVersionWithHydration } from '../civitai-model-lookup.mjs'
 
 export async function handleCheckpointList(response) {
   try {
@@ -365,41 +366,6 @@ function civitaiSingleModelMetadata(items) {
   }
 }
 
-function normalizeCivitaiVersionForModel(version) {
-  if (!version || typeof version !== 'object') {
-    return null
-  }
-
-  const versionId = parseCivitaiLookupId(version.id)
-  if (!versionId) {
-    return null
-  }
-
-  return {
-    ...version,
-    id: versionId,
-  }
-}
-
-function modelFromCivitaiVersion(version) {
-  const modelId = parseCivitaiLookupId(version?.modelId ?? version?.model?.id)
-  const modelVersion = normalizeCivitaiVersionForModel(version)
-  if (!modelId || !modelVersion) {
-    return null
-  }
-
-  return {
-    id: modelId,
-    name: safeTrim(version?.model?.name) || `Civitai model ${modelId}`,
-    type: safeTrim(version?.model?.type) || 'Unknown',
-    nsfw: version?.model?.nsfw === true,
-    creator: version?.model?.creator ?? null,
-    stats: version?.model?.stats ?? version?.stats ?? undefined,
-    tags: Array.isArray(version?.model?.tags) ? version.model.tags : [],
-    modelVersions: [modelVersion],
-  }
-}
-
 function sendCivitaiSingleModelResponse(response, model) {
   const items = model ? [model] : []
   return sendJson(response, 200, {
@@ -417,7 +383,7 @@ export async function handleCivitaiModelsProxy(url, response, request) {
       return
     }
 
-    const model = modelFromCivitaiVersion(version)
+    const model = await modelFromCivitaiVersionWithHydration(version, request)
     if (!model) {
       return sendError(
         response,

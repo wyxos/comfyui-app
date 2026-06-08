@@ -2,11 +2,13 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import {
   Check,
+  ExternalLink,
   Minus,
   Plus,
   X,
 } from 'lucide-vue-next'
 import AssetPreviewModal from '../../components/asset-preview/AssetPreviewModal.vue'
+import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
 import { useProvidedHomeView } from './homeViewContext'
 import type { HomeCheckpointEntry, HomeLoraSelection } from './useHomeView'
@@ -34,6 +36,7 @@ const {
   getLoraCompatibilityMetadata,
   toggleCheckpointLora,
   setCheckpointLoraStrength,
+  toggleLoraAllCompatible,
   removeCheckpointLora,
   assetPreviewDownloadActions,
   applyGenerationMetadataFromSource,
@@ -68,12 +71,57 @@ const loraTriggerWords = computed(() => getLoraTriggerWords(props.lora.name))
 const loraCivitaiModelId = computed(() => loraCompatibility.value?.modelId ?? null)
 const loraCivitaiVersionId = computed(() => loraCompatibility.value?.versionId ?? null)
 const canOpenLoraPreview = computed(() => Boolean(loraPreviewUrl.value || loraCivitaiModelId.value))
+const loraCivitaiUrl = computed(() => {
+  if (!loraCivitaiModelId.value) {
+    return ''
+  }
+
+  const versionQuery = loraCivitaiVersionId.value
+    ? `?modelVersionId=${encodeURIComponent(String(loraCivitaiVersionId.value))}`
+    : ''
+
+  return `https://civitai.com/models/${loraCivitaiModelId.value}${versionQuery}`
+})
+const allCompatibleModeLabel = computed(() => {
+  if (props.lora.appliedByAllCompatible) {
+    return 'Applied via all compatible'
+  }
+
+  return props.lora.applyToAllCompatible ? 'Applies to compatible' : ''
+})
+const areAllLoraTriggerWordsEnabled = computed(() => {
+  return (
+    props.lora.enabled &&
+    loraTriggerWords.value.length > 0 &&
+    loraTriggerWords.value.every((triggerWord) =>
+      isLoraTriggerWordEnabled(props.lora, triggerWord),
+    )
+  )
+})
+const allLoraTriggerWordsSwitchLabel = computed(() => {
+  const action = areAllLoraTriggerWordsEnabled.value ? 'Disable' : 'Enable'
+
+  return `${action} all trigger words for ${loraDisplayName.value}`
+})
 
 function updateStrength(event: Event) {
   const target = event.target
   if (target instanceof HTMLInputElement) {
     setCheckpointLoraStrength(props.checkpoint.name, props.lora.name, target.value)
   }
+}
+
+function toggleAllLoraTriggerWords() {
+  if (!props.lora.enabled) {
+    return
+  }
+
+  if (areAllLoraTriggerWordsEnabled.value) {
+    disableAllLoraTriggerWords(props.lora)
+    return
+  }
+
+  enableAllLoraTriggerWords(props.lora)
 }
 
 function openLoraPreview() {
@@ -123,7 +171,9 @@ onBeforeUnmount(() => {
   <div
     class="rounded-md border px-3 py-3 transition-colors"
     :class="
-      lora.enabled
+      lora.appliedByAllCompatible
+        ? 'border-secondary/45 bg-secondary/8'
+        : lora.enabled
         ? 'border-primary-foreground/12 bg-primary'
         : 'border-primary-foreground/20 bg-primary-foreground/6'
     "
@@ -136,28 +186,26 @@ onBeforeUnmount(() => {
         :aria-label="`Open ${lora.name} preview`"
         @click="openLoraPreview"
       >
-        <video
-          v-if="loraPreviewIsVideo"
-          class="h-full w-full object-cover"
+        <UiPreloadedMedia
           :src="loraPreviewUrl"
+          :is-video="loraPreviewIsVideo"
+          :alt="`${lora.name} preview`"
+          label=""
+          media-class="h-full w-full object-cover"
+          loading-class="bg-primary/80 text-primary-foreground"
+          spinner-class="mr-0 h-4 w-4"
           muted
           loop
           autoplay
           playsinline
           preload="metadata"
-          :aria-label="`${lora.name} video preview`"
-        />
-        <img
-          v-else
-          class="h-full w-full object-cover"
-          :src="loraPreviewUrl"
-          :alt="`${lora.name} preview`"
-          loading="lazy"
+          :aria-label="loraPreviewIsVideo ? `${lora.name} video preview` : undefined"
+          :loading="loraPreviewIsVideo ? undefined : 'lazy'"
         />
       </button>
 
       <div class="min-w-0 flex-1">
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
           <button
             v-if="canOpenLoraPreview"
             type="button"
@@ -172,7 +220,23 @@ onBeforeUnmount(() => {
           >
             {{ loraDisplayName }}
           </p>
+          <UiTooltip
+            v-if="loraCivitaiUrl"
+            content="Open on Civitai"
+          >
+            <a
+              :href="loraCivitaiUrl"
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-primary-foreground/12 bg-card text-primary-foreground/58 transition hover:border-secondary/45 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25"
+              :aria-label="`Open ${loraDisplayName} on Civitai`"
+              @click.stop
+            >
+              <ExternalLink class="h-3.5 w-3.5" />
+            </a>
+          </UiTooltip>
           <span
+            v-if="loraCompatibilityStatus !== 'compatible'"
             class="rounded-sm border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]"
             :class="
               loraCompatibilityStatus === 'warning'
@@ -181,6 +245,12 @@ onBeforeUnmount(() => {
             "
           >
             {{ getLoraCompatibilityLabel(checkpoint, lora.name) }}
+          </span>
+          <span
+            v-if="allCompatibleModeLabel"
+            class="rounded-sm border border-secondary/45 bg-secondary/14 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-secondary"
+          >
+            {{ allCompatibleModeLabel }}
           </span>
         </div>
         <p
@@ -192,6 +262,28 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="flex flex-wrap items-center justify-end gap-2">
+        <div class="flex items-center gap-2 text-[11px] text-primary-foreground/60">
+          <span>All compatible</span>
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="Boolean(lora.applyToAllCompatible || lora.appliedByAllCompatible)"
+            :aria-label="`Apply ${lora.name} to all compatible checkpoints`"
+            class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-ring/25"
+            :class="
+              lora.applyToAllCompatible || lora.appliedByAllCompatible
+                ? 'border-secondary bg-secondary'
+                : 'border-primary-foreground/12 bg-primary-foreground/8'
+            "
+            @click="toggleLoraAllCompatible(checkpoint.name, lora.name)"
+          >
+            <span
+              class="inline-block h-4 w-4 rounded-full bg-primary-foreground shadow-sm transition-transform"
+              :class="lora.applyToAllCompatible || lora.appliedByAllCompatible ? 'translate-x-5' : 'translate-x-1'"
+            />
+          </button>
+        </div>
+
         <label class="flex items-center gap-2 text-[11px] text-primary-foreground/60">
           <span>Strength</span>
           <input
@@ -239,22 +331,26 @@ onBeforeUnmount(() => {
         <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-foreground/48">
           Trigger words
         </p>
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-2 text-[11px] text-primary-foreground/60">
+          <span>All trigger words</span>
           <button
             type="button"
-            class="inline-flex h-6 items-center rounded-sm border border-secondary/35 bg-secondary/10 px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-secondary transition hover:border-secondary hover:bg-secondary/16 disabled:cursor-not-allowed disabled:opacity-45"
+            role="switch"
+            :aria-checked="areAllLoraTriggerWordsEnabled"
+            :aria-label="allLoraTriggerWordsSwitchLabel"
             :disabled="!lora.enabled"
-            @click="enableAllLoraTriggerWords(lora)"
+            class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-45"
+            :class="
+              areAllLoraTriggerWordsEnabled
+                ? 'border-secondary bg-secondary'
+                : 'border-primary-foreground/12 bg-primary-foreground/8'
+            "
+            @click="toggleAllLoraTriggerWords"
           >
-            All on
-          </button>
-          <button
-            type="button"
-            class="inline-flex h-6 items-center rounded-sm border border-primary-foreground/12 bg-card px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-primary-foreground/56 transition hover:border-primary-foreground/28 hover:text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
-            :disabled="!lora.enabled"
-            @click="disableAllLoraTriggerWords(lora)"
-          >
-            All off
+            <span
+              class="inline-block h-4 w-4 rounded-full bg-primary-foreground shadow-sm transition-transform"
+              :class="areAllLoraTriggerWordsEnabled ? 'translate-x-5' : 'translate-x-1'"
+            />
           </button>
         </div>
       </div>

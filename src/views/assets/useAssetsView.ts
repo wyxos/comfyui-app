@@ -6,14 +6,15 @@ import { createAssetDownloadActions } from './assetDownloadActions'
 import { createAssetSearchController } from './assetSearchController'
 import {
   ASSET_SEARCH_PRESETS,
-  BASE_MODEL_OPTIONS,
   BLACKLIST_STORAGE_KEY,
+  DEFAULT_BASE_MODEL_LABEL,
   DEFAULT_BASE_MODELS,
   DEFAULT_PERIOD,
   DEFAULT_SORT,
   MODEL_PERIOD_OPTIONS,
   MODEL_SORT_OPTIONS,
   MODEL_TYPE_OPTIONS,
+  VISIBLE_BASE_MODEL_OPTIONS,
   type BaseModelFilter,
   type CivitaiModel,
   type ModelPeriod,
@@ -63,10 +64,12 @@ const searched = ref(false)
 const activeQuery = ref('')
 const activeModelId = ref('')
 const activeModelVersionId = ref('')
+const activeTag = ref('')
 const activeUsername = ref('')
 const hasStoredCivitaiApiKey = ref(false)
 const modelIdQuery = ref('')
 const modelVersionIdQuery = ref('')
+const tagQuery = ref('')
 const primaryFileOnly = ref(false)
 const currentPage = ref(1)
 const totalItems = ref(0)
@@ -129,6 +132,7 @@ const {
   activeQuery,
   activeModelId,
   activeModelVersionId,
+  activeTag,
   activeUsername,
   blacklistedModelIdSet,
   currentCursor,
@@ -139,6 +143,7 @@ const {
   loading,
   modelIdQuery,
   modelVersionIdQuery,
+  tagQuery,
   models,
   nextCursor,
   primaryFileOnly,
@@ -164,6 +169,8 @@ const hasSearchInput = computed(() => {
       modelVersionIdQuery.value ||
       activeModelId.value ||
       activeModelVersionId.value ||
+      tagQuery.value.trim() ||
+      activeTag.value ||
       activeUsername.value ||
       selectedType.value,
     )
@@ -193,7 +200,7 @@ const selectedBaseModelLabel = computed(() => {
   }
 
   if (areSameBaseModels(selectedBaseModels.value, DEFAULT_BASE_MODELS)) {
-    return 'SDXL, Flux, Pony, Illustrious, Anima'
+    return DEFAULT_BASE_MODEL_LABEL
   }
 
   return `${selectedBaseModels.value.length} base model${selectedBaseModels.value.length === 1 ? '' : 's'}`
@@ -209,6 +216,10 @@ const resultSummary = computed(() => {
 
     if (activeUsername.value) {
       return `Loading @${activeUsername.value}`
+    }
+
+    if (activeTag.value) {
+      return `Loading #${activeTag.value}`
     }
 
     if (activeQuery.value) {
@@ -237,6 +248,10 @@ const resultSummary = computed(() => {
 
     if (activeUsername.value) {
       return `No models by @${activeUsername.value}`
+    }
+
+    if (activeTag.value) {
+      return `No models tagged "${activeTag.value}"`
     }
 
     if (activeQuery.value) {
@@ -373,7 +388,7 @@ onBeforeUnmount(() => {
     MODEL_SORT_OPTIONS,
     MODEL_PERIOD_OPTIONS,
     ASSET_SEARCH_PRESETS,
-    BASE_MODEL_OPTIONS,
+    BASE_MODEL_OPTIONS: VISIBLE_BASE_MODEL_OPTIONS,
     query,
     includeNsfw,
     selectedType,
@@ -387,10 +402,12 @@ onBeforeUnmount(() => {
     activeQuery,
     activeModelId,
     activeModelVersionId,
+    activeTag,
     activeUsername,
     hasStoredCivitaiApiKey,
     modelIdQuery,
     modelVersionIdQuery,
+    tagQuery,
     primaryFileOnly,
     currentPage,
     activeImageModel,

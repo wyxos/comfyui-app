@@ -9,6 +9,7 @@ import {
   Trash2,
   X,
 } from 'lucide-vue-next'
+import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import type { AssetDownloadItem, AssetDownloadState } from '../../composables/useAssetDownloads'
 
 const props = withDefaults(defineProps<{
@@ -163,22 +164,23 @@ function isBusy(action: DownloadAction) {
     <td class="px-3 py-2">
       <div class="flex min-w-0 items-center gap-3">
         <div class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border bg-background">
-          <video
-            v-if="previewFor(item) && isVideoPreview(item)"
-            class="h-full w-full object-cover"
-            :class="shouldBlurPreview(item) ? 'scale-110 blur-sm saturate-50' : ''"
-            :src="previewFor(item)"
+          <UiPreloadedMedia
+            v-if="previewFor(item)"
+            :src="previewFor(item) ?? ''"
+            :is-video="isVideoPreview(item)"
+            :alt="`${item.modelName} preview`"
+            label=""
+            :media-class="[
+              'h-full w-full object-cover',
+              shouldBlurPreview(item) ? 'scale-110 blur-sm saturate-50' : '',
+            ].filter(Boolean).join(' ')"
+            loading-class="bg-background text-muted-foreground"
+            spinner-class="mr-0 h-4 w-4"
             muted
             playsinline
+            preload="metadata"
+            :loading="isVideoPreview(item) ? undefined : 'lazy'"
           />
-          <img
-            v-else-if="previewFor(item)"
-            class="h-full w-full object-cover"
-            :class="shouldBlurPreview(item) ? 'scale-110 blur-sm saturate-50' : ''"
-            :src="previewFor(item)"
-            :alt="`${item.modelName} preview`"
-            loading="lazy"
-          >
           <FileDown
             v-else
             class="h-5 w-5 text-muted-foreground"

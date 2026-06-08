@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Hash, Search } from 'lucide-vue-next'
+import { Hash, Search, Tag } from 'lucide-vue-next'
 import UiSelect from '../../components/ui/UiSelect.vue'
 import { useProvidedAssetsView } from './assetsViewContext'
 
@@ -10,6 +10,7 @@ const {
   ASSET_SEARCH_PRESETS,
   BASE_MODEL_OPTIONS,
   query,
+  tagQuery,
   modelIdQuery,
   modelVersionIdQuery,
   includeNsfw,
@@ -57,7 +58,25 @@ const {
           >
         </div>
 
-        <div class="grid shrink-0 grid-cols-2 gap-2 sm:flex">
+        <div class="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-3 xl:flex">
+          <label
+            class="sr-only"
+            for="asset-tag"
+          >
+            Tag
+          </label>
+          <div class="relative min-w-0">
+            <Tag class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              id="asset-tag"
+              v-model="tagQuery"
+              class="h-12 w-full rounded-md border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-ring/25 sm:w-36"
+              placeholder="Tag"
+              type="search"
+              autocomplete="off"
+            >
+          </div>
+
           <label
             class="sr-only"
             for="asset-model-id"

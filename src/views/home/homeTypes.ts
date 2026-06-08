@@ -44,6 +44,8 @@ export type LoraSelection = {
   strength: string
   enabledTriggerWords?: string[]
   triggerWordWeights?: Record<string, string>
+  applyToAllCompatible?: boolean
+  appliedByAllCompatible?: boolean
 }
 
 export type ModelCompatibilityMetadata = {

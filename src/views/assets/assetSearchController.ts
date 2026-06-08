@@ -11,6 +11,7 @@ import {
   parseRoutePeriod,
   parseRoutePrimaryFileOnly,
   parseRouteSort,
+  parseRouteTag,
   parseRouteType,
   queryStringValue,
 } from './assetRouteHelpers'
@@ -77,6 +78,7 @@ export function createAssetSearchController(state: AssetSearchState) {
     const period = state.selectedPeriod.value
     const baseModels = state.selectedBaseModels.value
     const primaryFileOnly = state.primaryFileOnly.value
+    const tag = parseRouteTag(state.tagQuery.value)
     const modelId = parseRouteCivitaiId(state.modelIdQuery.value)
     const modelVersionId = parseRouteCivitaiId(state.modelVersionIdQuery.value)
     const normalizedCursor = cursor.trim()
@@ -92,6 +94,7 @@ export function createAssetSearchController(state: AssetSearchState) {
       baseModels,
       modelId,
       modelVersionId,
+      tag,
     )
     if (state.loading.value && searchKey === lastSearchKey) {
       return
@@ -107,6 +110,7 @@ export function createAssetSearchController(state: AssetSearchState) {
     state.activeQuery.value = term
     state.activeModelId.value = modelId
     state.activeModelVersionId.value = modelVersionId
+    state.activeTag.value = tag
     state.activeUsername.value = username
     state.currentPage.value = page
     state.currentCursor.value = normalizedCursor
@@ -131,6 +135,10 @@ export function createAssetSearchController(state: AssetSearchState) {
 
       if (term.length >= 2) {
         params.set('query', term)
+      }
+
+      if (tag) {
+        params.set('tag', tag)
       }
 
       if (username) {
@@ -208,6 +216,7 @@ export function createAssetSearchController(state: AssetSearchState) {
     const hasRouteNsfw = firstQueryValue(state.route.query.nsfw) !== undefined
     const routeNsfw = hasRouteNsfw ? parseRouteNsfw(state.route.query.nsfw) : defaultIncludeNsfw
     const routePrimaryFileOnly = parseRoutePrimaryFileOnly(state.route.query.primaryFileOnly)
+    const routeTag = parseRouteTag(state.route.query.tag)
     const routeUsername = queryStringValue(firstQueryValue(state.route.query.username)).trim()
     const routeType = parseRouteType(state.route.query.types)
     const routeSort = parseRouteSort(state.route.query.sort)
@@ -219,6 +228,7 @@ export function createAssetSearchController(state: AssetSearchState) {
     state.query.value = routeQuery
     state.modelIdQuery.value = routeModelId
     state.modelVersionIdQuery.value = routeModelVersionId
+    state.tagQuery.value = routeTag
     state.includeNsfw.value = routeNsfw
     state.primaryFileOnly.value = routePrimaryFileOnly
     state.selectedType.value = routeType
@@ -246,6 +256,7 @@ export function createAssetSearchController(state: AssetSearchState) {
       routeBaseModels,
       routeModelId,
       routeModelVersionId,
+      routeTag,
     )
     if (searchKey === lastSearchKey && state.searched.value) {
       return
@@ -276,8 +287,36 @@ export function createAssetSearchController(state: AssetSearchState) {
           state.primaryFileOnly.value,
           '',
           '',
+          state.tagQuery.value,
         )
       }, 450)
+    })
+
+    watch(state.tagQuery, (value) => {
+      if (suppressQueryWatch) {
+        return
+      }
+
+      window.clearTimeout(debounceId)
+      cursorHistory.length = 0
+      debounceId = window.setTimeout(() => {
+        void replaceSearchUrl(
+          state.query.value,
+          1,
+          state.includeNsfw.value,
+          '',
+          'replace',
+          state.activeUsername.value,
+          state.selectedType.value,
+          state.selectedSort.value,
+          state.selectedPeriod.value,
+          state.selectedBaseModels.value,
+          state.primaryFileOnly.value,
+          '',
+          '',
+          value,
+        )
+      }, 350)
     })
 
     watch([state.modelIdQuery, state.modelVersionIdQuery], ([modelId, modelVersionId]) => {
@@ -302,6 +341,7 @@ export function createAssetSearchController(state: AssetSearchState) {
           state.primaryFileOnly.value,
           modelId,
           modelVersionId,
+          '',
         )
       }, 350)
     })
@@ -351,6 +391,7 @@ export function createAssetSearchController(state: AssetSearchState) {
         state.route.query.modelId,
         state.route.query.modelVersionId,
         state.route.query.versionId,
+        state.route.query.tag,
         state.route.query.username,
         state.route.query.types,
         state.route.query.sort,

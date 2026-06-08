@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Check, ClipboardPaste, Copy, RefreshCw, Ruler, SlidersHorizontal, Trash2, Upload, X } from 'lucide-vue-next'
 import UiSelect from '../../components/ui/UiSelect.vue'
+import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
 import HomeControlNetNumberInput from './HomeControlNetNumberInput.vue'
 import { useProvidedHomeView } from './homeViewContext'
@@ -284,16 +285,15 @@ onBeforeUnmount(() => {
         @drop.prevent="handleControlNetImageDrop(controlNet.id, $event, checkpointName)"
         @paste="handleControlNetImagePaste(controlNet.id, $event, checkpointName)"
       >
-        <img
+        <UiPreloadedMedia
           v-if="controlNet.inputImagePreviewUrl"
           :src="controlNet.inputImagePreviewUrl"
           alt="ControlNet source image"
-          class="mx-auto block max-h-72 max-w-full object-contain"
+          media-class="mx-auto block max-h-72 max-w-full object-contain"
+          loading-class="bg-background/80 text-card-foreground"
         />
 
-        <div
-          class="absolute right-3 top-3 z-10 flex items-center gap-2"
-        >
+        <div class="absolute right-3 top-3 z-10 flex items-center gap-2">
           <UiTooltip content="Paste control image from clipboard">
             <button
               type="button"
@@ -391,11 +391,12 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="relative grid min-h-56 place-items-center overflow-hidden rounded-md border border-input bg-background">
-        <img
+        <UiPreloadedMedia
           v-if="controlNet.previewImageUrl"
           :src="controlNet.previewImageUrl"
           alt="ControlNet preprocessor preview"
-          class="mx-auto block max-h-72 max-w-full object-contain"
+          media-class="mx-auto block max-h-72 max-w-full object-contain"
+          loading-class="bg-background/80 text-card-foreground"
         />
 
         <div

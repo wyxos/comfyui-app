@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { X } from 'lucide-vue-next'
+import { ChevronDown, X } from 'lucide-vue-next'
 import AssetPreviewModal from '../../components/asset-preview/AssetPreviewModal.vue'
+import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
 import { useProvidedHomeView } from './homeViewContext'
 import HomeCheckpointControlNetPicker from './HomeCheckpointControlNetPicker.vue'
@@ -32,8 +33,11 @@ const {
 } = assetPreviewDownloadActions
 
 const isCheckpointPreviewOpen = ref(false)
+const isAssetsExpanded = ref(true)
 const savingSafety = ref(false)
 const safetyError = ref('')
+const loraCount = computed(() => props.checkpoint.loras.length)
+const controlNetCount = computed(() => props.checkpoint.controlNets?.length ?? 0)
 const checkpointPreviewIsVideo = computed(() =>
   isVideoPreview(props.checkpoint.previewUrl, props.checkpoint.previewMediaType),
 )
@@ -45,6 +49,11 @@ const checkpointPreviewSubtitle = computed(() =>
 const checkpointCivitaiModelId = computed(() => props.checkpoint.compatibility?.modelId ?? null)
 const checkpointCivitaiVersionId = computed(() => props.checkpoint.compatibility?.versionId ?? null)
 const canOpenCheckpointPreview = computed(() => Boolean(props.checkpoint.previewUrl || checkpointCivitaiModelId.value))
+const assetDetailsId = computed(() => `checkpoint-assets-${props.checkpoint.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`)
+
+function assetCountLabel(count: number, singular: string) {
+  return `${count} ${singular}${count === 1 ? '' : 's'}`
+}
 
 function openCheckpointPreview() {
   if (canOpenCheckpointPreview.value) {
@@ -106,23 +115,21 @@ onBeforeUnmount(() => {
         :aria-label="`Open ${checkpoint.name} preview`"
         @click="openCheckpointPreview"
       >
-        <video
-          v-if="checkpointPreviewIsVideo"
-          class="h-full w-full object-cover"
+        <UiPreloadedMedia
           :src="checkpoint.previewUrl"
+          :is-video="checkpointPreviewIsVideo"
+          :alt="`${checkpoint.name} preview`"
+          label=""
+          media-class="h-full w-full object-cover"
+          loading-class="bg-primary/80 text-primary-foreground"
+          spinner-class="mr-0 h-4 w-4"
           muted
           loop
           autoplay
           playsinline
           preload="metadata"
-          :aria-label="`${checkpoint.name} video preview`"
-        />
-        <img
-          v-else
-          class="h-full w-full object-cover"
-          :src="checkpoint.previewUrl"
-          :alt="`${checkpoint.name} preview`"
-          loading="lazy"
+          :aria-label="checkpointPreviewIsVideo ? `${checkpoint.name} video preview` : undefined"
+          :loading="checkpointPreviewIsVideo ? undefined : 'lazy'"
         />
       </button>
 
@@ -151,19 +158,32 @@ onBeforeUnmount(() => {
           <span class="rounded-sm border border-primary-foreground/12 bg-primary-foreground/8 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary-foreground/70">
             {{ checkpoint.family }}
           </span>
-          <span class="text-[11px] text-primary-foreground/48">
-            {{ checkpoint.enabled ? 'Enabled' : 'Disabled' }}
+          <span class="rounded-sm border border-primary-foreground/12 bg-primary-foreground/8 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary-foreground/58">
+            {{ assetCountLabel(loraCount, 'LoRA') }}
           </span>
-          <span
-            v-if="checkpoint.downloaded"
-            class="rounded-sm border border-secondary/35 bg-secondary/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-secondary"
-          >
-            Downloaded
+          <span class="rounded-sm border border-primary-foreground/12 bg-primary-foreground/8 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary-foreground/58">
+            {{ assetCountLabel(controlNetCount, 'ControlNet') }}
           </span>
         </div>
       </div>
 
       <div class="flex items-center gap-2">
+        <UiTooltip :content="isAssetsExpanded ? 'Collapse assets' : 'Expand assets'">
+          <button
+            type="button"
+            :aria-expanded="isAssetsExpanded"
+            :aria-controls="assetDetailsId"
+            :aria-label="`${isAssetsExpanded ? 'Collapse' : 'Expand'} checkpoint assets`"
+            class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary-foreground/12 bg-primary-foreground/8 text-primary-foreground/64 transition hover:border-accent hover:text-primary-foreground focus:border-accent focus:outline-none focus:ring-2 focus:ring-ring/25"
+            @click="isAssetsExpanded = !isAssetsExpanded"
+          >
+            <ChevronDown
+              class="h-4 w-4 transition-transform"
+              :class="isAssetsExpanded ? 'rotate-0' : '-rotate-90'"
+            />
+          </button>
+        </UiTooltip>
+
         <button
           type="button"
           role="switch"
@@ -192,8 +212,13 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <HomeCheckpointLoraPicker :checkpoint="checkpoint" />
-    <HomeCheckpointControlNetPicker :checkpoint="checkpoint" />
+    <div
+      v-show="isAssetsExpanded"
+      :id="assetDetailsId"
+    >
+      <HomeCheckpointLoraPicker :checkpoint="checkpoint" />
+      <HomeCheckpointControlNetPicker :checkpoint="checkpoint" />
+    </div>
 
     <AssetPreviewModal
       :open="isCheckpointPreviewOpen"

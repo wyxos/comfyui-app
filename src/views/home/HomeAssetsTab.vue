@@ -18,6 +18,12 @@ const {
 } = useProvidedHomeView()
 
 const isCheckpointPickerOpen = ref(false)
+const areAllSelectedCheckpointsEnabled = computed(() => {
+  return (
+    selectedCheckpointEntries.value.length > 0 &&
+    selectedCheckpointEntries.value.every((checkpoint) => checkpoint.enabled)
+  )
+})
 const canOpenCheckpointPicker = computed(() => {
   return !loadingCheckpoints.value && checkpoints.value.length > 0 && checkpointOptions.value.length > 0
 })
@@ -31,6 +37,10 @@ function openCheckpointPicker() {
 function selectCheckpoint(value: string) {
   addSelectedCheckpoint(value)
 }
+
+function toggleAllSelectedCheckpoints() {
+  setAllSelectedCheckpointsEnabled(!areAllSelectedCheckpointsEnabled.value)
+}
 </script>
 
 <template>
@@ -39,32 +49,6 @@ function selectCheckpoint(value: string) {
     class="space-y-5"
   >
     <div class="space-y-3">
-      <label class="flex flex-col gap-2">
-        <span class="field-label">Checkpoint</span>
-        <button
-          type="button"
-          class="flex min-h-12 w-full items-center justify-between gap-3 rounded-md border border-input bg-card px-3 py-2 text-left text-sm text-card-foreground outline-none transition hover:border-accent hover:bg-accent/8 focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-60"
-          aria-label="Add checkpoint"
-          :disabled="!canOpenCheckpointPicker"
-          @click="openCheckpointPicker"
-        >
-          <span class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-            <LoaderCircle
-              v-if="loadingCheckpoints"
-              class="h-4 w-4 shrink-0 animate-spin text-secondary"
-            />
-            <Plus
-              v-else
-              class="h-4 w-4 shrink-0 text-secondary"
-            />
-            <span class="truncate">{{ checkpointPickerPlaceholder }}</span>
-          </span>
-          <span class="shrink-0 rounded-sm border border-border bg-background px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-            {{ checkpointOptions.length }}
-          </span>
-        </button>
-      </label>
-
       <div
         v-if="loadingCheckpoints"
         role="status"
@@ -77,20 +61,27 @@ function selectCheckpoint(value: string) {
 
       <template v-if="selectedCheckpointEntries.length">
         <div class="flex flex-wrap items-center justify-end gap-1">
-          <button
-            type="button"
-            class="inline-flex h-6 items-center rounded-sm border border-secondary/35 bg-secondary/10 px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-secondary transition hover:border-secondary hover:bg-secondary/16"
-            @click="setAllSelectedCheckpointsEnabled(true)"
-          >
-            All on
-          </button>
-          <button
-            type="button"
-            class="inline-flex h-6 items-center rounded-sm border border-primary-foreground/12 bg-card px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-primary-foreground/56 transition hover:border-primary-foreground/28 hover:text-primary-foreground"
-            @click="setAllSelectedCheckpointsEnabled(false)"
-          >
-            All off
-          </button>
+          <div class="flex items-center gap-2 text-[11px] text-primary-foreground/60">
+            <span>All checkpoints</span>
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="areAllSelectedCheckpointsEnabled"
+              :aria-label="`${areAllSelectedCheckpointsEnabled ? 'Disable' : 'Enable'} all checkpoints`"
+              class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-ring/25"
+              :class="
+                areAllSelectedCheckpointsEnabled
+                  ? 'border-secondary bg-secondary'
+                  : 'border-primary-foreground/12 bg-primary-foreground/8'
+              "
+              @click="toggleAllSelectedCheckpoints"
+            >
+              <span
+                class="inline-block h-4 w-4 rounded-full bg-primary-foreground shadow-sm transition-transform"
+                :class="areAllSelectedCheckpointsEnabled ? 'translate-x-5' : 'translate-x-1'"
+              />
+            </button>
+          </div>
           <button
             type="button"
             class="inline-flex h-6 items-center gap-1 rounded-sm border border-destructive/40 bg-destructive/10 px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-destructive transition hover:border-destructive hover:bg-destructive hover:text-destructive-foreground"
@@ -116,6 +107,29 @@ function selectCheckpoint(value: string) {
       >
           Add one or more checkpoints. Each enabled checkpoint submits its own ComfyUI job.
       </p>
+
+      <button
+        type="button"
+        class="flex min-h-12 w-full items-center justify-between gap-3 rounded-md border border-input bg-card px-3 py-2 text-left text-sm text-card-foreground outline-none transition hover:border-accent hover:bg-accent/8 focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-60"
+        aria-label="Add checkpoint"
+        :disabled="!canOpenCheckpointPicker"
+        @click="openCheckpointPicker"
+      >
+        <span class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+          <LoaderCircle
+            v-if="loadingCheckpoints"
+            class="h-4 w-4 shrink-0 animate-spin text-secondary"
+          />
+          <Plus
+            v-else
+            class="h-4 w-4 shrink-0 text-secondary"
+          />
+          <span class="truncate">{{ checkpointPickerPlaceholder }}</span>
+        </span>
+        <span class="shrink-0 rounded-sm border border-border bg-background px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+          {{ checkpointOptions.length }}
+        </span>
+      </button>
     </div>
 
     <HomeAssetPickerModal

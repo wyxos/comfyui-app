@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Image as ImageIcon } from 'lucide-vue-next'
 import UiCarousel from '../../components/ui/UiCarousel.vue'
+import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import { useProvidedHomeView } from './homeViewContext'
 
 const {
@@ -51,11 +52,12 @@ const {
                   @click="openPreviewModal(index)"
                   @contextmenu="openGeneratedOutputContextMenu($event, item.output, item.checkpointName)"
                 >
-                  <img
+                  <UiPreloadedMedia
                     :src="item.output.url"
                     :alt="item.variantLabel ?? 'Generation preview'"
-                    class="block h-full max-w-full object-contain"
-                  >
+                    media-class="block h-full max-w-full object-contain"
+                    loading-class="bg-primary/80 text-primary-foreground"
+                  />
                 </button>
 
                 <div
@@ -79,11 +81,12 @@ const {
               @click="openPreviewModal()"
               @contextmenu="openGeneratedOutputContextMenu($event, selectedPreviewOutput, selectedPreviewItem?.checkpointName ?? null)"
             >
-              <img
+              <UiPreloadedMedia
                 :src="imageUrl ?? ''"
                 alt="Generation preview"
-                class="block h-full max-w-full object-contain"
-              >
+                media-class="block h-full max-w-full object-contain"
+                loading-class="bg-primary/80 text-primary-foreground"
+              />
             </button>
 
             <div
@@ -119,12 +122,15 @@ const {
               class="pointer-events-none absolute bottom-3 left-3 z-10"
             >
               <div class="flex h-[300px] w-[300px] items-center justify-center overflow-hidden rounded-md border border-primary-foreground/12 bg-primary/82 shadow-lg backdrop-blur-sm">
-                <img
+                <UiPreloadedMedia
                   data-testid="generation-input-preview"
                   :src="selectedGenerationInputImageSnapshot.url"
                   :alt="selectedGenerationInputImageSnapshot.name"
-                  class="block max-h-full max-w-full object-contain"
-                >
+                  label=""
+                  media-class="block max-h-full max-w-full object-contain"
+                  loading-class="bg-primary/80 text-primary-foreground"
+                  spinner-class="mr-0 h-4 w-4"
+                />
               </div>
             </div>
           </template>
@@ -263,11 +269,14 @@ const {
                 v-if="item.output"
                 class="aspect-square overflow-hidden rounded-sm bg-primary-foreground/8"
               >
-                <img
+                <UiPreloadedMedia
                   :src="item.output.url"
                   :alt="item.variantLabel ?? `Preview ${index + 1}`"
-                  class="h-full w-full object-cover"
-                >
+                  label=""
+                  media-class="h-full w-full object-cover"
+                  loading-class="bg-primary/80 text-primary-foreground"
+                  spinner-class="mr-0 h-4 w-4"
+                />
               </div>
 
               <div

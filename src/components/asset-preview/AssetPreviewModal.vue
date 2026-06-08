@@ -16,6 +16,7 @@ import AssetPreviewSafetyEditor from './AssetPreviewSafetyEditor.vue'
 import AssetPreviewVersionList from './AssetPreviewVersionList.vue'
 import type { AssetPreviewModalProps } from './assetPreviewTypes'
 import { useAssetPreviewModal } from './useAssetPreviewModal'
+import UiPreloadedMedia from '../ui/UiPreloadedMedia.vue'
 import { serializeGenerationMetadataClipboard } from '../../lib/generationMetadata'
 
 const props = withDefaults(
@@ -210,23 +211,20 @@ async function handleActiveImageMetadataAction() {
             Loading preview...
           </div>
 
-          <video
-            v-if="displayedImageUrl && activeSlide?.isVideo"
-            class="max-h-full max-w-full object-contain"
+          <UiPreloadedMedia
+            v-if="displayedImageUrl"
             :src="displayedImageUrl"
+            :is-video="Boolean(activeSlide?.isVideo)"
+            :alt="`${modalTitle} preview image`"
+            label=""
+            media-class="max-h-full max-w-full object-contain"
+            loading-class="hidden"
             controls
             autoplay
             loop
             playsinline
             preload="auto"
-            @loadeddata="handleModalVideoReady(displayedImageUrl)"
-            @canplay="handleModalVideoReady(displayedImageUrl)"
-          />
-          <img
-            v-else-if="displayedImageUrl"
-            class="max-h-full max-w-full object-contain"
-            :src="displayedImageUrl"
-            :alt="`${modalTitle} preview image`"
+            @ready="handleModalVideoReady"
           />
           <div
             v-else-if="!civitaiLoading"

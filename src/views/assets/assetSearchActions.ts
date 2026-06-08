@@ -40,6 +40,7 @@ export function createAssetSearchActions(state: AssetSearchState, deps: AssetSea
         state.primaryFileOnly.value,
         '',
         '',
+        '',
       )
     }
   }
@@ -58,6 +59,7 @@ export function createAssetSearchActions(state: AssetSearchState, deps: AssetSea
           state.selectedPeriod.value,
           state.selectedBaseModels.value,
           state.primaryFileOnly.value,
+          '',
           '',
           '',
         )
@@ -99,6 +101,7 @@ export function createAssetSearchActions(state: AssetSearchState, deps: AssetSea
       state.primaryFileOnly.value,
       state.modelIdQuery.value,
       '',
+      '',
     )
   }
 
@@ -119,6 +122,7 @@ export function createAssetSearchActions(state: AssetSearchState, deps: AssetSea
       state.primaryFileOnly.value,
       '',
       state.modelVersionIdQuery.value,
+      '',
     )
   }
 
@@ -136,6 +140,7 @@ export function createAssetSearchActions(state: AssetSearchState, deps: AssetSea
       preset.period,
       [...DEFAULT_BASE_MODELS],
       preset.primaryFileOnly,
+      '',
       '',
       '',
     )

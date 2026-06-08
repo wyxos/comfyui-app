@@ -8,13 +8,18 @@ import type {
   LoraSelection,
   ModelCompatibilityMetadata,
 } from './homeTypes'
-import {
-  coerceTrimmedFieldString,
-} from './homeValueHelpers'
+import { coerceTrimmedFieldString } from './homeValueHelpers'
 
 type HomeModelActionDeps = {
   buildCheckpointSelection: (name: string, enabled?: boolean, loras?: LoraSelection[]) => CheckpointSelection
-  buildLoraSelection: (name: string, strength: string | number, enabled?: boolean, enabledTriggerWords?: string[], triggerWordWeights?: Record<string, unknown>) => LoraSelection
+  buildLoraSelection: (
+    name: string,
+    strength: string | number,
+    enabled?: boolean,
+    enabledTriggerWords?: string[],
+    triggerWordWeights?: Record<string, unknown>,
+    mode?: Pick<LoraSelection, 'applyToAllCompatible' | 'appliedByAllCompatible'>,
+  ) => LoraSelection
   formatLoraStrength: (value: string | number, fallback?: number) => string
 }
 
@@ -24,7 +29,7 @@ export function createHomeModelActions(
   deps: HomeModelActionDeps,
 ) {
 const { defaultLoraStrength, loadingLoras, loras, selectedCheckpointPicker, selectedCheckpoints } = state
-const { loraDetailsByName } = selection
+const { loraDetailsByName, selectedCheckpointEntries } = selection
 const { buildCheckpointSelection, buildLoraSelection, formatLoraStrength } = deps
 
 function getLoraPreviewUrl(loraName: string) {
@@ -183,14 +188,116 @@ function getCheckpointLoraPickerPlaceholder(checkpoint: CheckpointEntry) {
   return getCheckpointLoraOptions(checkpoint).length ? 'Add LoRA' : 'No compatible LoRAs'
 }
 
-function getCheckpointSelectedLoraSummary(checkpoint: CheckpointEntry) {
-  const total = checkpoint.loras.length
-  const enabled = checkpoint.loras.filter((lora) => lora.enabled).length
-  if (!total) {
-    return 'No LoRAs selected for this checkpoint.'
+function getSelectedCheckpointEntry(checkpointName: string) {
+  return selectedCheckpointEntries.value.find((checkpoint) => checkpoint.name === checkpointName) ?? null
+}
+
+function canApplyLoraToCheckpoint(checkpointName: string, loraName: string) {
+  const checkpoint = getSelectedCheckpointEntry(checkpointName)
+  const lora = loraDetailsByName.value.get(loraName)
+
+  return Boolean(checkpoint && lora && getLoraCompatibilityStatus(checkpoint, lora) !== 'incompatible')
+}
+
+function buildAllCompatibleLoraCopy(source: LoraSelection) {
+  return buildLoraSelection(
+    source.name,
+    source.strength,
+    source.enabled,
+    source.enabledTriggerWords,
+    source.triggerWordWeights,
+    { appliedByAllCompatible: true },
+  )
+}
+
+function clearLoraAllCompatible(name: string) {
+  selectedCheckpoints.value = selectedCheckpoints.value.map((checkpoint) => ({
+    ...checkpoint,
+    loras: checkpoint.loras
+      .filter((selection) => !(selection.name === name && selection.appliedByAllCompatible))
+      .map((selection) =>
+        selection.name === name
+          ? {
+              ...selection,
+              applyToAllCompatible: undefined,
+              appliedByAllCompatible: undefined,
+            }
+          : selection,
+      ),
+  }))
+}
+
+function getAllCompatibleLoraSource(name: string) {
+  for (const checkpoint of selectedCheckpoints.value) {
+    const source = checkpoint.loras.find((selection) =>
+      selection.name === name && selection.applyToAllCompatible,
+    )
+    if (source) {
+      return source
+    }
   }
 
-  return `${enabled} enabled of ${total} selected`
+  return null
+}
+
+function syncAllCompatibleLora(name: string) {
+  const source = getAllCompatibleLoraSource(name)
+  if (!source) {
+    clearLoraAllCompatible(name)
+    return
+  }
+
+  selectedCheckpoints.value = selectedCheckpoints.value.map((checkpoint) => {
+    if (!canApplyLoraToCheckpoint(checkpoint.name, name)) {
+      return {
+        ...checkpoint,
+        loras: checkpoint.loras.filter((selection) =>
+          !(selection.name === name && selection.appliedByAllCompatible),
+        ),
+      }
+    }
+
+    const hasSelection = checkpoint.loras.some((selection) => selection.name === name)
+    if (!hasSelection) {
+      return {
+        ...checkpoint,
+        loras: [...checkpoint.loras, buildAllCompatibleLoraCopy(source)],
+      }
+    }
+
+    return {
+      ...checkpoint,
+      loras: checkpoint.loras.map((selection) => {
+        if (selection.name !== name) {
+          return selection
+        }
+
+        if (selection.applyToAllCompatible) {
+          return {
+            ...selection,
+            applyToAllCompatible: true,
+            appliedByAllCompatible: undefined,
+          }
+        }
+
+        return selection.appliedByAllCompatible
+          ? buildAllCompatibleLoraCopy(source)
+          : selection
+      }),
+    }
+  })
+}
+
+function syncAllCompatibleLoras() {
+  const sourceNames = new Set(
+    selectedCheckpoints.value.flatMap((checkpoint) =>
+      checkpoint.loras
+        .filter((selection) => selection.applyToAllCompatible)
+        .map((selection) => selection.name),
+    ),
+  )
+
+  sourceNames.forEach((name) => syncAllCompatibleLora(name))
 }
 
 function addSelectedCheckpoint(name: string) {
@@ -214,6 +321,7 @@ function addSelectedCheckpoint(name: string) {
     buildCheckpointSelection(normalizedName),
   ]
   selectedCheckpointPicker.value = ''
+  syncAllCompatibleLoras()
 }
 
 function removeSelectedCheckpoint(name: string) {
@@ -278,7 +386,12 @@ function removeCheckpointLora(checkpointName: string, name: string) {
     return
   }
 
+  const removedSelection = checkpoint.loras.find((selection) => selection.name === name)
   checkpoint.loras = checkpoint.loras.filter((selection) => selection.name !== name)
+
+  if (removedSelection?.applyToAllCompatible) {
+    clearLoraAllCompatible(name)
+  }
 }
 
 function clearCheckpointLoras(checkpointName: string) {
@@ -287,8 +400,12 @@ function clearCheckpointLoras(checkpointName: string) {
     return
   }
 
+  const allCompatibleNames = checkpoint.loras
+    .filter((selection) => selection.applyToAllCompatible)
+    .map((selection) => selection.name)
   checkpoint.loras = []
   checkpoint.loraPicker = ''
+  allCompatibleNames.forEach((name) => clearLoraAllCompatible(name))
 }
 
 function toggleCheckpointLora(checkpointName: string, name: string) {
@@ -299,6 +416,9 @@ function toggleCheckpointLora(checkpointName: string, name: string) {
   }
 
   selection.enabled = !selection.enabled
+  if (selection.applyToAllCompatible) {
+    syncAllCompatibleLora(name)
+  }
 }
 
 function setCheckpointLoraStrength(checkpointName: string, name: string, strength: string) {
@@ -309,6 +429,9 @@ function setCheckpointLoraStrength(checkpointName: string, name: string, strengt
   }
 
   selection.strength = strength
+  if (selection.applyToAllCompatible) {
+    syncAllCompatibleLora(name)
+  }
 }
 
 function setAllCheckpointLorasEnabled(checkpointName: string, enabled: boolean) {
@@ -321,6 +444,28 @@ function setAllCheckpointLorasEnabled(checkpointName: string, enabled: boolean) 
     ...selection,
     enabled,
   }))
+  checkpoint.loras
+    .filter((selection) => selection.applyToAllCompatible)
+    .forEach((selection) => syncAllCompatibleLora(selection.name))
+}
+
+function toggleLoraAllCompatible(checkpointName: string, name: string) {
+  if (getAllCompatibleLoraSource(name)) {
+    clearLoraAllCompatible(name)
+    return
+  }
+
+  const checkpoint = selectedCheckpoints.value.find((selection) => selection.name === checkpointName)
+  const lora = checkpoint?.loras.find((selection) => selection.name === name)
+  if (!checkpoint || !lora) {
+    return
+  }
+
+  checkpoint.enabled = true
+  lora.enabled = true
+  lora.applyToAllCompatible = true
+  lora.appliedByAllCompatible = undefined
+  syncAllCompatibleLora(name)
 }
 
 return {
@@ -335,7 +480,6 @@ return {
   getLoraCompatibilityMetadata,
   getCheckpointLoraOptions,
   getCheckpointLoraPickerPlaceholder,
-  getCheckpointSelectedLoraSummary,
   addSelectedCheckpoint,
   removeSelectedCheckpoint,
   clearSelectedCheckpoints,
@@ -347,5 +491,6 @@ return {
   toggleCheckpointLora,
   setCheckpointLoraStrength,
   setAllCheckpointLorasEnabled,
+  toggleLoraAllCompatible,
 }
 }

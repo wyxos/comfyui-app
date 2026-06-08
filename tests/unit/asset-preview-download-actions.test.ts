@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { flushPromises, mount } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
+import { computed, defineComponent, h } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 function jsonResponse(payload: unknown, status = 200) {
@@ -49,5 +49,54 @@ describe('useAssetPreviewDownloadActions', () => {
 
     wrapper.unmount()
     vi.runOnlyPendingTimers()
+  })
+
+  it('requires confirmation before redownloading a completed preview version', async () => {
+    const queueDownload = vi.fn()
+    vi.doMock('../../src/composables/useAssetDownloads', () => ({
+      useAssetDownloads: () => ({
+        downloadByVersionId: computed(() => new Map([
+          [201, [{ id: 'complete-version', state: 'complete', versionId: 201, fileName: 'preview.safetensors' }]],
+        ])),
+        queueDownload,
+        deleteDownloadedFile: vi.fn(),
+        startPolling: vi.fn(),
+        stopPolling: vi.fn(),
+      }),
+    }))
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const { useAssetPreviewDownloadActions } = await import('../../src/components/asset-preview/useAssetPreviewDownloadActions')
+    let actions: ReturnType<typeof useAssetPreviewDownloadActions> | null = null
+    const Consumer = defineComponent({
+      setup() {
+        actions = useAssetPreviewDownloadActions({ autoStart: false })
+        return () => h('div')
+      },
+    })
+
+    const wrapper = mount(Consumer)
+    await actions?.queueAssetDownload({
+      id: 101,
+      name: 'Preview LoRA',
+      type: 'LORA',
+      nsfw: false,
+      creator: null,
+      stats: null,
+      modelVersions: [],
+    }, {
+      id: 201,
+      name: 'v1',
+      baseModel: 'Pony',
+      files: [{ id: 301, name: 'preview.safetensors', type: 'Model', primary: true, downloadUrl: 'https://download.test/file' }],
+    })
+
+    expect(queueDownload).not.toHaveBeenCalled()
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'Re-download preview.safetensors? This will replace the existing downloaded file.',
+    )
+
+    wrapper.unmount()
+    confirmSpy.mockRestore()
   })
 })

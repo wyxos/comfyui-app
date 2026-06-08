@@ -84,6 +84,21 @@ describe('companion app e2e flows', () => {
     await byVersion.cleanup()
   })
 
+  it('searches assets by Civitai tag', async () => {
+    const tagged = await renderCompanionApp('/assets?tag=mecha')
+
+    await vi.waitFor(() => {
+      expect(tagged.api.calls.some((call) => call.path === '/api/civitai/models')).toBe(true)
+    })
+
+    const searchCall = tagged.api.calls.find((call) => call.path === '/api/civitai/models')
+    expect(searchCall?.search.get('tag')).toBe('mecha')
+    expect(searchCall?.search.get('query')).toBeNull()
+    expect((tagged.host.querySelector('#asset-tag') as HTMLInputElement | null)?.value).toBe('mecha')
+
+    await tagged.cleanup()
+  })
+
   it('covers asset filters, empty results, route pagination, metadata, and download panel actions', async () => {
     const empty = await renderCompanionApp('/assets?q=missing', { models: [] })
 

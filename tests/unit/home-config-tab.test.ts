@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 import HomeConfigTab from '../../src/views/home/HomeConfigTab.vue'
 import { provideHomeView } from '../../src/views/home/homeViewContext'
 
-function mountConfigTab() {
+function mountConfigTab(options: { hasAnimaCheckpointSelected?: boolean } = {}) {
   const seed = ref('')
   const context = {
     width: ref('704'),
@@ -34,7 +34,7 @@ function mountConfigTab() {
     schedulerSelectOptions: ref(['karras']),
     clipNameSelectOptions: ref(['qwen_3_06b_base.safetensors']),
     vaeNameSelectOptions: ref(['wan_2.1_vae.safetensors']),
-    hasAnimaCheckpointSelected: ref(false),
+    hasAnimaCheckpointSelected: ref(options.hasAnimaCheckpointSelected ?? false),
     loadingGenerationOptions: ref(false),
     generationOptionsError: ref(''),
     lastGeneratedSeedTooltip: ref('No generated seed yet'),
@@ -60,8 +60,14 @@ function mountConfigTab() {
       stubs: {
         UiSlider: true,
         UiTooltip: defineComponent({
-          setup(_, { slots }) {
-            return () => h('span', slots.default?.())
+          props: {
+            content: {
+              type: String,
+              default: '',
+            },
+          },
+          setup(props, { slots }) {
+            return () => h('span', { 'data-tooltip-content': props.content }, slots.default?.())
           },
         }),
       },
@@ -72,6 +78,33 @@ function mountConfigTab() {
 }
 
 describe('HomeConfigTab', () => {
+  it('adds purpose and impact tooltips to config field labels', () => {
+    const { wrapper } = mountConfigTab({ hasAnimaCheckpointSelected: true })
+    const labels = wrapper.findAll('[data-testid="config-field-label"]')
+
+    expect(labels.map((label) => label.text())).toEqual([
+      'Size',
+      'Scale',
+      'Seed',
+      'Steps',
+      'CFG',
+      'Sampler',
+      'Scheduler',
+      'Anima template',
+      'CLIP name',
+      'VAE name',
+    ])
+
+    for (const label of labels) {
+      const tooltip = label.element.closest('[data-tooltip-content]')
+      const content = tooltip?.getAttribute('data-tooltip-content') ?? ''
+
+      expect(label.attributes('tabindex')).toBe('0')
+      expect(content).toContain('Purpose:')
+      expect(content).toContain('Impact:')
+    }
+  })
+
   it('labels blank seeds as random and entered seeds as fixed', async () => {
     const { seed, wrapper } = mountConfigTab()
     const seedMode = () => wrapper.get('[data-testid="seed-mode-label"]')
