@@ -59,12 +59,57 @@ describe('HomeAssetPickerModal', () => {
       },
     })
 
-    const assetCard = wrapper.get('button[aria-label="Preview asset"]')
+    const assetCard = wrapper.get('[data-asset-picker-card]')
     expect(assetCard.classes()).toContain('flex-col')
     expect(assetCard.classes()).toContain('min-h-[20rem]')
     expect(assetCard.find('.h-64').exists()).toBe(true)
     expect(assetCard.find('img').classes()).toContain('object-contain')
+    expect(wrapper.find('button[aria-label="Preview asset"]').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('preview-asset.safetensors')
+  })
+
+  it('shows base model badges and cycles picker previews without selecting the asset', async () => {
+    const wrapper = mount(HomeAssetPickerModal, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        title: 'Select checkpoint',
+        options: [
+          {
+            label: 'Multi preview checkpoint',
+            value: 'multi-preview.safetensors',
+            previewUrl: '/fallback-preview.png',
+            previewPaths: [
+              { url: '/preview-one.png', mediaType: 'image' },
+              { url: '/preview-two.png', mediaType: 'image' },
+            ],
+            modelMetadata: {
+              baseModel: 'Illustrious',
+            },
+            typeLabel: 'Checkpoint',
+          },
+        ],
+      },
+    })
+
+    expect(wrapper.text()).toContain('Illustrious')
+    expect(wrapper.text()).toContain('1 / 2')
+    expect(wrapper.text()).not.toContain('Checkpoint')
+    expect(wrapper.get('img').attributes('src')).toBe('/preview-one.png')
+
+    await wrapper.get('button[aria-label="Next preview image for Multi preview checkpoint"]').trigger('click')
+
+    expect(wrapper.emitted('select')).toBeUndefined()
+    expect(wrapper.get('img').attributes('src')).toBe('/preview-two.png')
+    expect(wrapper.text()).toContain('2 / 2')
+
+    await wrapper.get('button[aria-label="Previous preview image for Multi preview checkpoint"]').trigger('click')
+
+    expect(wrapper.get('img').attributes('src')).toBe('/preview-one.png')
+
+    await wrapper.get('button[aria-label="Multi preview checkpoint"]').trigger('click')
+
+    expect(wrapper.emitted('select')).toEqual([['multi-preview.safetensors']])
   })
 
   it('filters NSFW models by default and exposes badges when included', async () => {

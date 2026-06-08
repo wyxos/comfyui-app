@@ -3,6 +3,7 @@ import { readJsonBody, sendError, sendJson, streamFile } from '../http.mjs'
 import { findModelPreviewPath } from '../model-options.mjs'
 import {
   getComfyCheckpointDir,
+  getComfyControlNetDir,
   getComfyLoraDir,
   resolveStoredInputImageName,
 } from '../model-paths.mjs'
@@ -18,6 +19,8 @@ export async function handleModelPreview(url, response) {
       rootPath = await getComfyCheckpointDir()
     } else if (modelType === 'lora') {
       rootPath = await getComfyLoraDir()
+    } else if (modelType === 'controlnet') {
+      rootPath = await getComfyControlNetDir()
     }
   } catch {}
 

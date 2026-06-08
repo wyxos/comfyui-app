@@ -172,13 +172,13 @@ function getCheckpointLoraOptions(checkpoint: CheckpointEntry) {
       value: lora.name,
       previewUrl: lora.previewUrl ?? null,
       previewMediaType: lora.previewMediaType ?? null,
+      previewPaths: lora.previewPaths ?? null,
       modelNsfw: lora.modelNsfw ?? lora.compatibility?.modelNsfw ?? null,
       modelMetadata: {
         nsfw: lora.modelNsfw ?? lora.compatibility?.modelNsfw ?? null,
         baseModel: lora.compatibility?.baseModel ?? '',
         baseModelKey: lora.compatibility?.baseModelKey ?? normalizeBaseModelKey(lora.compatibility?.baseModel),
       },
-      typeLabel: 'LoRA',
     }))
 }
 

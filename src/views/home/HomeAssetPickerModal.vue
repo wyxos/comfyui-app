@@ -1,37 +1,18 @@
 <script setup lang="ts">
-import { Image as ImageIcon, Search, X } from 'lucide-vue-next'
+import { Search, X } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import UiPaginatedCardGrid from '../../components/ui/UiPaginatedCardGrid.vue'
-import UiPreviewCard from '../../components/ui/UiPreviewCard.vue'
 import { fetchAppSettings } from '../../composables/useAppSettings'
-
-type AssetPickerOption = {
-  label: string
-  value: string
-  previewUrl?: string | null
-  previewMediaType?: 'image' | 'video' | string | null
-  family?: string | null
-  baseModel?: string | null
-  baseModelKey?: string | null
-  compatibleBaseModels?: string[] | null
-  compatibleBaseModelKeys?: string[] | null
-  modelNsfw?: boolean | number | string | null
-  modelMetadata?: {
-    nsfw?: boolean | number | string | null
-    family?: string | null
-    baseModel?: string | null
-    baseModelKey?: string | null
-    compatibleBaseModels?: string[] | null
-    compatibleBaseModelKeys?: string[] | null
-  } | null
-  typeLabel?: string | null
-}
-
-type BaseModelFilterOption = {
-  key: string
-  label: string
-  count: number
-}
+import HomeAssetPickerCard from './HomeAssetPickerCard.vue'
+import type { AssetPickerOption, BaseModelFilterOption } from './homeAssetPickerOptionHelpers'
+import {
+  activePreviewMediaFor,
+  normalizeBaseModelFilterKey,
+  optionBaseModelBadgeLabel,
+  optionBaseModelLabels,
+  optionHasNsfw,
+  optionPreviewCount,
+} from './homeAssetPickerOptionHelpers'
 
 const props = withDefaults(
   defineProps<{
@@ -63,6 +44,7 @@ const searchQuery = ref('')
 const includeNsfw = ref(false)
 const selectedBaseModelFilter = ref('')
 const currentPage = ref(1)
+const previewIndexes = ref<Record<string, number>>({})
 let previousBodyOverflow: string | null = null
 let openLoadToken = 0
 let includeNsfwTouched = false
@@ -131,84 +113,6 @@ const pageRangeLabel = computed(() => {
   return `${pageStartIndex.value + 1}-${pageEndIndex.value} of ${filteredOptions.value.length}`
 })
 
-function optionHasVideoPreview(option: AssetPickerOption) {
-  return option.previewMediaType === 'video'
-}
-
-function isNsfwValue(value: unknown) {
-  if (typeof value === 'boolean') {
-    return value
-  }
-
-  if (typeof value === 'number') {
-    return value > 0
-  }
-
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase()
-    return Boolean(normalized && !['false', '0', 'no', 'none', 'safe'].includes(normalized))
-  }
-
-  return false
-}
-
-function optionHasNsfw(option: AssetPickerOption) {
-  return isNsfwValue(option.modelNsfw ?? option.modelMetadata?.nsfw)
-}
-
-function normalizeBaseModelFilterKey(value: unknown) {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-}
-
-function addBaseModelLabel(labels: Map<string, string>, value: unknown) {
-  const label = String(value ?? '').trim()
-  const key = normalizeBaseModelFilterKey(label)
-  if (key && !labels.has(key)) {
-    labels.set(key, label)
-  }
-}
-
-function optionBaseModelLabels(option: AssetPickerOption) {
-  const labels = new Map<string, string>()
-  const metadata = option.modelMetadata
-
-  addBaseModelLabel(labels, option.baseModel)
-  addBaseModelLabel(labels, metadata?.baseModel)
-
-  for (const baseModel of option.compatibleBaseModels ?? []) {
-    addBaseModelLabel(labels, baseModel)
-  }
-
-  for (const baseModel of metadata?.compatibleBaseModels ?? []) {
-    addBaseModelLabel(labels, baseModel)
-  }
-
-  if (!labels.size) {
-    addBaseModelLabel(labels, option.family)
-    addBaseModelLabel(labels, metadata?.family)
-    addBaseModelLabel(labels, option.baseModelKey)
-    addBaseModelLabel(labels, metadata?.baseModelKey)
-
-    for (const baseModelKey of option.compatibleBaseModelKeys ?? []) {
-      addBaseModelLabel(labels, baseModelKey)
-    }
-
-    for (const baseModelKey of metadata?.compatibleBaseModelKeys ?? []) {
-      addBaseModelLabel(labels, baseModelKey)
-    }
-  }
-
-  return Array.from(labels.values())
-}
-
-function optionTypeLabel(option: AssetPickerOption) {
-  return option.typeLabel || (props.title.toLowerCase().includes('lora') ? 'LoRA' : 'Checkpoint')
-}
-
 function lockBodyScroll() {
   if (typeof document === 'undefined' || previousBodyOverflow !== null) {
     return
@@ -257,6 +161,28 @@ function applyBaseModelFilter(baseModelKey: string) {
   selectedBaseModelFilter.value = baseModelKey
 }
 
+function activePreviewIndex(option: AssetPickerOption) {
+  const total = optionPreviewCount(option)
+  if (total < 1) {
+    return 0
+  }
+
+  const index = previewIndexes.value[option.value] ?? 0
+  return ((index % total) + total) % total
+}
+
+function showOptionPreview(option: AssetPickerOption, step: number) {
+  const total = optionPreviewCount(option)
+  if (total < 2) {
+    return
+  }
+
+  previewIndexes.value = {
+    ...previewIndexes.value,
+    [option.value]: activePreviewIndex(option) + step,
+  }
+}
+
 async function loadOpenDefaults(token: number) {
   try {
     const settings = await fetchAppSettings()
@@ -296,6 +222,7 @@ watch(
       searchQuery.value = ''
       includeNsfw.value = false
       selectedBaseModelFilter.value = ''
+      previewIndexes.value = {}
       includeNsfwTouched = false
       currentPage.value = 1
       lockBodyScroll()
@@ -426,50 +353,18 @@ onBeforeUnmount(() => {
       footer-class="bg-card/92"
       @go-to-page="goToPage"
     >
-      <UiPreviewCard
+      <HomeAssetPickerCard
         v-for="option in visibleOptions"
         :key="option.value"
-        tag="button"
-        min-height-class="min-h-[20rem]"
-        media-class="h-64"
-        :preview-url="option.previewUrl ?? ''"
-        :is-video-preview="optionHasVideoPreview(option)"
-        :preview-label="`${option.label} preview`"
-        :aria-label="option.label"
-        :title="option.value !== option.label ? `${option.label}\n${option.value}` : option.label"
-        @click="selectOption(option)"
-      >
-        <template #placeholder>
-          <ImageIcon
-            class="h-8 w-8 text-primary-foreground/35 transition group-hover:text-accent"
-            :stroke-width="1.6"
-          />
-          <span class="text-xs font-semibold uppercase tracking-[0.16em] text-primary-foreground/68">
-            No preview available
-          </span>
-        </template>
-
-        <template #media-overlay>
-          <div class="absolute right-3 top-3 flex flex-wrap justify-end gap-2">
-            <span
-              v-if="optionHasNsfw(option)"
-              class="rounded-sm border border-destructive/50 bg-destructive/90 px-2 py-1 text-[11px] font-semibold text-destructive-foreground shadow-sm backdrop-blur-sm"
-            >
-              NSFW
-            </span>
-            <span class="rounded-sm border border-primary-foreground/12 bg-primary/85 px-2 py-1 text-[11px] font-semibold text-primary-foreground/82 shadow-sm backdrop-blur-sm">
-              {{ optionTypeLabel(option) }}
-            </span>
-          </div>
-        </template>
-
-        <h3
-          class="truncate text-sm font-semibold leading-5 text-card-foreground transition group-hover:text-secondary"
-          :title="option.label"
-        >
-          {{ option.label }}
-        </h3>
-      </UiPreviewCard>
+        :option="option"
+        :preview-media="activePreviewMediaFor(option, activePreviewIndex(option))"
+        :preview-index="activePreviewIndex(option)"
+        :preview-count="optionPreviewCount(option)"
+        :base-model-label="optionBaseModelBadgeLabel(option)"
+        :has-nsfw="optionHasNsfw(option)"
+        @select="selectOption(option)"
+        @show-preview="showOptionPreview(option, $event)"
+      />
 
       <template #empty>
         <div class="max-w-sm">

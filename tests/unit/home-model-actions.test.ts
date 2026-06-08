@@ -47,6 +47,10 @@ function createActionsHarness() {
   state.loras.value = [
     {
       name: 'illustrious-lora.safetensors',
+      previewPaths: [
+        { url: '/api/model-archive-media?type=lora&name=illustrious-lora.safetensors&index=0', mediaType: 'image' },
+        { url: '/api/model-archive-media?type=lora&name=illustrious-lora.safetensors&index=1', mediaType: 'image' },
+      ],
       compatibility: { baseModel: 'Illustrious', baseModelKey: 'illustrious' },
     },
   ]
@@ -126,5 +130,9 @@ describe('home model actions', () => {
       baseModel: 'Illustrious',
       baseModelKey: 'illustrious',
     })
+    expect(option.previewPaths).toEqual([
+      { url: '/api/model-archive-media?type=lora&name=illustrious-lora.safetensors&index=0', mediaType: 'image' },
+      { url: '/api/model-archive-media?type=lora&name=illustrious-lora.safetensors&index=1', mediaType: 'image' },
+    ])
   })
 })

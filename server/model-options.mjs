@@ -7,6 +7,7 @@ import { getComfyCheckpointDir, getComfyControlNetDir, getComfyLoraDir, resolveM
 import { readJsonFileIfExists } from './model-trigger-words.mjs'
 import { getModelCompatibilityMetadata, normalizeModelCompatibilityMetadata } from './model-metadata.mjs'
 import { detectCheckpointFamily } from './checkpoint-family.mjs'
+import { serializeModelOptionPreviewPaths } from './model-option-preview-paths.mjs'
 
 export async function readModelSidecar(rootPath, modelName) {
   const resolvedModelPath = resolveModelPath(rootPath, modelName)
@@ -272,6 +273,7 @@ export async function enrichCheckpointOptions(checkpoints) {
   return Promise.all(checkpoints.map(async (checkpoint) => {
     const sidecar = await readModelSidecar(rootPath, checkpoint.name)
     const previewPath = await findModelPreviewPath(rootPath, checkpoint.name)
+    const download = downloadMetadata.get(normalizeFileKey(checkpoint.name))
     const baseCompatibility = await getModelCompatibilityMetadata({
       rootPath,
       modelName: checkpoint.name,
@@ -280,7 +282,7 @@ export async function enrichCheckpointOptions(checkpoints) {
     })
     const { compatibility, modelNsfw } = mergeDownloadMetadata(
       baseCompatibility,
-      downloadMetadata.get(normalizeFileKey(checkpoint.name)),
+      download,
     )
     return {
       ...checkpoint,
@@ -289,6 +291,12 @@ export async function enrichCheckpointOptions(checkpoints) {
       downloaded: Boolean(sidecar || previewPath),
       previewUrl: previewPath ? `/api/model-preview?type=checkpoint&name=${encodeURIComponent(checkpoint.name)}` : null,
       previewMediaType: previewPath ? modelPreviewMediaType(previewPath) : null,
+      previewPaths: serializeModelOptionPreviewPaths({
+        download,
+        sidecarPayload: sidecar?.payload,
+        type: 'checkpoint',
+        modelName: checkpoint.name,
+      }),
       modelNsfw,
       compatibility,
       civitai: sidecar?.payload ?? null,
@@ -311,6 +319,7 @@ export async function enrichLoraOptions(loras) {
   return Promise.all(loras.map(async (lora) => {
     const sidecar = await readModelSidecar(rootPath, lora.name)
     const previewPath = await findModelPreviewPath(rootPath, lora.name)
+    const download = downloadMetadata.get(normalizeFileKey(lora.name))
     const baseCompatibility = await getModelCompatibilityMetadata({
       rootPath,
       modelName: lora.name,
@@ -319,7 +328,7 @@ export async function enrichLoraOptions(loras) {
     })
     const { compatibility, modelNsfw } = mergeDownloadMetadata(
       baseCompatibility,
-      downloadMetadata.get(normalizeFileKey(lora.name)),
+      download,
     )
     return {
       ...lora,
@@ -328,6 +337,12 @@ export async function enrichLoraOptions(loras) {
       downloaded: Boolean(sidecar || previewPath),
       previewUrl: previewPath ? `/api/model-preview?type=lora&name=${encodeURIComponent(lora.name)}` : null,
       previewMediaType: previewPath ? modelPreviewMediaType(previewPath) : null,
+      previewPaths: serializeModelOptionPreviewPaths({
+        download,
+        sidecarPayload: sidecar?.payload,
+        type: 'lora',
+        modelName: lora.name,
+      }),
       modelNsfw,
       compatibility,
       civitai: sidecar?.payload ?? null,
@@ -425,6 +440,7 @@ export async function enrichControlNetOptions(controlNets) {
 
   return Promise.all(controlNets.map(async (controlNet) => {
     const sidecar = await readModelSidecar(rootPath, controlNet.name)
+    const previewPath = await findModelPreviewPath(rootPath, controlNet.name)
     const inferredPayload = inferControlNetCompatibilityPayload(controlNet.name)
     const metadataSidecar = sidecar ?? (inferredPayload ? { payload: inferredPayload } : null)
     const baseCompatibility = await getModelCompatibilityMetadata({
@@ -444,7 +460,14 @@ export async function enrichControlNetOptions(controlNets) {
     return {
       ...controlNet,
       displayName: buildModelDisplayName(controlNet.name, sidecar?.payload),
-      downloaded: Boolean(sidecar),
+      downloaded: Boolean(sidecar || previewPath),
+      previewUrl: previewPath ? `/api/model-preview?type=controlnet&name=${encodeURIComponent(controlNet.name)}` : null,
+      previewMediaType: previewPath ? modelPreviewMediaType(previewPath) : null,
+      previewPaths: serializeModelOptionPreviewPaths({
+        sidecarPayload: sidecar?.payload,
+        type: 'controlnet',
+        modelName: controlNet.name,
+      }),
       compatibility,
       controlType: compatibility.controlType,
       loaderType: compatibility.loaderType,

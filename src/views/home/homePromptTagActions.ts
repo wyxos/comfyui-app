@@ -42,7 +42,7 @@ function buildPromptFromSections(
       .join(', '),
   )
     .filter(Boolean)
-    .join(' BREAK ')
+    .join(', ')
 }
 
 function buildNegativePromptFromTags(includeDraft = false) {

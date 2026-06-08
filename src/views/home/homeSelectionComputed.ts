@@ -117,11 +117,20 @@ const checkpointOptions = computed(() => {
       value: checkpoint.name,
       previewUrl: checkpoint.previewUrl ?? null,
       previewMediaType: checkpoint.previewMediaType ?? null,
+      previewPaths: checkpoint.previewPaths ?? null,
+      baseModel: checkpoint.compatibility?.baseModel ?? null,
+      baseModelKey: checkpoint.compatibility?.baseModelKey ?? null,
+      compatibleBaseModels: checkpoint.compatibility?.compatibleBaseModels ?? null,
+      compatibleBaseModelKeys: checkpoint.compatibility?.compatibleBaseModelKeys ?? null,
       modelNsfw: checkpoint.modelNsfw ?? checkpoint.compatibility?.modelNsfw ?? null,
       modelMetadata: {
         nsfw: checkpoint.modelNsfw ?? checkpoint.compatibility?.modelNsfw ?? null,
+        family: checkpoint.family,
+        baseModel: checkpoint.compatibility?.baseModel ?? null,
+        baseModelKey: checkpoint.compatibility?.baseModelKey ?? null,
+        compatibleBaseModels: checkpoint.compatibility?.compatibleBaseModels ?? null,
+        compatibleBaseModelKeys: checkpoint.compatibility?.compatibleBaseModelKeys ?? null,
       },
-      typeLabel: 'Checkpoint',
     }))
 })
 const loraDetailsByName = computed(() => {

@@ -92,6 +92,32 @@ function getControlNetCompatibilityStatus(
   return 'unverified'
 }
 
+function buildControlNetPickerOption(controlNet: ControlNetOption, label: string) {
+  const metadata = controlNet.compatibility ?? null
+  const modelNsfw = controlNet.modelNsfw ?? metadata?.modelNsfw ?? null
+
+  return {
+    label,
+    value: controlNet.name,
+    previewUrl: controlNet.previewUrl ?? null,
+    previewMediaType: controlNet.previewMediaType ?? null,
+    previewPaths: controlNet.previewPaths ?? null,
+    previewImages: controlNet.previewImages ?? null,
+    baseModel: metadata?.baseModel ?? null,
+    baseModelKey: metadata?.baseModelKey ?? null,
+    compatibleBaseModels: metadata?.compatibleBaseModels ?? null,
+    compatibleBaseModelKeys: metadata?.compatibleBaseModelKeys ?? null,
+    modelNsfw,
+    modelMetadata: {
+      nsfw: modelNsfw,
+      baseModel: metadata?.baseModel ?? null,
+      baseModelKey: metadata?.baseModelKey ?? null,
+      compatibleBaseModels: metadata?.compatibleBaseModels ?? null,
+      compatibleBaseModelKeys: metadata?.compatibleBaseModelKeys ?? null,
+    },
+  }
+}
+
 export function createHomeControlNetCompatibility(controlNets: Ref<ControlNetOption[]>) {
   function getControlNetCompatibilityLabel(checkpoint: CheckpointEntry, controlNetName: string) {
     const controlNet = controlNets.value.find((entry) => entry.name === controlNetName)
@@ -129,10 +155,10 @@ export function createHomeControlNetCompatibility(controlNets: Ref<ControlNetOpt
           .localeCompare(second.controlNet.displayName ?? second.controlNet.name)
       })
       .map(({ controlNet, status }) => ({
+        controlNet,
         label: `${controlNet.displayName ?? controlNet.name}${status === 'unverified' ? ' · Unverified' : ''}`,
-        value: controlNet.name,
-        typeLabel: controlNet.controlType || 'ControlNet',
       }))
+      .map(({ controlNet, label }) => buildControlNetPickerOption(controlNet, label))
   }
 
   function getCheckpointControlNetModelOptions(checkpoint: CheckpointEntry, currentModel = '') {
@@ -170,10 +196,12 @@ export function createHomeControlNetCompatibility(controlNets: Ref<ControlNetOpt
           .localeCompare(second.controlNet.displayName ?? second.controlNet.name)
       })
       .map(({ controlNet, status }) => ({
-        label: `${controlNet.displayName ?? controlNet.name}${status === 'unverified' ? ' · Unverified' : status === 'incompatible' ? ' · Incompatible' : ''}`,
-        value: controlNet.name,
-        typeLabel: controlNet.controlType || 'ControlNet',
+        controlNet,
+        label: `${controlNet.displayName ?? controlNet.name}${
+          status === 'unverified' ? ' · Unverified' : status === 'incompatible' ? ' · Incompatible' : ''
+        }`,
       }))
+      .map(({ controlNet, label }) => buildControlNetPickerOption(controlNet, label))
   }
 
   function getCheckpointControlNetPickerPlaceholder(checkpoint: CheckpointEntry) {

@@ -1,6 +1,12 @@
 export type JobState = 'idle' | 'queued' | 'running' | 'cancelling' | 'cancelled' | 'complete' | 'error'
 export type CheckpointFamily = 'sdxl' | 'anima'
 
+export type ModelPreviewPath = {
+  url?: string | null
+  mediaType?: 'image' | 'video' | string | null
+  type?: 'image' | 'video' | string | null
+}
+
 export type CheckpointOption = {
   name: string
   family: CheckpointFamily
@@ -8,6 +14,8 @@ export type CheckpointOption = {
   downloaded?: boolean
   previewUrl?: string | null
   previewMediaType?: 'image' | 'video' | string | null
+  previewPaths?: ModelPreviewPath[] | null
+  previewImages?: ModelPreviewPath[] | null
   modelNsfw?: boolean | null
   compatibility?: ModelCompatibilityMetadata | null
 }
@@ -34,6 +42,8 @@ export type LoraOption = {
   downloaded?: boolean
   previewUrl?: string | null
   previewMediaType?: 'image' | 'video' | string | null
+  previewPaths?: ModelPreviewPath[] | null
+  previewImages?: ModelPreviewPath[] | null
   modelNsfw?: boolean | null
   compatibility?: ModelCompatibilityMetadata | null
 }
@@ -100,6 +110,11 @@ export type ControlNetOption = {
   name: string
   displayName?: string
   downloaded?: boolean
+  previewUrl?: string | null
+  previewMediaType?: 'image' | 'video' | string | null
+  previewPaths?: ModelPreviewPath[] | null
+  previewImages?: ModelPreviewPath[] | null
+  modelNsfw?: boolean | null
   compatibility?: ModelCompatibilityMetadata | null
   controlType?: string
   loaderType?: string

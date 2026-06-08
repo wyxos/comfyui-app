@@ -242,7 +242,7 @@ describe('home prompt tags', () => {
     expect(actions.buildPromptFromSections(state.promptSections.value)).toBe('blue hair, (red eyes:1.2)')
   })
 
-  it('separates non-empty prompt sections with regional prompter BREAK markers', () => {
+  it('joins non-empty prompt sections without Regional Prompter BREAK markers', () => {
     const state = createHomeState()
     const actions = createHomePromptTagActions(state)
 
@@ -255,7 +255,7 @@ describe('home prompt tags', () => {
     state.promptSections.value.quality = [{ text: 'sharp focus', strength: '1' }]
 
     expect(actions.buildPromptFromSections(state.promptSections.value, state.promptSectionDrafts.value)).toBe(
-      'blue hair, (red eyes:1.2) BREAK rainy neon greenhouse BREAK sharp focus',
+      'blue hair, (red eyes:1.2), rainy neon greenhouse, sharp focus',
     )
   })
 
