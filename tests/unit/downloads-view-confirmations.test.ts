@@ -45,8 +45,11 @@ describe('DownloadsView confirmations', () => {
     vi.doMock('../../src/composables/useAppSettings', () => ({
       fetchAppSettings: vi.fn().mockResolvedValue({ includeNsfw: false }),
     }))
+    const confirm = vi.fn().mockResolvedValue(false)
+    vi.doMock('../../src/composables/useConfirmDialog', () => ({
+      useConfirmDialog: () => confirm,
+    }))
 
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const { default: DownloadsView } = await import('../../src/views/DownloadsView.vue')
     const wrapper = mount(DownloadsView)
 
@@ -54,10 +57,11 @@ describe('DownloadsView confirmations', () => {
     await flushPromises()
 
     expect(redownloadDownload).not.toHaveBeenCalled()
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'Re-download complete.safetensors? This will replace the existing downloaded file.',
-    )
-
-    confirmSpy.mockRestore()
+    expect(confirm).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Re-download file?',
+      description: 'Re-download complete.safetensors? This will replace the existing downloaded file.',
+      confirmLabel: 'Re-download',
+      destructive: true,
+    }))
   })
 })

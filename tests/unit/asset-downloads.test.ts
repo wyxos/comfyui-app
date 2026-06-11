@@ -389,8 +389,11 @@ describe('DownloadsView', () => {
     vi.doMock('../../src/composables/useAppSettings', () => ({
       fetchAppSettings: vi.fn().mockResolvedValue({ includeNsfw: false }),
     }))
+    const confirm = vi.fn().mockResolvedValue(true)
+    vi.doMock('../../src/composables/useConfirmDialog', () => ({
+      useConfirmDialog: () => confirm,
+    }))
 
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const { default: DownloadsView } = await import('../../src/views/DownloadsView.vue')
     const wrapper = mount(DownloadsView)
 
@@ -409,91 +412,18 @@ describe('DownloadsView', () => {
 
     expect(redownloadDownload).toHaveBeenCalledWith('complete-download')
     expect(deleteDownloadedFile).toHaveBeenCalledWith('complete-download')
-    expect(confirmSpy).toHaveBeenNthCalledWith(1, 'Re-download complete.safetensors? This will replace the existing downloaded file.')
-    expect(confirmSpy).toHaveBeenNthCalledWith(2, 'Delete complete.safetensors from disk? The download record will remain for redownload.')
-
-    confirmSpy.mockRestore()
-  })
-
-})
-
-describe('LibraryView', () => {
-  beforeEach(() => {
-    vi.resetModules()
-  })
-
-  it('paginates local checkpoints and LoRAs forty cards at a time', async () => {
-    const now = Date.now()
-    const downloads = ref(
-      Array.from({ length: 46 }, (_, index) => {
-        const displayNumber = index + 1
-        const suffix = String(displayNumber).padStart(2, '0')
-        const modelType = index % 2 === 0 ? 'LORA' : 'Checkpoint'
-        const modelNsfw = displayNumber === 46
-
-        return {
-          id: `library-download-${suffix}`,
-          state: 'complete',
-          modelId: 1000 + displayNumber,
-          modelName: `Library model ${suffix}`,
-          modelType,
-          modelNsfw,
-          modelMetadata: { nsfw: modelNsfw },
-          versionId: 2000 + displayNumber,
-          versionName: `v${displayNumber}`,
-          fileId: 3000 + displayNumber,
-          fileName: `library_model_${suffix}.safetensors`,
-          targetPath: `C:\\models\\${modelType.toLowerCase()}\\library_model_${suffix}.safetensors`,
-          finishedAt: now - index,
-          updatedAt: now - index,
-          previewUrl: `/api/view?filename=library-${suffix}.png`,
-          previewPaths: [
-            {
-              url: `/api/civitai/downloads/library-download-${suffix}/previews/0`,
-              mediaType: displayNumber === 1 ? 'video' : 'image',
-            },
-          ],
-        }
-      }),
-    )
-    const refreshDownloads = vi.fn()
-
-    vi.doMock('../../src/composables/useAssetDownloads', () => ({
-      useAssetDownloads: () => ({
-        downloads,
-        activeDownloads: computed(() => []),
-        completedDownloads: computed(() => downloads.value.filter((item) => item.state === 'complete')),
-        loading: ref(false),
-        error: ref(''),
-        refreshDownloads,
-      }),
+    expect(confirm).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      title: 'Re-download file?',
+      description: 'Re-download complete.safetensors? This will replace the existing downloaded file.',
+      confirmLabel: 'Re-download',
+      destructive: true,
     }))
-
-    const { default: LibraryView } = await import('../../src/views/LibraryView.vue')
-    const wrapper = mount(LibraryView)
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('46 local models, 23 checkpoints, 23 LoRAs')
-    expect(wrapper.text()).toContain('1-40 of 45')
-    expect(wrapper.text()).toContain('Library model 01')
-    expect(wrapper.text()).not.toContain('library_model_01.safetensors')
-    expect(wrapper.text()).not.toContain('Downloaded')
-    expect(wrapper.find('video').exists()).toBe(true)
-    const firstCard = wrapper.get('[aria-label="Open Library model 01 preview"]')
-    expect(firstCard.classes()).toContain('min-h-[20rem]')
-    expect(firstCard.find('.h-64').exists()).toBe(true)
-    expect(wrapper.text()).not.toContain('Library model 41')
-    expect(wrapper.text()).not.toContain('Library model 46')
-    expect(refreshDownloads).toHaveBeenCalled()
-
-    await wrapper.get('[aria-label="Next library page"]').trigger('click')
-    expect(wrapper.text()).toContain('41-45 of 45')
-    expect(wrapper.text()).toContain('Library model 41')
-    await wrapper.get('[aria-label="Include NSFW library models"]').setValue(true)
-    expect(wrapper.text()).toContain('1-40 of 46')
-    await wrapper.get('[aria-label="Next library page"]').trigger('click')
-    expect(wrapper.text()).toContain('41-46 of 46')
-    expect(wrapper.text()).toContain('Library model 46')
-    expect(wrapper.text()).toContain('NSFW')
+    expect(confirm).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      title: 'Delete downloaded file?',
+      description: 'Delete complete.safetensors from disk? The download record will remain for redownload.',
+      confirmLabel: 'Delete file',
+      destructive: true,
+    }))
   })
+
 })

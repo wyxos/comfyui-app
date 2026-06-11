@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Check, ClipboardPaste, Copy, RefreshCw, Ruler, SlidersHorizontal, Trash2, Upload, X } from 'lucide-vue-next'
+import UiSwitch from '../../components/ui/UiSwitch.vue'
 import UiSelect from '../../components/ui/UiSelect.vue'
 import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
@@ -114,24 +115,11 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          role="switch"
+        <UiSwitch
+          :checked="controlNet.enabled"
           :aria-label="`Enable ${controlNet.model || 'ControlNet instance'}`"
-          :aria-checked="controlNet.enabled"
-          class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-ring/25"
-          :class="
-            controlNet.enabled
-              ? 'border-secondary bg-secondary'
-              : 'border-border bg-muted hover:border-accent'
-          "
           @click="setControlNetEnabled(controlNet.id, !controlNet.enabled, checkpointName)"
-        >
-          <span
-            class="inline-block h-4 w-4 rounded-full bg-primary-foreground shadow-sm transition-transform"
-            :class="controlNet.enabled ? 'translate-x-5' : 'translate-x-1'"
-          />
-        </button>
+        />
 
         <UiTooltip content="Remove ControlNet">
           <button

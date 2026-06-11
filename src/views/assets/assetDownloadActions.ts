@@ -1,5 +1,6 @@
 import type { ComputedRef, Ref } from 'vue'
 import { versionDownloadUnavailableLabel } from '../../components/asset-preview/assetPreviewHelpers'
+import type { ConfirmDialogFn } from '../../composables/useConfirmDialog'
 import type {
   AssetDownloadItem,
   QueueDownloadPayload,
@@ -26,6 +27,7 @@ type DownloadActionState = {
   queueDownload: (payload: QueueDownloadPayload) => Promise<unknown>
   watchDownload?: (payload: WatchDownloadPayload) => Promise<unknown>
   unwatchDownload?: (id: string) => Promise<unknown>
+  confirm: ConfirmDialogFn
 }
 
 type QueueAssetDownloadOptions = {
@@ -370,7 +372,12 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     const forceRedownload = existingDownload?.state === 'complete'
     if (forceRedownload) {
       const fileName = existingDownload.fileName || file.name
-      const confirmed = window.confirm(`Re-download ${fileName}? This will replace the existing downloaded file.`)
+      const confirmed = await state.confirm({
+        title: 'Re-download file?',
+        description: `Re-download ${fileName}? This will replace the existing downloaded file.`,
+        confirmLabel: 'Re-download',
+        destructive: true,
+      })
       if (!confirmed) {
         return false
       }

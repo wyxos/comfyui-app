@@ -2,6 +2,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { AssetPreviewDownload } from '../../components/asset-preview/assetPreviewTypes'
 import { useAssetDownloads } from '../../composables/useAssetDownloads'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { createAssetDownloadActions } from './assetDownloadActions'
 import { createAssetSearchController } from './assetSearchController'
 import {
@@ -81,6 +82,7 @@ const openDownloadMenuKey = ref('')
 const queuingDownloadKey = ref('')
 const downloadActionError = ref('')
 const downloadActionNotice = ref('')
+const confirm = useConfirmDialog()
 
 const {
   downloadByVersionId,
@@ -115,6 +117,7 @@ const {
   queuingDownloadKey,
   watchedByVersionId,
   watchDownload,
+  confirm,
 })
 
 const blacklistedModelIdSet = computed(() => new Set(blacklistedModelIds.value))

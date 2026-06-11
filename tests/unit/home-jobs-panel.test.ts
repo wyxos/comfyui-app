@@ -64,7 +64,7 @@ function mountJobsPanel() {
     getJobEntrySecondaryLabel: () => '1 output ready',
     getJobEntryElapsedMs: () => 7000,
     getJobEntryReferenceLabel: () => '71067b7c...2F1339',
-    getJobEntryPreviewVisibleOutputs: () => [],
+    getJobEntryPreviewVisibleOutputs: () => [latestOutput],
     getJobEntryPreviewHiddenOutputCount: () => 0,
     getJobEntryPreviewOutputKey: () => 'output-1',
     formatElapsed: () => '7s',
@@ -102,12 +102,15 @@ describe('HomeJobsPanel', () => {
 
     expect(scroll.text()).toContain('waiIllustriousSDXL_v170')
     expect(scroll.text()).toContain('71067b7c...2F1339')
+    expect(scroll.text()).toContain('7s')
+    expect(scroll.text()).not.toContain('Time')
     expect(scroll.text()).not.toContain('Prompt Id')
     expect(scroll.text()).not.toContain('Seed')
     expect(scroll.text()).not.toContain('metadata-output.png')
     expect(scroll.text()).not.toContain('Previous')
     expect(scroll.text()).not.toContain('Next')
     expect(scroll.text()).not.toContain('1-10 of 548')
+    expect(wrapper.get('[data-testid="job-history-elapsed"]').text()).toBe('7s')
 
     expect(footer.text()).toContain('Previous')
     expect(footer.text()).toContain('1-10 of 548')

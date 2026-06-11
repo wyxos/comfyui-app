@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Check, ChevronDown, Image as ImageIcon, Search } from 'lucide-vue-next'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import UiPreloadedMedia from './UiPreloadedMedia.vue'
 
 type SelectOption = {
@@ -34,6 +34,7 @@ const emit = defineEmits<{
 }>()
 
 const root = ref<HTMLElement | null>(null)
+const searchInput = ref<HTMLInputElement | null>(null)
 const open = ref(false)
 const searchQuery = ref('')
 
@@ -65,6 +66,9 @@ function toggle() {
   open.value = !open.value
   if (open.value) {
     searchQuery.value = ''
+    if (props.searchable) {
+      void nextTick(() => searchInput.value?.focus())
+    }
   }
 }
 
@@ -108,10 +112,14 @@ onBeforeUnmount(() => {
   >
     <button
       type="button"
+      role="combobox"
       class="flex min-h-12 w-full items-center justify-between gap-3 rounded-md border border-input bg-card px-3 py-2 text-left text-sm text-card-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-60"
       :class="open ? 'border-accent ring-2 ring-ring/25' : ''"
       :disabled="disabled"
+      :value="modelValue"
       :aria-label="ariaLabel"
+      :aria-expanded="open"
+      aria-haspopup="listbox"
       @click="toggle"
     >
       <span class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
@@ -152,6 +160,7 @@ onBeforeUnmount(() => {
 
     <div
       v-if="open"
+      role="listbox"
       class="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-30 overflow-hidden rounded-md border border-border bg-card shadow-[0_18px_40px_rgba(0,0,0,0.28)]"
     >
       <div
@@ -161,6 +170,7 @@ onBeforeUnmount(() => {
         <label class="flex h-9 items-center gap-2 rounded-sm border border-input bg-background px-2 text-xs text-muted-foreground focus-within:border-accent focus-within:ring-2 focus-within:ring-ring/25">
           <Search class="h-3.5 w-3.5 shrink-0" />
           <input
+            ref="searchInput"
             v-model="searchQuery"
             class="min-w-0 flex-1 bg-transparent text-card-foreground outline-none placeholder:text-muted-foreground"
             type="search"
@@ -176,6 +186,8 @@ onBeforeUnmount(() => {
           v-for="option in filteredOptions"
           :key="option.value"
           type="button"
+          role="option"
+          :aria-selected="option.value === modelValue"
           class="flex min-h-14 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-accent/10 hover:text-accent"
           @click="selectOption(option)"
         >

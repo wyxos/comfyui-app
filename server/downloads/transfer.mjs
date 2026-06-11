@@ -8,6 +8,7 @@ import { civitaiDownloadSegmentCount, civitaiSegmentStallTimeoutMs, civitaiSegme
 import { safeTrim } from '../shared.mjs'
 import { getStoredCivitaiApiKey } from '../settings.mjs'
 import { scheduleDownloadsPersist } from './state.mjs'
+import { getCivitaiSha256Hash } from './hash-metadata.mjs'
 import { refreshDownloadedSidecarsInBackground, safeUnlink, statFileIfExists } from './metadata.mjs'
 
 const progressPersistDelayMs = 15000
@@ -179,8 +180,7 @@ export async function probeCivitaiSegmentedDownload(download) {
 }
 
 export function getExpectedCivitaiSha256(download) {
-  const expectedHash = safeTrim(download.hashes?.SHA256).toUpperCase()
-  return /^[A-F0-9]{64}$/.test(expectedHash) ? expectedHash : ''
+  return getCivitaiSha256Hash(download.hashes)
 }
 
 export async function hashFileSha256(filePath) {

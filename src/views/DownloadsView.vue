@@ -10,6 +10,7 @@ import {
 import { computed, onMounted, ref, watch } from 'vue'
 import { fetchAppSettings } from '../composables/useAppSettings'
 import { useAssetDownloads, type AssetDownloadItem } from '../composables/useAssetDownloads'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
 import DownloadsTableRow from './downloads/DownloadsTableRow.vue'
 
 const PAGE_SIZE = 20
@@ -52,6 +53,7 @@ const currentPage = ref(1)
 const actionKey = ref('')
 const actionError = ref('')
 const includeNsfwPreviews = ref(false)
+const confirm = useConfirmDialog()
 
 const modelDownloads = computed(() => {
   return downloads.value
@@ -150,14 +152,24 @@ async function runDownloadAction(item: AssetDownloadItem, action: DownloadAction
   }
 
   if (action === 'delete') {
-    const confirmed = window.confirm(`Delete ${item.fileName} from disk? The download record will remain for redownload.`)
+    const confirmed = await confirm({
+      title: 'Delete downloaded file?',
+      description: `Delete ${item.fileName} from disk? The download record will remain for redownload.`,
+      confirmLabel: 'Delete file',
+      destructive: true,
+    })
     if (!confirmed) {
       return
     }
   }
 
   if (action === 'redownload' && item.state === 'complete') {
-    const confirmed = window.confirm(`Re-download ${item.fileName}? This will replace the existing downloaded file.`)
+    const confirmed = await confirm({
+      title: 'Re-download file?',
+      description: `Re-download ${item.fileName}? This will replace the existing downloaded file.`,
+      confirmLabel: 'Re-download',
+      destructive: true,
+    })
     if (!confirmed) {
       return
     }

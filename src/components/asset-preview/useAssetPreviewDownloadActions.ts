@@ -10,8 +10,10 @@ import type {
   CivitaiModelVersion,
 } from './assetPreviewTypes'
 import { useAssetDownloads } from '../../composables/useAssetDownloads'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
 export function useAssetPreviewDownloadActions(options: { autoStart?: boolean } = {}) {
+  const confirm = useConfirmDialog()
   const {
     downloadByVersionId,
     queueDownload,
@@ -77,7 +79,12 @@ export function useAssetPreviewDownloadActions(options: { autoStart?: boolean } 
     const forceRedownload = existingDownload?.state === 'complete'
     if (forceRedownload) {
       const fileName = existingDownload.fileName || file.name
-      const confirmed = window.confirm(`Re-download ${fileName}? This will replace the existing downloaded file.`)
+      const confirmed = await confirm({
+        title: 'Re-download file?',
+        description: `Re-download ${fileName}? This will replace the existing downloaded file.`,
+        confirmLabel: 'Re-download',
+        destructive: true,
+      })
       if (!confirmed) {
         return
       }

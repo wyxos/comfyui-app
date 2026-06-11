@@ -12,6 +12,7 @@ import {
 import { computed } from 'vue'
 import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useProvidedHomeView } from './homeViewContext'
 
 const {
@@ -42,7 +43,6 @@ const {
   getJobEntryReferenceLabel,
   getJobEntryPreviewVisibleOutputs,
   getJobEntryPreviewHiddenOutputCount,
-  getJobEntryPreviewOutputKey,
   formatElapsed,
   copyOutputPath,
   cancelQueuedJobs,
@@ -55,17 +55,28 @@ const {
 } = useProvidedHomeView()
 
 const queuedJobCount = computed(() => jobListTabs.value.find((tab) => tab.value === 'queued')?.count ?? 0)
+const confirm = useConfirmDialog()
 
-function confirmDeleteJob(entry: Parameters<typeof deleteJobEntry>[0]) {
+async function confirmDeleteJob(entry: Parameters<typeof deleteJobEntry>[0]) {
   const label = getJobEntryPrimaryLabel(entry)
-  if (window.confirm(`Delete ${label} from companion and ComfyUI history? Generated files will be kept.`)) {
+  if (await confirm({
+    title: 'Delete job history?',
+    description: `Delete ${label} from companion and ComfyUI history? Generated files will be kept.`,
+    confirmLabel: 'Delete job',
+    destructive: true,
+  })) {
     void deleteJobEntry(entry, false)
   }
 }
 
-function confirmDeleteJobAndOutputs(entry: Parameters<typeof deleteJobEntry>[0]) {
+async function confirmDeleteJobAndOutputs(entry: Parameters<typeof deleteJobEntry>[0]) {
   const label = getJobEntryPrimaryLabel(entry)
-  if (window.confirm(`Delete ${label} from companion and ComfyUI history, and remove its generated image files? This cannot be undone.`)) {
+  if (await confirm({
+    title: 'Delete job and files?',
+    description: `Delete ${label} from companion and ComfyUI history, and remove its generated image files? This cannot be undone.`,
+    confirmLabel: 'Delete files',
+    destructive: true,
+  })) {
     void deleteJobEntry(entry, true)
   }
 }
@@ -155,80 +166,89 @@ function confirmDeleteJobAndOutputs(entry: Parameters<typeof deleteJobEntry>[0])
           :key="entry.key"
           class="relative"
         >
-          <button
-            type="button"
-            class="w-full rounded-md border px-3 py-3 text-left transition"
-            :class="
-              isJobEntryActive(entry)
-                ? 'border-secondary bg-secondary/12 text-primary-foreground'
-                : 'border-primary-foreground/12 bg-primary-foreground/6 text-primary-foreground hover:border-accent hover:text-accent'
-            "
-            @click="selectJobEntry(entry)"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <span class="min-w-0 truncate text-sm font-semibold">
-                {{ getJobEntryPrimaryLabel(entry) }}
-              </span>
-              <span
-                class="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-foreground/62"
-                :class="jobListTab === 'history' ? 'mr-20' : ''"
-              >
-                {{ getJobEntryStateLabel(entry) }}
-              </span>
-            </div>
-
-            <p class="mt-1 text-xs text-primary-foreground/62">
-              {{ getJobEntryVariantSummary(entry) }}
-            </p>
-
-            <div class="mt-2 flex items-center justify-between gap-3 text-xs text-primary-foreground/72">
-              <span class="min-w-0 truncate">{{ getJobEntrySecondaryLabel(entry) }}</span>
-              <span class="shrink-0">{{ formatElapsed(getJobEntryElapsedMs(entry)) }}</span>
-            </div>
-
-            <div class="mt-2 flex items-end justify-between gap-3">
-              <p class="min-w-0 truncate text-[11px] uppercase tracking-[0.12em] text-primary-foreground/48">
-                {{ getJobEntryReferenceLabel(entry) }}
-              </p>
-
+            <button
+              type="button"
+              class="w-full rounded-md border px-3 py-3 text-left transition"
+              :class="
+                isJobEntryActive(entry)
+                  ? 'border-secondary bg-secondary/12 text-primary-foreground'
+                  : 'border-primary-foreground/12 bg-primary-foreground/6 text-primary-foreground hover:border-accent hover:text-accent'
+              "
+              @click="selectJobEntry(entry)"
+            >
               <div
-                v-if="jobListTab === 'history' && getJobEntryPreviewVisibleOutputs(entry).length"
-                data-testid="job-output-preview-stack"
-                class="flex shrink-0 items-center -space-x-4"
-                aria-hidden="true"
+                class="min-w-0"
+                :class="jobListTab === 'history' ? 'flex gap-3 pb-9' : ''"
               >
-                <span
-                  v-for="(output, index) in getJobEntryPreviewVisibleOutputs(entry)"
-                  :key="getJobEntryPreviewOutputKey(output, index)"
-                  class="relative h-[100px] w-[100px] overflow-hidden rounded-md border border-primary-foreground/14 bg-primary-foreground/8 ring-2 ring-primary"
-                  :style="{ zIndex: getJobEntryPreviewVisibleOutputs(entry).length - index }"
-                  @contextmenu="openGeneratedOutputContextMenu($event, output, null)"
+                <div
+                  v-if="jobListTab === 'history' && getJobEntryPreviewVisibleOutputs(entry).length"
+                  class="flex w-16 shrink-0 flex-col gap-1"
+                  aria-hidden="true"
                 >
-                  <UiPreloadedMedia
-                    data-testid="job-output-preview"
-                    :src="output.url"
-                    alt=""
-                    label=""
-                    media-class="h-full w-full object-cover"
-                    loading-class="bg-primary/80 text-primary-foreground"
-                    spinner-class="mr-0 h-4 w-4"
-                  />
-                </span>
+                  <div
+                    class="relative h-20 overflow-hidden rounded-sm border border-primary-foreground/14 bg-primary-foreground/8"
+                    @contextmenu="openGeneratedOutputContextMenu($event, getJobEntryPreviewVisibleOutputs(entry)[0], null)"
+                  >
+                    <UiPreloadedMedia
+                      data-testid="job-output-preview"
+                      :src="getJobEntryPreviewVisibleOutputs(entry)[0]?.url ?? ''"
+                      alt=""
+                      label=""
+                      media-class="h-full w-full object-cover"
+                      loading-class="bg-primary/80 text-primary-foreground"
+                      spinner-class="mr-0 h-4 w-4"
+                    />
+                    <span
+                      v-if="getJobEntryPreviewVisibleOutputs(entry).length + getJobEntryPreviewHiddenOutputCount(entry) > 1"
+                      class="absolute bottom-1 right-1 rounded-sm border border-secondary/40 bg-secondary/90 px-1.5 py-0.5 text-[10px] font-semibold text-secondary-foreground"
+                    >
+                      +{{ getJobEntryPreviewVisibleOutputs(entry).length + getJobEntryPreviewHiddenOutputCount(entry) - 1 }}
+                    </span>
+                  </div>
+                  <span
+                    data-testid="job-history-elapsed"
+                    class="text-center text-[11px] font-semibold leading-4 text-primary-foreground/62"
+                  >
+                    {{ formatElapsed(getJobEntryElapsedMs(entry)) }}
+                  </span>
+                </div>
 
-                <span
-                  v-if="getJobEntryPreviewHiddenOutputCount(entry)"
-                  class="relative z-10 inline-flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-md border border-secondary/40 bg-secondary/14 text-sm font-semibold text-secondary ring-2 ring-primary"
-                >
-                  +{{ getJobEntryPreviewHiddenOutputCount(entry) }}
-                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-start justify-between gap-3">
+                    <span class="min-w-0 truncate text-sm font-semibold">
+                      {{ getJobEntryPrimaryLabel(entry) }}
+                    </span>
+                    <span class="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-foreground/62">
+                      {{ getJobEntryStateLabel(entry) }}
+                    </span>
+                  </div>
+
+                  <dl class="mt-2 grid gap-1 text-xs text-primary-foreground/72">
+                    <div class="flex min-w-0 items-center justify-between gap-3">
+                      <dt class="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary-foreground/42">
+                        Prompt
+                      </dt>
+                      <dd class="min-w-0 truncate">{{ getJobEntryVariantSummary(entry) }}</dd>
+                    </div>
+                    <div class="flex min-w-0 items-center justify-between gap-3">
+                      <dt class="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary-foreground/42">
+                        Output
+                      </dt>
+                      <dd class="min-w-0 truncate">{{ getJobEntrySecondaryLabel(entry) }}</dd>
+                    </div>
+                  </dl>
+
+                  <p class="mt-2 min-w-0 truncate text-[11px] uppercase tracking-[0.12em] text-primary-foreground/48">
+                    {{ getJobEntryReferenceLabel(entry) }}
+                  </p>
+                </div>
               </div>
-            </div>
-          </button>
+            </button>
 
-          <div
-            v-if="jobListTab === 'history'"
-            class="absolute right-2 top-2 flex items-center gap-1"
-          >
+            <div
+              v-if="jobListTab === 'history'"
+              class="absolute bottom-2 right-2 flex items-center gap-1"
+            >
             <UiTooltip content="Delete job from companion and ComfyUI history">
               <button
                 type="button"

@@ -12,6 +12,7 @@ import UiPreviewCard from '../components/ui/UiPreviewCard.vue'
 import { fetchAppSettings } from '../composables/useAppSettings'
 import { useAssetDownloads } from '../composables/useAssetDownloads'
 import {
+  baseModelLabelsFor,
   compatibilityForDownload,
   controlNetBaseModelLabel,
   controlNetDisplayName,
@@ -50,6 +51,7 @@ const {
 const query = ref('')
 const includeNsfw = ref(false)
 const typeFilter = ref<LibraryTypeFilter>('all')
+const baseModelFilter = ref('all')
 const currentPage = ref(1)
 const selectedModel = ref<LibraryModelItem | null>(null)
 const controlNetModels = ref<ControlNetLibraryItem[]>([])
@@ -97,6 +99,13 @@ const filteredModels = computed(() => {
       return false
     }
 
+    if (
+      baseModelFilter.value !== 'all' &&
+      !baseModelLabelsFor(item).some((baseModel) => baseModel.toLowerCase() === baseModelFilter.value.toLowerCase())
+    ) {
+      return false
+    }
+
     if (!search) {
       return true
     }
@@ -106,6 +115,7 @@ const filteredModels = computed(() => {
       item.versionName,
       item.fileName,
       item.baseModel,
+      baseModelLabelsFor(item).join(' '),
       'targetPath' in item ? item.targetPath : '',
     ]
       .filter(Boolean)
@@ -132,8 +142,38 @@ const typeCounts = computed(() => ({
   lora: libraryModels.value.filter((item) => item.itemKind === 'lora').length,
   controlnet: libraryModels.value.filter((item) => item.itemKind === 'controlnet').length,
 }))
-watch([query, typeFilter, includeNsfw], () => {
+const baseModelOptions = computed(() => {
+  const counts = new Map<string, number>()
+  let scopedTotal = 0
+  for (const item of libraryModels.value) {
+    if (!includeNsfw.value && modelHasNsfw(item)) {
+      continue
+    }
+
+    if (typeFilter.value !== 'all' && item.itemKind !== typeFilter.value) {
+      continue
+    }
+
+    scopedTotal += 1
+    for (const baseModel of baseModelLabelsFor(item)) {
+      counts.set(baseModel, (counts.get(baseModel) ?? 0) + 1)
+    }
+  }
+
+  return [
+    { label: 'All bases', value: 'all', count: scopedTotal },
+    ...Array.from(counts, ([label, count]) => ({ label, value: label, count }))
+      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
+  ]
+})
+watch([query, typeFilter, baseModelFilter, includeNsfw], () => {
   currentPage.value = 1
+})
+
+watch(baseModelOptions, (options) => {
+  if (baseModelFilter.value !== 'all' && !options.some((option) => option.value === baseModelFilter.value)) {
+    baseModelFilter.value = 'all'
+  }
 })
 
 watch(pageCount, (nextPageCount) => {
@@ -311,6 +351,25 @@ onMounted(() => {
             @click="typeFilter = option.value"
           >
             {{ option.label }}
+          </button>
+        </div>
+
+        <div
+          class="flex min-h-9 max-w-full flex-wrap overflow-hidden rounded-md border border-border"
+          role="group"
+          aria-label="Library base model filter"
+        >
+          <button
+            v-for="option in baseModelOptions"
+            :key="option.value"
+            class="border-r border-b border-border px-3 py-2 text-xs font-semibold last:border-r-0"
+            :class="baseModelFilter === option.value ? 'bg-secondary text-secondary-foreground' : 'bg-background text-muted-foreground hover:bg-accent/10 hover:text-accent'"
+            type="button"
+            :aria-label="`Show ${option.label} base models`"
+            @click="baseModelFilter = option.value"
+          >
+            {{ option.label }}
+            <span class="ml-1 text-[10px] opacity-70">{{ option.count }}</span>
           </button>
         </div>
 

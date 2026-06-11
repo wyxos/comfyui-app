@@ -7,6 +7,7 @@ import {
   RefreshCw,
   RotateCcw,
 } from 'lucide-vue-next'
+import UiSelect from '../../components/ui/UiSelect.vue'
 import UiSlider from '../../components/ui/UiSlider.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
 import { useProvidedHomeView } from './homeViewContext'
@@ -61,6 +62,10 @@ const seedModeClass = computed(() =>
     ? 'border-secondary/45 bg-secondary/10 text-secondary'
     : 'border-accent/35 bg-accent/10 text-accent',
 )
+const samplerUiOptions = computed(() => buildConfigSelectOptions(samplerPlaceholder.value, samplerSelectOptions.value))
+const schedulerUiOptions = computed(() => buildConfigSelectOptions(schedulerPlaceholder.value, schedulerSelectOptions.value))
+const clipNameUiOptions = computed(() => buildConfigSelectOptions(clipNamePlaceholder.value, clipNameSelectOptions.value))
+const vaeNameUiOptions = computed(() => buildConfigSelectOptions(vaeNamePlaceholder.value, vaeNameSelectOptions.value))
 const configFieldTooltips = {
   size:
     'Purpose: sets the generated image dimensions.\nImpact: larger values use more VRAM and time but can preserve more detail; smaller values render faster but reduce detail and crop room.',
@@ -93,6 +98,13 @@ function handleAspectRatioInput(event: Event) {
 
 function defaultOptionLabel(value: string) {
   return value ? `Default (${value})` : 'Default'
+}
+
+function buildConfigSelectOptions(defaultValue: string, options: string[]) {
+  return [
+    { label: defaultOptionLabel(defaultValue), value: '' },
+    ...options.map((option) => ({ label: option, value: option })),
+  ]
 }
 </script>
 
@@ -349,21 +361,15 @@ function defaultOptionLabel(value: string) {
             Sampler
           </span>
         </UiTooltip>
-        <select
+        <UiSelect
           v-model="samplerName"
+          :options="samplerUiOptions"
+          :placeholder="defaultOptionLabel(samplerPlaceholder)"
           aria-label="Sampler"
-          class="h-11 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-card-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-55"
+          searchable
+          search-placeholder="Search samplers..."
           :disabled="loadingGenerationOptions"
-        >
-          <option value="">{{ defaultOptionLabel(samplerPlaceholder) }}</option>
-          <option
-            v-for="option in samplerSelectOptions"
-            :key="option"
-            :value="option"
-          >
-            {{ option }}
-          </option>
-        </select>
+        />
       </label>
 
       <label class="flex flex-col gap-2">
@@ -376,21 +382,15 @@ function defaultOptionLabel(value: string) {
             Scheduler
           </span>
         </UiTooltip>
-        <select
+        <UiSelect
           v-model="scheduler"
+          :options="schedulerUiOptions"
+          :placeholder="defaultOptionLabel(schedulerPlaceholder)"
           aria-label="Scheduler"
-          class="h-11 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-card-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-55"
+          searchable
+          search-placeholder="Search schedulers..."
           :disabled="loadingGenerationOptions"
-        >
-          <option value="">{{ defaultOptionLabel(schedulerPlaceholder) }}</option>
-          <option
-            v-for="option in schedulerSelectOptions"
-            :key="option"
-            :value="option"
-          >
-            {{ option }}
-          </option>
-        </select>
+        />
       </label>
     </div>
 
@@ -425,21 +425,15 @@ function defaultOptionLabel(value: string) {
               CLIP name
             </span>
           </UiTooltip>
-          <select
+          <UiSelect
             v-model="clipName"
+            :options="clipNameUiOptions"
+            :placeholder="defaultOptionLabel(clipNamePlaceholder)"
             aria-label="CLIP name"
-            class="h-11 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-card-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-55"
+            searchable
+            search-placeholder="Search CLIP files..."
             :disabled="loadingGenerationOptions"
-          >
-            <option value="">{{ defaultOptionLabel(clipNamePlaceholder) }}</option>
-            <option
-              v-for="option in clipNameSelectOptions"
-              :key="option"
-              :value="option"
-            >
-              {{ option }}
-            </option>
-          </select>
+          />
         </label>
 
         <label class="flex flex-col gap-2">
@@ -452,21 +446,15 @@ function defaultOptionLabel(value: string) {
               VAE name
             </span>
           </UiTooltip>
-          <select
+          <UiSelect
             v-model="vaeName"
+            :options="vaeNameUiOptions"
+            :placeholder="defaultOptionLabel(vaeNamePlaceholder)"
             aria-label="VAE name"
-            class="h-11 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-card-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-55"
+            searchable
+            search-placeholder="Search VAE files..."
             :disabled="loadingGenerationOptions"
-          >
-            <option value="">{{ defaultOptionLabel(vaeNamePlaceholder) }}</option>
-            <option
-              v-for="option in vaeNameSelectOptions"
-              :key="option"
-              :value="option"
-            >
-              {{ option }}
-            </option>
-          </select>
+          />
         </label>
       </div>
     </div>

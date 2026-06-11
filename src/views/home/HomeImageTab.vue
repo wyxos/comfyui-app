@@ -7,6 +7,7 @@ import {
   X,
 } from 'lucide-vue-next'
 import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
+import UiSwitch from '../../components/ui/UiSwitch.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
 import { useProvidedHomeView } from './homeViewContext'
 
@@ -76,49 +77,23 @@ onBeforeUnmount(() => {
                     class="h-8 w-8 cursor-pointer rounded-md border border-primary-foreground/12 bg-primary p-1 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="!flattenInputImageBackground"
                   />
-                  <button
-                    type="button"
-                    role="switch"
+                  <UiSwitch
+                    :checked="flattenInputImageBackground"
                     aria-label="Flatten transparent input background"
-                    :aria-checked="flattenInputImageBackground"
-                    class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-ring/25"
-                    :class="
-                      flattenInputImageBackground
-                        ? 'border-secondary bg-secondary'
-                        : 'border-primary-foreground/12 bg-primary-foreground/8 hover:border-accent'
-                    "
                     @click="flattenInputImageBackground = !flattenInputImageBackground"
-                  >
-                    <span
-                      class="inline-block h-4 w-4 rounded-full bg-primary-foreground shadow-sm transition-transform"
-                      :class="flattenInputImageBackground ? 'translate-x-5' : 'translate-x-1'"
-                    />
-                  </button>
+                  />
                   <span
                     class="text-xs font-medium"
                     :class="shouldUseInputImage ? 'text-secondary' : 'text-muted-foreground'"
                   >
                     {{ shouldUseInputImage ? 'Enabled' : 'Disabled' }}
                   </span>
-                  <button
-                    type="button"
-                    role="switch"
+                  <UiSwitch
+                    :checked="shouldUseInputImage"
                     aria-label="Use input image"
-                    :aria-checked="shouldUseInputImage"
-                    class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-50"
-                    :class="
-                      useInputImage
-                        ? 'border-secondary bg-secondary'
-                        : 'border-primary-foreground/12 bg-primary-foreground/8 hover:border-accent'
-                    "
                     :disabled="!hasInputImage"
                     @click="useInputImage = !useInputImage"
-                  >
-                    <span
-                      class="inline-block h-4 w-4 rounded-full bg-primary-foreground shadow-sm transition-transform"
-                      :class="useInputImage ? 'translate-x-5' : 'translate-x-1'"
-                    />
-                  </button>
+                  />
                 </div>
               </div>
               <input

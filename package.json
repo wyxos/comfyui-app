@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1 --port 3210",
+    "dev": "node scripts/dev-server.mjs",
     "build": "vue-tsc -b && vite build",
     "extension:typecheck": "tsc -p extension/tsconfig.json",
     "extension:build": "npm run extension:typecheck && vite build --config extension/vite.config.ts",

@@ -39,6 +39,7 @@ function createContext(overrides: Record<string, unknown> = {}) {
     getLoraCompatibilityStatus: () => 'compatible',
     getLoraCompatibilityLabel: () => 'Compatible',
     getLoraCompatibilityMetadata: () => null,
+    loadingLoras: ref(false),
     toggleCheckpointLora: vi.fn(),
     setCheckpointLoraStrength: vi.fn(),
     toggleLoraAllCompatible: vi.fn(),
@@ -49,6 +50,7 @@ function createContext(overrides: Record<string, unknown> = {}) {
       downloadStatusLabel: () => '',
       queueAssetDownload: vi.fn(),
       deleteAssetDownload: vi.fn(),
+      repairDownloadPreviews: vi.fn(),
       modelDownloadKey: () => '',
       startPolling: vi.fn(),
       stopPolling: vi.fn(),
@@ -122,10 +124,26 @@ describe('HomeLoraSelectionCard', () => {
 
     expect(wrapper.text()).toContain('Collared Shirt')
     expect(wrapper.text()).toContain('collared-shirt-lora.safetensors')
+    expect(wrapper.text()).not.toContain('Applies to compatible')
+    expect(wrapper.text()).not.toContain('Applied via all compatible')
+    expect(controls.classes()).toContain('items-stretch')
     expect(controls.get('a[aria-label="Open Collared Shirt on Civitai"]').exists()).toBe(true)
     expect(controls.get('button[aria-label="Apply collared-shirt-lora.safetensors to all compatible checkpoints"]').attributes('role')).toBe('switch')
     expect(controls.get('input[type="number"]').element).toHaveProperty('value', '0.75')
     expect(controls.get('button[aria-label="Disable collared-shirt-lora.safetensors"]').attributes('role')).toBe('switch')
     expect(controls.get('button[aria-label="Remove collared-shirt-lora.safetensors"]').exists()).toBe(true)
+  })
+
+  it('reserves a loading thumbnail while LoRA metadata is still loading', () => {
+    const lora: HomeLoraSelection = {
+      name: 'pending-preview-lora.safetensors',
+      enabled: true,
+      strength: '1',
+    }
+    const wrapper = mountCard(lora, {
+      loadingLoras: ref(true),
+    })
+
+    expect(wrapper.get('[aria-label="Loading pending-preview-lora.safetensors preview"]').exists()).toBe(true)
   })
 })

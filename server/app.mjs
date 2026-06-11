@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { Readable } from 'node:stream'
 import { comfyUrl, defaultRuntimeAdapters, host, indexPath, port, refreshConfigFromEnv, runtimeAdapters } from './config.mjs'
 import { resolveAsset, sendError, sendJson, streamFile } from './http.mjs'
 import { comfySocketConnected, connectComfySocket, resetComfySocketRuntimeState } from './comfy-socket.mjs'
@@ -57,7 +58,42 @@ import { resetComfyModelDirsFromEnv } from './model-paths.mjs'
 import { resetModelMetadataRuntimeState } from './model-metadata.mjs'
 import { resetJobStoreRuntimeState } from './job-store.mjs'
 
-export function createCompanionServer({ connectWebSocket = true } = {}) {
+const proxyHeaderBlocklist = new Set(['connection', 'content-encoding', 'content-length', 'transfer-encoding'])
+
+async function proxyDevAsset(devAssetOrigin, request, response) {
+  const targetUrl = new URL(request.url ?? '/', devAssetOrigin)
+
+  try {
+    const upstreamResponse = await fetch(targetUrl, {
+      method: request.method,
+      headers: request.headers,
+    })
+    const headers = {}
+    upstreamResponse.headers.forEach((value, key) => {
+      if (!proxyHeaderBlocklist.has(key.toLowerCase())) {
+        headers[key] = value
+      }
+    })
+    response.writeHead(upstreamResponse.status, headers)
+
+    if (request.method === 'HEAD' || !upstreamResponse.body) {
+      response.end()
+      return
+    }
+
+    Readable.fromWeb(upstreamResponse.body).pipe(response)
+  } catch (error) {
+    return sendError(
+      response,
+      502,
+      'dev-asset-proxy-failed',
+      `Frontend dev server did not respond at ${devAssetOrigin.toString()}`,
+      error instanceof Error ? { message: error.message } : null,
+    )
+  }
+}
+
+export function createCompanionServer({ connectWebSocket = true, devAssetOrigin = null } = {}) {
   const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', `http://${request.headers.host ?? `${host}:${port}`}`)
 
@@ -245,6 +281,14 @@ export function createCompanionServer({ connectWebSocket = true } = {}) {
 
   if (url.pathname === '/api/open-parent-folder' && request.method === 'POST') {
     return handleOpenParentFolder(request, response)
+  }
+
+  if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
+    return sendError(response, 404, 'route-not-found', `No API route matched ${request.method} ${url.pathname}`)
+  }
+
+  if (devAssetOrigin) {
+    return proxyDevAsset(devAssetOrigin, request, response)
   }
 
   if (!existsSync(indexPath)) {

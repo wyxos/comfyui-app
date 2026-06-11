@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
 import { flushPromises, mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
+import { defineComponent, h, nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import UiSelect from '../../src/components/ui/UiSelect.vue'
+import UiSwitch from '../../src/components/ui/UiSwitch.vue'
 import UiTooltip from '../../src/components/ui/UiTooltip.vue'
 
 const { emblaApi } = vi.hoisted(() => ({
@@ -94,6 +95,20 @@ describe('UiTooltip', () => {
     await nextTick()
 
     expect(document.body.textContent).not.toContain('Tooltip content')
+  })
+})
+
+describe('UiSwitch', () => {
+  it('uses a square-rounded thumb', () => {
+    const wrapper = mount(UiSwitch, {
+      props: {
+        checked: true,
+      },
+    })
+
+    const thumb = wrapper.get('span')
+    expect(thumb.classes()).toContain('rounded-sm')
+    expect(thumb.classes()).not.toContain('rounded-full')
   })
 })
 
@@ -212,6 +227,7 @@ describe('AssetPreviewModal', () => {
 
   it('shows download and delete actions for a downloaded version file', async () => {
     const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
+    const { default: ConfirmationProvider } = await import('../../src/components/ConfirmationProvider.vue')
     const version = {
       id: 201,
       name: 'v16.0',
@@ -232,24 +248,29 @@ describe('AssetPreviewModal', () => {
       fileName: 'wai.safetensors',
     }
     const deleteAssetDownload = vi.fn()
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const wrapper = mount(AssetPreviewModal, {
-      attachTo: document.body,
-      props: {
-        open: true,
-        model: {
-          id: 101,
-          name: 'Civitai WAI checkpoint',
-          type: 'Checkpoint',
-          modelVersions: [version],
-        },
-        showDownloadActions: true,
-        downloadForVersion: () => download,
-        queueAssetDownload: vi.fn(),
-        deleteAssetDownload,
-        modelDownloadKey: () => '101:201',
+    const Host = defineComponent({
+      setup() {
+        return () =>
+          h(ConfirmationProvider, null, {
+            default: () =>
+              h(AssetPreviewModal, {
+                open: true,
+                model: {
+                  id: 101,
+                  name: 'Civitai WAI checkpoint',
+                  type: 'Checkpoint',
+                  modelVersions: [version],
+                },
+                showDownloadActions: true,
+                downloadForVersion: () => download,
+                queueAssetDownload: vi.fn(),
+                deleteAssetDownload,
+                modelDownloadKey: () => '101:201',
+              }),
+          })
       },
     })
+    const wrapper = mount(Host, { attachTo: document.body })
 
     await nextTick()
 
@@ -258,10 +279,15 @@ describe('AssetPreviewModal', () => {
     expect(deleteButton.exists()).toBe(true)
 
     await deleteButton.trigger('click')
+    await nextTick()
 
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'Delete wai.safetensors from disk? The download record will remain for redownload.',
-    )
+    expect(document.body.textContent).toContain('Delete downloaded file?')
+    const confirmButton = Array.from(document.body.querySelectorAll('button'))
+      .find((button) => button.textContent?.trim() === 'Delete file') as HTMLButtonElement | undefined
+    expect(confirmButton).toBeDefined()
+    confirmButton?.click()
+    await flushPromises()
+
     expect(deleteAssetDownload).toHaveBeenCalledWith(download, version)
   })
 

@@ -65,8 +65,9 @@ describe('useAssetPreviewDownloadActions', () => {
       }),
     }))
 
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const { useAssetPreviewDownloadActions } = await import('../../src/components/asset-preview/useAssetPreviewDownloadActions')
+    const { provideConfirmDialog } = await import('../../src/composables/useConfirmDialog')
+    const confirm = vi.fn().mockResolvedValue(false)
     let actions: ReturnType<typeof useAssetPreviewDownloadActions> | null = null
     const Consumer = defineComponent({
       setup() {
@@ -74,8 +75,14 @@ describe('useAssetPreviewDownloadActions', () => {
         return () => h('div')
       },
     })
+    const Provider = defineComponent({
+      setup() {
+        provideConfirmDialog(confirm)
+        return () => h(Consumer)
+      },
+    })
 
-    const wrapper = mount(Consumer)
+    const wrapper = mount(Provider)
     await actions?.queueAssetDownload({
       id: 101,
       name: 'Preview LoRA',
@@ -92,12 +99,14 @@ describe('useAssetPreviewDownloadActions', () => {
     })
 
     expect(queueDownload).not.toHaveBeenCalled()
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'Re-download preview.safetensors? This will replace the existing downloaded file.',
-    )
+    expect(confirm).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Re-download file?',
+      description: 'Re-download preview.safetensors? This will replace the existing downloaded file.',
+      confirmLabel: 'Re-download',
+      destructive: true,
+    }))
 
     wrapper.unmount()
-    confirmSpy.mockRestore()
   })
 
   it('posts a single-download preview repair action', async () => {

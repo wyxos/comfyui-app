@@ -180,7 +180,7 @@ describe('createAssetDownloadActions', () => {
 
   it('requires confirmation before redownloading a completed version from asset cards', async () => {
     const queueDownload = vi.fn()
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const confirm = vi.fn().mockResolvedValue(false)
     const { createAssetDownloadActions } = await import('../../src/views/assets/assetDownloadActions')
     const actions = createAssetDownloadActions({
       downloadByVersionId: computed(() => new Map([
@@ -191,6 +191,7 @@ describe('createAssetDownloadActions', () => {
       openDownloadMenuKey: ref(''),
       queuingDownloadKey: ref(''),
       queueDownload,
+      confirm,
     } as never)
 
     await actions.queueAssetDownload({
@@ -202,11 +203,12 @@ describe('createAssetDownloadActions', () => {
     }, modelVersion(201, 'v1.safetensors'))
 
     expect(queueDownload).not.toHaveBeenCalled()
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'Re-download v1.safetensors? This will replace the existing downloaded file.',
-    )
-
-    confirmSpy.mockRestore()
+    expect(confirm).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Re-download file?',
+      description: 'Re-download v1.safetensors? This will replace the existing downloaded file.',
+      confirmLabel: 'Re-download',
+      destructive: true,
+    }))
   })
 })
 

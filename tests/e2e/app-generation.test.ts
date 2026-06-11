@@ -259,6 +259,7 @@ describe('companion app e2e flows', () => {
       await screen.getByRole('switch', { name: `Disable ${checkpointName}` }).click()
       await expect.element(screen.getByRole('switch', { name: `Enable ${checkpointName}` })).toBeVisible()
 
+      await screen.getByRole('button', { name: 'Expand checkpoint assets' }).click()
       await screen.getByLabelText(`Add LoRA for ${checkpointName}`).click()
       await screen.getByRole('button', { name: loraName }).click()
 
@@ -266,7 +267,7 @@ describe('companion app e2e flows', () => {
       await expect.element(screen.getByRole('switch', { name: `Disable ${loraName}` })).toBeVisible()
     })
 
-  it('uses job output URLs for capped history preview stacks', async () => {
+  it('uses the first job output URL for compact history previews', async () => {
       const outputs = Array.from({ length: 5 }, (_, index) =>
         createJobOutput(`history-output-${index + 1}.png`, index + 1),
       )
@@ -275,23 +276,24 @@ describe('companion app e2e flows', () => {
       })
 
       await expect.element(screen.getByText('5 outputs ready', { exact: true })).toBeVisible()
-      await expect.element(screen.getByText('+2')).toBeVisible()
-
-      const stack = document.querySelector('[data-testid="job-output-preview-stack"]')
-      expect(stack).not.toBeNull()
+      await expect.element(screen.getByText('+4')).toBeVisible()
 
       const previewImages = Array.from(
-        stack?.querySelectorAll<HTMLImageElement>('img[data-testid="job-output-preview"]') ?? [],
+        document.querySelectorAll<HTMLImageElement>('img[data-testid="job-output-preview"]'),
       )
-      expect(previewImages).toHaveLength(3)
+      expect(previewImages).toHaveLength(1)
       expect(previewImages.map((image) => image.getAttribute('src'))).toEqual([
         '/api/view?filename=history-output-1.png&subfolder=&type=output',
-        '/api/view?filename=history-output-2.png&subfolder=&type=output',
-        '/api/view?filename=history-output-3.png&subfolder=&type=output',
       ])
+      expect(document.querySelector('[data-testid="job-history-elapsed"]')?.textContent?.trim()).toBe('4s')
+      expect(document.body.textContent).not.toContain('Time')
 
-      vi.spyOn(window, 'confirm').mockReturnValue(true)
       await screen.getByRole('button', { name: /Delete historyCheckpoint\.safetensors from history and remove generated files/ }).click()
+      await vi.waitFor(() => {
+        expect(document.body.textContent).toContain('Delete job and files?')
+      })
+      ;(Array.from(document.body.querySelectorAll<HTMLButtonElement>('button'))
+        .find((button) => button.textContent?.trim() === 'Delete files') as HTMLButtonElement).click()
       await vi.waitFor(() => {
         const deleteCall = api.calls.find((call) => call.method === 'DELETE' && call.path === '/api/jobs/history-prompt-1')
         expect(deleteCall?.search.get('deleteOutputs')).toBe('1')

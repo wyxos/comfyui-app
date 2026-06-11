@@ -27,8 +27,10 @@ import type {
 import { useAssetPreviewArchiveFallback } from './useAssetPreviewArchiveFallback'
 import { useAssetPreviewImageSafety } from './useAssetPreviewImageSafety'
 import { useAssetPreviewNavigationEvents } from './useAssetPreviewNavigationEvents'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
 export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, emitClose: () => void) {
+  const confirm = useConfirmDialog()
   const fetchedModel = ref<CivitaiModel | null>(null)
   const imageDetails = ref<Record<string, CivitaiImage>>({})
   const civitaiLoading = ref(false)
@@ -330,14 +332,14 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     void props.queueAssetDownload(civitaiModel.value, version)
   }
 
-  function deleteVersionDownload(version: CivitaiModelVersion) {
+  async function deleteVersionDownload(version: CivitaiModelVersion) {
     const download = downloadForVersion(version)
     if (!download || !props.deleteAssetDownload) {
       return
     }
 
     const fileName = download.fileName || primaryFileForVersion(version)?.name || modelVersionLabel(version)
-    const confirmed = window.confirm(`Delete ${fileName} from disk? The download record will remain for redownload.`)
+    const confirmed = await confirm({ title: 'Delete downloaded file?', description: `Delete ${fileName} from disk? The download record will remain for redownload.`, confirmLabel: 'Delete file', destructive: true })
     if (!confirmed) {
       return
     }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Plus, X } from 'lucide-vue-next'
+import UiSwitch from '../../components/ui/UiSwitch.vue'
 import { useProvidedHomeView } from './homeViewContext'
 import HomeAssetPickerModal from './HomeAssetPickerModal.vue'
 import HomeControlNetInstanceCard from './HomeControlNetInstanceCard.vue'
@@ -77,24 +78,11 @@ function toggleAllCheckpointControlNets() {
       >
         <div class="flex items-center gap-2 text-[11px] text-primary-foreground/60">
           <span>All ControlNets</span>
-          <button
-            type="button"
-            role="switch"
-            :aria-checked="areAllCheckpointControlNetsEnabled"
+          <UiSwitch
+            :checked="areAllCheckpointControlNetsEnabled"
             :aria-label="`${areAllCheckpointControlNetsEnabled ? 'Disable' : 'Enable'} all ControlNets for ${checkpoint.displayName}`"
-            class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-ring/25"
-            :class="
-              areAllCheckpointControlNetsEnabled
-                ? 'border-secondary bg-secondary'
-                : 'border-primary-foreground/12 bg-primary-foreground/8'
-            "
             @click="toggleAllCheckpointControlNets"
-          >
-            <span
-              class="inline-block h-4 w-4 rounded-full bg-primary-foreground shadow-sm transition-transform"
-              :class="areAllCheckpointControlNetsEnabled ? 'translate-x-5' : 'translate-x-1'"
-            />
-          </button>
+          />
         </div>
         <button
           type="button"

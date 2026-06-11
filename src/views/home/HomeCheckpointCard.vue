@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ChevronDown, LoaderCircle, X } from 'lucide-vue-next'
 import AssetPreviewModal from '../../components/asset-preview/AssetPreviewModal.vue'
 import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
+import UiSwitch from '../../components/ui/UiSwitch.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
 import { useProvidedHomeView } from './homeViewContext'
 import HomeCheckpointControlNetPicker from './HomeCheckpointControlNetPicker.vue'
@@ -36,7 +37,7 @@ const {
 } = assetPreviewDownloadActions
 
 const isCheckpointPreviewOpen = ref(false)
-const isAssetsExpanded = ref(true)
+const isAssetsExpanded = ref(props.checkpoint.enabled)
 const savingSafety = ref(false)
 const safetyError = ref('')
 const savingImageSafety = ref(false)
@@ -118,6 +119,12 @@ watch(isCheckpointPreviewOpen, (isOpen) => {
   stopPolling()
 })
 
+watch(() => props.checkpoint.enabled, (enabled) => {
+  if (!enabled) {
+    isAssetsExpanded.value = false
+  }
+})
+
 onBeforeUnmount(() => {
   if (isCheckpointPreviewOpen.value) {
     stopPolling()
@@ -131,7 +138,7 @@ onBeforeUnmount(() => {
     :class="
       checkpoint.enabled
         ? 'border-primary-foreground/12 bg-primary'
-        : 'border-primary-foreground/20 bg-primary-foreground/6'
+        : 'border-primary-foreground/12 bg-primary-foreground/4 opacity-70'
     "
   >
     <div class="flex items-start gap-3">
@@ -219,20 +226,12 @@ onBeforeUnmount(() => {
           </button>
         </UiTooltip>
 
-        <button
-          type="button"
-          role="switch"
-          :aria-checked="checkpoint.enabled"
+        <UiSwitch
+          :checked="checkpoint.enabled"
+          size="md"
           :aria-label="`${checkpoint.enabled ? 'Disable' : 'Enable'} ${checkpoint.name}`"
-          class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-ring/25"
-          :class="checkpoint.enabled ? 'border-secondary bg-secondary' : 'border-primary-foreground/12 bg-primary-foreground/8'"
           @click="toggleSelectedCheckpoint(checkpoint.name)"
-        >
-          <span
-            class="inline-block h-4 w-4 rounded-full bg-primary-foreground shadow-sm transition-transform"
-            :class="checkpoint.enabled ? 'translate-x-5' : 'translate-x-1'"
-          />
-        </button>
+        />
 
         <UiTooltip content="Remove checkpoint">
           <button

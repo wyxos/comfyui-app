@@ -5,6 +5,7 @@ import { normalizeOptionalBoolean, normalizePlainObject, safeTrim } from '../sha
 import { getStoredCivitaiApiKey } from '../settings.mjs'
 import { scheduleDownloadsPersist } from './state.mjs'
 import { verifyCivitaiDownloadHash } from './transfer.mjs'
+import { normalizeCivitaiDownloadHashes } from './hash-metadata.mjs'
 import { getComfyCheckpointDir, getComfyControlNetDir, getComfyLoraDir, normalizeNumericField } from '../model-paths.mjs'
 import { readJsonFileIfExists } from '../model-trigger-words.mjs'
 import { fetchCivitaiVersionMetadata } from '../model-metadata.mjs'
@@ -25,7 +26,7 @@ export function normalizeDownloadFile(rawFile) {
     primary: file.primary === true,
     downloadUrl,
     sizeKb,
-    hashes: normalizePlainObject(file.hashes),
+    hashes: normalizeCivitaiDownloadHashes(file.hashes),
     metadata: normalizePlainObject(file.metadata),
   }
 }

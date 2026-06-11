@@ -72,6 +72,43 @@ export function modelTypeLabel(item: LibraryModelItem) {
   return item.itemKind === 'lora' ? 'LoRA' : 'Checkpoint'
 }
 
+function appendBaseModelLabels(target: string[], values: unknown[]) {
+  const seen = new Set(target.map((value) => value.toLowerCase()))
+
+  for (const value of values) {
+    if (Array.isArray(value)) {
+      appendBaseModelLabels(target, value)
+      continue
+    }
+
+    if (typeof value !== 'string') {
+      continue
+    }
+
+    for (const entry of value.split(/[\r\n,|]+/g)) {
+      const label = entry.trim()
+      const key = label.toLowerCase()
+      if (!label || seen.has(key)) {
+        continue
+      }
+
+      seen.add(key)
+      target.push(label)
+    }
+  }
+}
+
+export function baseModelLabelsFor(item: LibraryModelItem) {
+  const labels: string[] = []
+  appendBaseModelLabels(labels, [
+    item.compatibility?.compatibleBaseModels,
+    item.compatibility?.baseModel,
+    item.baseModel,
+  ])
+
+  return labels
+}
+
 export function primaryPreviewPath(item: LibraryModelItem) {
   return item.previewPaths?.find((preview) => preview.url) ?? null
 }

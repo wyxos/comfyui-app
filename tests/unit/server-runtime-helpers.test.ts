@@ -228,6 +228,57 @@ describe('server runtime helpers', () => {
     }
   })
 
+  it('returns JSON for unmatched API routes instead of the frontend shell', async () => {
+    const server = createCompanionServer({ connectWebSocket: false })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+
+    try {
+      const address = server.address() as AddressInfo
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/does-not-exist`)
+      await expect(response.json()).resolves.toMatchObject({
+        ok: false,
+        error: 'route-not-found',
+      })
+      expect(response.status).toBe(404)
+      expect(response.headers.get('content-type')).toContain('application/json')
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()))
+      })
+    }
+  })
+
+  it('proxies frontend requests to the Vite dev origin when configured', async () => {
+    let requestedPath = ''
+    const frontendServer = createServer((request, response) => {
+      requestedPath = request.url ?? ''
+      response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })
+      response.end('dev asset body')
+    })
+    await new Promise<void>((resolve) => frontendServer.listen(0, '127.0.0.1', resolve))
+    const frontendAddress = frontendServer.address() as AddressInfo
+    const server = createCompanionServer({
+      connectWebSocket: false,
+      devAssetOrigin: new URL(`http://127.0.0.1:${frontendAddress.port}/`),
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+
+    try {
+      const address = server.address() as AddressInfo
+      const response = await fetch(`http://127.0.0.1:${address.port}/src/main.ts?cache=skip`)
+      await expect(response.text()).resolves.toBe('dev asset body')
+      expect(response.status).toBe(200)
+      expect(requestedPath).toBe('/src/main.ts?cache=skip')
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()))
+      })
+      await new Promise<void>((resolve, reject) => {
+        frontendServer.close((error) => (error ? reject(error) : resolve()))
+      })
+    }
+  })
+
   it('does not connect a ComfyUI websocket when the HTTP server cannot bind', async () => {
     const blocker = createServer()
     await new Promise<void>((resolve) => blocker.listen(0, '127.0.0.1', resolve))

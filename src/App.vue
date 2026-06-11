@@ -2,6 +2,7 @@
 import { Download } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import AssetDownloadsPanel from './components/AssetDownloadsPanel.vue'
+import ConfirmationProvider from './components/ConfirmationProvider.vue'
 import { useAssetDownloadSummary } from './composables/useAssetDownloads'
 
 const downloadsSheetOpen = ref(false)
@@ -40,6 +41,7 @@ const navGroups = [
 </script>
 
 <template>
+  <ConfirmationProvider>
   <div class="grid h-screen overflow-hidden grid-rows-[3.75rem_minmax(0,1fr)] bg-background text-foreground">
     <header class="shrink-0 border-b border-border bg-card/92 backdrop-blur">
       <div class="flex h-[3.75rem] items-center justify-between gap-6 px-4 sm:px-6">
@@ -115,4 +117,5 @@ const navGroups = [
       @close="downloadsSheetOpen = false"
     />
   </div>
+  </ConfirmationProvider>
 </template>
