@@ -78,6 +78,7 @@ const totalPages = ref(0)
 const currentCursor = ref('')
 const nextCursor = ref('')
 const activeImageModel = ref<CivitaiModel | null>(null)
+const activeImageInitialIndex = ref(0)
 const openDownloadMenuKey = ref('')
 const queuingDownloadKey = ref('')
 const downloadActionError = ref('')
@@ -350,17 +351,19 @@ function blacklistModel(model: CivitaiModel) {
   }
 }
 
-function openImageModal(model: CivitaiModel) {
+function openImageModal(model: CivitaiModel, initialImageIndex = 0) {
   const version = firstVersion(model)
   if (!version || !imagesForVersion(version).length) {
     return
   }
 
+  activeImageInitialIndex.value = initialImageIndex
   activeImageModel.value = model
 }
 
 function closeImageModal() {
   activeImageModel.value = null
+  activeImageInitialIndex.value = 0
 }
 
 async function deleteAssetDownload(download: AssetPreviewDownload) {
@@ -415,6 +418,7 @@ onBeforeUnmount(() => {
     primaryFileOnly,
     currentPage,
     activeImageModel,
+    activeImageInitialIndex,
     openDownloadMenuKey,
     queuingDownloadKey,
     downloadActionError,

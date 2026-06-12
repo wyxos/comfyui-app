@@ -113,6 +113,7 @@ export type AssetPreviewModalProps = {
   model?: CivitaiModel | null
   title?: string
   previewUrl?: string | null
+  initialImageIndex?: number
   isVideo?: boolean
   subtitle?: string | null
   kindLabel?: string

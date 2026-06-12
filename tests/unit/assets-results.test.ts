@@ -160,6 +160,37 @@ describe('AssetsResults', () => {
     expect(document.body.textContent?.match(/Carousel model/g)?.length ?? 0).toBeGreaterThan(titleCopiesBeforeFocus)
   })
 
+  it('keeps card actions in the title row as compact icon controls', () => {
+    const { wrapper } = mountAssetsResults()
+
+    const titleRow = wrapper.get('[data-asset-card-title-row]')
+    const actionBar = wrapper.get('[data-asset-card-header-actions]')
+    const openLink = wrapper.get('[data-asset-card-open-link]')
+    const hideButton = wrapper.get('[data-asset-card-hide-button]')
+    const downloadButton = wrapper.get('[data-asset-card-download-button]')
+
+    expect(titleRow.element.contains(actionBar.element)).toBe(true)
+    expect(openLink.attributes('aria-label')).toBe('Open Carousel model on Civitai')
+    expect(openLink.attributes('href')).toBe('https://civitai.com/models/101')
+    expect(hideButton.attributes('aria-label')).toBe('Hide Carousel model')
+    expect(downloadButton.attributes('aria-label')).toBe('Versions for Carousel model')
+    expect(hideButton.text()).toBe('')
+    expect(downloadButton.text()).toBe('')
+    expect(wrapper.find('[data-asset-card-version-actions]').exists()).toBe(false)
+
+    for (const control of [openLink, hideButton, downloadButton]) {
+      expect(control.classes()).toEqual(expect.arrayContaining([
+        'inline-flex',
+        'h-8',
+        'w-8',
+        'items-center',
+        'justify-center',
+        'rounded-md',
+        'border',
+      ]))
+    }
+  })
+
   it('cycles list-card preview images without opening the modal', async () => {
     const { openImageModal, wrapper } = mountAssetsResults()
 
@@ -172,12 +203,47 @@ describe('AssetsResults', () => {
     expect(wrapper.get('img').attributes('src')).toBe('https://example.test/second.jpg')
     expect(wrapper.text()).toContain('2 / 2')
 
+    await wrapper.get('button[aria-label="Open Carousel model image preview"]').trigger('click')
+
+    expect(openImageModal).toHaveBeenCalledWith(expect.objectContaining({ id: 101 }), 1)
+
     await wrapper.get('button[aria-label="Previous preview image for Carousel model"]').trigger('click')
 
     expect(wrapper.get('img').attributes('src')).toBe('https://example.test/first.jpg')
+  })
 
-    await wrapper.get('button[aria-label="Open Carousel model image preview"]').trigger('click')
+  it('runs card alt-click shortcuts for download and hide', async () => {
+    const handleDownloadClick = vi.fn()
+    const blacklistModel = vi.fn()
+    const { model, openImageModal, wrapper } = mountAssetsResults({
+      blacklistModel,
+      handleDownloadClick,
+    })
+    const card = wrapper.get('article')
 
-    expect(openImageModal).toHaveBeenCalledWith(expect.objectContaining({ id: 101 }))
+    const downloadEvent = new MouseEvent('click', {
+      altKey: true,
+      bubbles: true,
+      button: 0,
+      cancelable: true,
+    })
+    card.element.dispatchEvent(downloadEvent)
+    await nextTick()
+
+    expect(downloadEvent.defaultPrevented).toBe(true)
+    expect(handleDownloadClick).toHaveBeenCalledWith(model)
+    expect(openImageModal).not.toHaveBeenCalled()
+
+    const hideEvent = new MouseEvent('contextmenu', {
+      altKey: true,
+      bubbles: true,
+      button: 2,
+      cancelable: true,
+    })
+    card.element.dispatchEvent(hideEvent)
+    await nextTick()
+
+    expect(hideEvent.defaultPrevented).toBe(true)
+    expect(blacklistModel).toHaveBeenCalledWith(model)
   })
 })

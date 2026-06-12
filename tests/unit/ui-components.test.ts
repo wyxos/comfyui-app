@@ -426,6 +426,39 @@ describe('AssetPreviewModal', () => {
     expect(auxOnlyForwardEvent.defaultPrevented).toBe(true)
     expect(document.body.textContent).toContain('2 / 2')
   })
+
+  it('opens on the requested initial image index', async () => {
+    const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
+    mount(AssetPreviewModal, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        initialImageIndex: 2,
+        model: {
+          id: 101,
+          name: 'Indexed preview model',
+          type: 'Checkpoint',
+          modelVersions: [
+            {
+              id: 201,
+              name: 'v1',
+              baseModel: 'Illustrious',
+              images: [
+                { url: 'https://example.test/first.jpg', type: 'image', nsfw: false },
+                { url: 'https://example.test/second.jpg', type: 'image', nsfw: false },
+                { url: 'https://example.test/third.jpg', type: 'image', nsfw: false },
+              ],
+            },
+          ],
+        },
+      },
+    })
+
+    await nextTick()
+
+    expect(document.body.textContent).toContain('3 / 3')
+    expect(document.body.textContent).toContain('3 of 3')
+  })
 })
 
 describe('UiCarousel', () => {

@@ -128,6 +128,30 @@ function showPreviewImage(model: CivitaiModel, step: number) {
     [model.id]: activePreviewImageIndex(model) + step,
   }
 }
+
+function openActiveImageModal(model: CivitaiModel) {
+  openImageModal(model, activePreviewImageIndex(model))
+}
+
+function handleCardAltClick(model: CivitaiModel, event: MouseEvent) {
+  if (!event.altKey || event.button !== 0) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  void handleDownloadClick(model)
+}
+
+function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
+  if (!event.altKey) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  blacklistModel(model)
+}
 </script>
 
 <template>
@@ -137,6 +161,8 @@ function showPreviewImage(model: CivitaiModel, step: number) {
       'border-secondary/70 shadow-[0_0_0_1px_rgba(255,198,0,0.28)]': hasDownloadedVersion(model),
       'border-accent/70 shadow-[0_0_0_1px_rgba(0,175,255,0.25)]': activeDownloadForModel(model),
     }"
+    @click.capture="handleCardAltClick(model, $event)"
+    @contextmenu.capture="handleCardAltContextMenu(model, $event)"
   >
     <div
       class="relative h-56 shrink-0 border-b border-border bg-muted"
@@ -147,7 +173,7 @@ function showPreviewImage(model: CivitaiModel, step: number) {
         type="button"
         :aria-label="activePreviewUrlFor(model) ? `Open ${model.name} image preview` : `${model.name} has no preview available`"
         :disabled="!activePreviewUrlFor(model)"
-        @click="openImageModal(model)"
+        @click="openActiveImageModal(model)"
       >
         <div class="relative flex h-full w-full items-center justify-center overflow-hidden">
           <video
@@ -268,7 +294,7 @@ function showPreviewImage(model: CivitaiModel, step: number) {
       data-asset-card-body
     >
       <div
-        class="flex min-w-0 items-start justify-between gap-3"
+        class="flex min-w-0 items-start justify-between gap-2"
         data-asset-card-title-row
       >
         <UiTooltip
@@ -285,7 +311,101 @@ function showPreviewImage(model: CivitaiModel, step: number) {
             {{ model.name }}
           </a>
         </UiTooltip>
-        <ExternalLink class="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
+        <div
+          class="relative flex shrink-0 items-center gap-1.5"
+          data-asset-card-header-actions
+        >
+          <a
+            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition hover:border-secondary/60 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/35"
+            data-asset-card-open-link
+            :href="modelUrl(model)"
+            target="_blank"
+            rel="noreferrer"
+            :aria-label="`Open ${model.name} on Civitai`"
+            :title="`Open ${model.name} on Civitai`"
+          >
+            <ExternalLink class="h-4 w-4" />
+          </a>
+          <button
+            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-destructive/35 bg-destructive/10 text-destructive transition hover:border-destructive/70 hover:bg-destructive hover:text-destructive-foreground focus:outline-none focus:ring-2 focus:ring-destructive/35"
+            type="button"
+            data-asset-card-hide-button
+            :aria-label="`Hide ${model.name}`"
+            :title="`Hide ${model.name}`"
+            @click="blacklistModel(model)"
+          >
+            <Ban class="h-4 w-4" />
+          </button>
+
+          <button
+            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-card-foreground transition hover:border-secondary/60 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            data-asset-card-download-button
+            :disabled="!versionsForModel(model).length || (versionsForModel(model).length === 1 && (!canQueueVersion(firstVersion(model)) || isModelDownloadQueuing(model)))"
+            :aria-label="`${downloadButtonLabel(model)} for ${model.name}`"
+            :title="downloadButtonLabel(model)"
+            @click="handleDownloadClick(model)"
+          >
+            <Check v-if="hasDownloadedVersion(model)" class="h-4 w-4 text-secondary" />
+            <LoaderCircle v-else-if="activeDownloadForModel(model)?.state === 'downloading' || isModelDownloadQueuing(model)" class="h-4 w-4 animate-spin text-accent" />
+            <Clock v-else-if="activeDownloadForModel(model)?.state === 'queued' || activeDownloadForModel(model)?.state === 'paused'" class="h-4 w-4 text-accent" />
+            <Download v-else class="h-4 w-4" />
+          </button>
+
+          <div
+            v-if="openDownloadMenuKey === String(model.id)"
+            class="absolute right-0 top-9 z-30 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
+            data-asset-card-download-menu
+          >
+            <div class="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
+              <span class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Download version
+              </span>
+              <button
+                class="inline-flex h-7 items-center gap-1 rounded-sm border border-secondary/35 bg-secondary/10 px-2 text-xs font-semibold text-secondary transition hover:border-secondary hover:bg-secondary hover:text-secondary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                type="button"
+                :disabled="!queueableMissingVersionsForModel(model).length || isModelDownloadQueuing(model)"
+                @click="queueMissingVersionsForModel(model)"
+              >
+                <LoaderCircle v-if="isModelDownloadQueuing(model)" class="h-3.5 w-3.5 animate-spin" />
+                <Download v-else class="h-3.5 w-3.5" />
+                Queue all
+              </button>
+            </div>
+            <div class="max-h-72 overflow-auto p-1">
+              <button
+                v-for="version in versionsForModel(model)"
+                :key="version.id"
+                class="flex w-full items-start justify-between gap-3 rounded-sm px-3 py-2 text-left text-xs transition hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-50"
+                type="button"
+                :disabled="!canQueueVersion(version) || isVersionQueuing(model, version)"
+                @click="queueAssetDownload(model, version)"
+              >
+                <span class="min-w-0">
+                  <span class="block truncate font-semibold text-card-foreground">
+                    {{ modelVersionLabel(version) }}
+                  </span>
+                  <span class="mt-1 block truncate text-muted-foreground">
+                    {{ primaryFileForVersion(version)?.name ?? 'No model file' }}
+                    <template v-if="fileSizeFor(primaryFileForVersion(version))">
+                      · {{ formatFileSize(fileSizeFor(primaryFileForVersion(version))) }}
+                    </template>
+                  </span>
+                </span>
+                <span class="inline-flex shrink-0 items-center gap-1 rounded-sm border border-border px-2 py-0.5 font-semibold text-muted-foreground">
+                  <Check v-if="downloadForVersion(version)?.state === 'complete'" class="h-3.5 w-3.5 text-secondary" />
+                  <LoaderCircle v-else-if="downloadForVersion(version)?.state === 'downloading' || isVersionQueuing(model, version)" class="h-3.5 w-3.5 animate-spin text-accent" />
+                  <Clock v-else-if="downloadForVersion(version)" class="h-3.5 w-3.5 text-accent" />
+                  {{
+                    downloadForVersion(version)?.state === 'complete'
+                      ? 'Re-download'
+                      : versionDownloadButtonLabel(version)
+                  }}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div
@@ -350,123 +470,6 @@ function showPreviewImage(model: CivitaiModel, step: number) {
         >
           {{ hasDownloadedVersion(model) ? 'Downloaded' : downloadStatusLabel(activeDownloadForModel(model)) }}
         </span>
-      </div>
-
-      <div class="relative flex items-center justify-between gap-3 border-t border-border/70 pt-3">
-        <div class="min-w-0 text-xs text-muted-foreground">
-          <p class="truncate font-semibold text-card-foreground">
-            {{ firstVersion(model)?.name ?? 'No version' }}
-          </p>
-          <p class="truncate">
-            {{ primaryFileForVersion(firstVersion(model))?.name ?? 'No model file' }}
-          </p>
-        </div>
-
-        <div class="flex shrink-0 items-center gap-2">
-          <button
-            class="inline-flex h-9 items-center gap-2 rounded-md border border-destructive/35 bg-destructive/10 px-3 text-xs font-semibold text-destructive transition hover:border-destructive/70 hover:bg-destructive hover:text-destructive-foreground"
-            type="button"
-            :aria-label="`Blacklist ${model.name}`"
-            title="Blacklist model"
-            @click="blacklistModel(model)"
-          >
-            <Ban class="h-4 w-4" />
-            Hide
-          </button>
-
-          <button
-            class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold text-card-foreground transition hover:border-secondary/60 hover:text-secondary disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            :disabled="!versionsForModel(model).length || (versionsForModel(model).length === 1 && (!canQueueVersion(firstVersion(model)) || isModelDownloadQueuing(model)))"
-            @click="handleDownloadClick(model)"
-          >
-            <Check
-              v-if="hasDownloadedVersion(model)"
-              class="h-4 w-4 text-secondary"
-            />
-            <LoaderCircle
-              v-else-if="activeDownloadForModel(model)?.state === 'downloading' || isModelDownloadQueuing(model)"
-              class="h-4 w-4 animate-spin text-accent"
-            />
-            <Clock
-              v-else-if="activeDownloadForModel(model)?.state === 'queued' || activeDownloadForModel(model)?.state === 'paused'"
-              class="h-4 w-4 text-accent"
-            />
-            <Download
-              v-else
-              class="h-4 w-4"
-            />
-            {{ downloadButtonLabel(model) }}
-          </button>
-        </div>
-
-        <div
-          v-if="openDownloadMenuKey === String(model.id)"
-          class="absolute bottom-11 right-0 z-30 w-80 overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
-        >
-          <div class="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
-            <span class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Download version
-            </span>
-            <button
-              class="inline-flex h-7 items-center gap-1 rounded-sm border border-secondary/35 bg-secondary/10 px-2 text-xs font-semibold text-secondary transition hover:border-secondary hover:bg-secondary hover:text-secondary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              type="button"
-              :disabled="!queueableMissingVersionsForModel(model).length || isModelDownloadQueuing(model)"
-              @click="queueMissingVersionsForModel(model)"
-            >
-              <LoaderCircle
-                v-if="isModelDownloadQueuing(model)"
-                class="h-3.5 w-3.5 animate-spin"
-              />
-              <Download
-                v-else
-                class="h-3.5 w-3.5"
-              />
-              Queue all
-            </button>
-          </div>
-          <div class="max-h-72 overflow-auto p-1">
-            <button
-              v-for="version in versionsForModel(model)"
-              :key="version.id"
-              class="flex w-full items-start justify-between gap-3 rounded-sm px-3 py-2 text-left text-xs transition hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-50"
-              type="button"
-              :disabled="!canQueueVersion(version) || isVersionQueuing(model, version)"
-              @click="queueAssetDownload(model, version)"
-            >
-              <span class="min-w-0">
-                <span class="block truncate font-semibold text-card-foreground">
-                  {{ modelVersionLabel(version) }}
-                </span>
-                <span class="mt-1 block truncate text-muted-foreground">
-                  {{ primaryFileForVersion(version)?.name ?? 'No model file' }}
-                  <template v-if="fileSizeFor(primaryFileForVersion(version))">
-                    · {{ formatFileSize(fileSizeFor(primaryFileForVersion(version))) }}
-                  </template>
-                </span>
-              </span>
-              <span class="inline-flex shrink-0 items-center gap-1 rounded-sm border border-border px-2 py-0.5 font-semibold text-muted-foreground">
-                <Check
-                  v-if="downloadForVersion(version)?.state === 'complete'"
-                  class="h-3.5 w-3.5 text-secondary"
-                />
-                <LoaderCircle
-                  v-else-if="downloadForVersion(version)?.state === 'downloading' || isVersionQueuing(model, version)"
-                  class="h-3.5 w-3.5 animate-spin text-accent"
-                />
-                <Clock
-                  v-else-if="downloadForVersion(version)"
-                  class="h-3.5 w-3.5 text-accent"
-                />
-                {{
-                  downloadForVersion(version)?.state === 'complete'
-                    ? 'Re-download'
-                    : versionDownloadButtonLabel(version)
-                }}
-              </span>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   </article>

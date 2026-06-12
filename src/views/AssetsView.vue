@@ -11,6 +11,7 @@ provideAssetsView(view)
 
 const {
   activeImageModel,
+  activeImageInitialIndex,
   queuingDownloadKey,
   downloadForVersion,
   downloadStatusLabel,
@@ -36,6 +37,7 @@ function assetPreviewDownloadStatusLabel(download: AssetPreviewDownload | null) 
   <AssetPreviewModal
     :open="Boolean(activeImageModel)"
     :model="activeImageModel"
+    :initial-image-index="activeImageInitialIndex"
     :queuing-download-key="queuingDownloadKey"
     :download-for-version="downloadForVersion"
     :download-status-label="assetPreviewDownloadStatusLabel"

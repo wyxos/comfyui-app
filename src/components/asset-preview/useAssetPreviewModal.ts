@@ -251,8 +251,10 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
 
   function setInitialVersion(model: CivitaiModel | null | undefined) {
     const versionFromProps = model?.modelVersions?.find((version) => version.id === normalizedVersionId.value)
-    activeVersionId.value = versionFromProps?.id ?? model?.modelVersions?.[0]?.id ?? null
-    activeImageIndex.value = 0
+    const initialVersion = versionFromProps ?? model?.modelVersions?.[0] ?? null
+    const slideCount = imagesForVersion(initialVersion).length || (props.previewUrl ? 1 : 0)
+    activeVersionId.value = initialVersion?.id ?? null
+    activeImageIndex.value = slideCount > 0 ? Math.min(Math.max(0, numberProp(props.initialImageIndex) ?? 0), slideCount - 1) : 0
   }
 
   function close() {
@@ -348,7 +350,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
   }
 
   watch(
-    () => [props.open, props.model?.id ?? null, normalizedModelId.value, normalizedVersionId.value, props.modelType, props.fileName],
+    () => [props.open, props.model?.id ?? null, normalizedModelId.value, normalizedVersionId.value, props.initialImageIndex, props.modelType, props.fileName],
     () => {
       if (props.open) {
         imageDetails.value = {}

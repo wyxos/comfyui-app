@@ -210,6 +210,50 @@ describe('createAssetDownloadActions', () => {
       destructive: true,
     }))
   })
+
+  it('downloads single-version models and opens the versions menu for multi-version models', async () => {
+    const queueDownload = vi.fn().mockResolvedValue({ ok: true })
+    const openDownloadMenuKey = ref('')
+    const { createAssetDownloadActions } = await import('../../src/views/assets/assetDownloadActions')
+    const actions = createAssetDownloadActions({
+      downloadByVersionId: computed(() => new Map()),
+      downloadActionError: ref(''),
+      downloadActionNotice: ref(''),
+      openDownloadMenuKey,
+      queuingDownloadKey: ref(''),
+      queueDownload,
+      confirm: vi.fn(),
+    } as never)
+
+    await actions.handleDownloadClick({
+      id: 101,
+      name: 'Single version LoRA',
+      type: 'LORA',
+      nsfw: false,
+      modelVersions: [modelVersion(201, 'v1.safetensors')],
+    })
+
+    expect(queueDownload).toHaveBeenCalledWith(expect.objectContaining({
+      modelId: 101,
+      versionId: 201,
+      file: expect.objectContaining({ name: 'v1.safetensors' }),
+    }))
+    expect(openDownloadMenuKey.value).toBe('')
+
+    await actions.handleDownloadClick({
+      id: 102,
+      name: 'Multi version LoRA',
+      type: 'LORA',
+      nsfw: false,
+      modelVersions: [
+        modelVersion(202, 'v2.safetensors'),
+        modelVersion(203, 'v3.safetensors'),
+      ],
+    })
+
+    expect(queueDownload).toHaveBeenCalledTimes(1)
+    expect(openDownloadMenuKey.value).toBe('102')
+  })
 })
 
 function modelVersion(id: number, fileName: string) {
