@@ -25,6 +25,11 @@ export const routes: RouteRecordRaw[] = [
     component: AssetsView,
   },
   {
+    path: '/assets/hidden',
+    name: 'assets-hidden',
+    component: AssetsView,
+  },
+  {
     path: '/downloads',
     name: 'downloads',
     component: DownloadsView,

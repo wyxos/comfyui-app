@@ -8,6 +8,7 @@ import {
   Clock,
   Download,
   ExternalLink,
+  Eye,
   Image as ImageIcon,
   LoaderCircle,
   MessageCircle,
@@ -18,6 +19,7 @@ import UiTooltip from '../../components/ui/UiTooltip.vue'
 import { imagesForVersion } from './assetModelHelpers'
 import { useProvidedAssetsView } from './assetsViewContext'
 import type { CivitaiModel } from './assetViewTypes'
+import { useAssetDownloadMenuPlacement } from './useAssetDownloadMenuPlacement'
 
 defineProps<{
   model: CivitaiModel
@@ -52,23 +54,29 @@ const {
   queueableMissingVersionsForModel,
   handleDownloadClick,
   modelUrl,
+  isHiddenRoute,
   blacklistModel,
+  restoreHiddenModel,
   creatorFilterHref,
   openImageModal,
 } = useProvidedAssetsView()
 
 const cardPreviewImageIndexes = ref<Record<number, number>>({})
 const cardPreviewMediaReady = ref<Record<string, boolean>>({})
+const {
+  downloadMenuPlacementFor,
+  handleDownloadButtonClick,
+  setDownloadButtonRef,
+  setDownloadMenuRef,
+} = useAssetDownloadMenuPlacement(openDownloadMenuKey, handleDownloadClick)
 
 function previewImagesForModel(model: CivitaiModel) {
   const version = firstVersion(model)
   return version ? imagesForVersion(version) : []
 }
-
 function previewCountForModel(model: CivitaiModel) {
   return previewImagesForModel(model).length
 }
-
 function activePreviewImageIndex(model: CivitaiModel) {
   const total = previewCountForModel(model)
   if (total < 1) {
@@ -78,24 +86,19 @@ function activePreviewImageIndex(model: CivitaiModel) {
   const index = cardPreviewImageIndexes.value[model.id] ?? 0
   return ((index % total) + total) % total
 }
-
 function activePreviewMediaFor(model: CivitaiModel) {
   return previewImagesForModel(model)[activePreviewImageIndex(model)] ?? thumbnailMediaFor(model)
 }
-
 function activePreviewUrlFor(model: CivitaiModel) {
   return activePreviewMediaFor(model)?.url ?? null
 }
-
 function previewMediaReadyKey(model: CivitaiModel, url = activePreviewUrlFor(model)) {
   return url ? `${model.id}:${url}` : ''
 }
-
 function isActivePreviewMediaReady(model: CivitaiModel) {
   const key = previewMediaReadyKey(model)
   return !key || cardPreviewMediaReady.value[key] === true
 }
-
 function mediaUrlFromEvent(event: Event) {
   const target = event.currentTarget
   if (target instanceof HTMLImageElement || target instanceof HTMLVideoElement) {
@@ -104,7 +107,6 @@ function mediaUrlFromEvent(event: Event) {
 
   return ''
 }
-
 function markPreviewMediaReady(model: CivitaiModel, event: Event) {
   const key = previewMediaReadyKey(model, mediaUrlFromEvent(event) || activePreviewUrlFor(model))
   if (!key || cardPreviewMediaReady.value[key]) {
@@ -116,7 +118,6 @@ function markPreviewMediaReady(model: CivitaiModel, event: Event) {
     [key]: true,
   }
 }
-
 function showPreviewImage(model: CivitaiModel, step: number) {
   const total = previewCountForModel(model)
   if (total < 2) {
@@ -128,11 +129,9 @@ function showPreviewImage(model: CivitaiModel, step: number) {
     [model.id]: activePreviewImageIndex(model) + step,
   }
 }
-
 function openActiveImageModal(model: CivitaiModel) {
   openImageModal(model, activePreviewImageIndex(model))
 }
-
 function handleCardAltClick(model: CivitaiModel, event: MouseEvent) {
   if (!event.altKey || event.button !== 0) {
     return
@@ -142,7 +141,6 @@ function handleCardAltClick(model: CivitaiModel, event: MouseEvent) {
   event.stopPropagation()
   void handleDownloadClick(model)
 }
-
 function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
   if (!event.altKey) {
     return
@@ -156,10 +154,12 @@ function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
 
 <template>
   <article
-    class="group flex min-h-[17.5rem] min-w-0 flex-col overflow-visible rounded-md border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-accent/70 hover:shadow-[0_18px_50px_rgba(0,0,0,0.22)]"
+    class="group relative flex min-h-[17.5rem] min-w-0 flex-col overflow-visible rounded-md border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-accent/70 hover:shadow-[0_18px_50px_rgba(0,0,0,0.22)]"
     :class="{
-      'border-secondary/70 shadow-[0_0_0_1px_rgba(255,198,0,0.28)]': hasDownloadedVersion(model),
-      'border-accent/70 shadow-[0_0_0_1px_rgba(0,175,255,0.25)]': activeDownloadForModel(model),
+      'z-10': openDownloadMenuKey === String(model.id),
+      'border-success/70 shadow-[0_0_0_1px_rgba(52,211,153,0.28)]': hasDownloadedVersion(model),
+      'border-secondary/70 shadow-[0_0_0_1px_rgba(255,198,0,0.28)]': !hasDownloadedVersion(model) && activeDownloadForModel(model)?.state === 'queued',
+      'border-accent/70 shadow-[0_0_0_1px_rgba(0,175,255,0.25)]': !hasDownloadedVersion(model) && activeDownloadForModel(model) && activeDownloadForModel(model)?.state !== 'queued',
     }"
     @click.capture="handleCardAltClick(model, $event)"
     @contextmenu.capture="handleCardAltContextMenu(model, $event)"
@@ -327,6 +327,18 @@ function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
             <ExternalLink class="h-4 w-4" />
           </a>
           <button
+            v-if="isHiddenRoute"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-secondary/35 bg-secondary/10 text-secondary transition hover:border-secondary hover:bg-secondary hover:text-secondary-foreground focus:outline-none focus:ring-2 focus:ring-ring/35"
+            type="button"
+            data-asset-card-show-button
+            :aria-label="`Show ${model.name}`"
+            :title="`Show ${model.name}`"
+            @click="restoreHiddenModel(model)"
+          >
+            <Eye class="h-4 w-4" />
+          </button>
+          <button
+            v-else
             class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-destructive/35 bg-destructive/10 text-destructive transition hover:border-destructive/70 hover:bg-destructive hover:text-destructive-foreground focus:outline-none focus:ring-2 focus:ring-destructive/35"
             type="button"
             data-asset-card-hide-button
@@ -338,23 +350,28 @@ function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
           </button>
 
           <button
+            :ref="(element) => setDownloadButtonRef(model.id, element)"
             class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-card-foreground transition hover:border-secondary/60 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50"
             type="button"
             data-asset-card-download-button
             :disabled="!versionsForModel(model).length || (versionsForModel(model).length === 1 && (!canQueueVersion(firstVersion(model)) || isModelDownloadQueuing(model)))"
             :aria-label="`${downloadButtonLabel(model)} for ${model.name}`"
             :title="downloadButtonLabel(model)"
-            @click="handleDownloadClick(model)"
+            @click="handleDownloadButtonClick(model)"
           >
-            <Check v-if="hasDownloadedVersion(model)" class="h-4 w-4 text-secondary" />
+            <Check v-if="hasDownloadedVersion(model)" class="h-4 w-4 text-success" />
             <LoaderCircle v-else-if="activeDownloadForModel(model)?.state === 'downloading' || isModelDownloadQueuing(model)" class="h-4 w-4 animate-spin text-accent" />
-            <Clock v-else-if="activeDownloadForModel(model)?.state === 'queued' || activeDownloadForModel(model)?.state === 'paused'" class="h-4 w-4 text-accent" />
+            <Clock v-else-if="activeDownloadForModel(model)?.state === 'queued'" class="h-4 w-4 text-secondary" />
+            <Clock v-else-if="activeDownloadForModel(model)?.state === 'paused'" class="h-4 w-4 text-accent" />
             <Download v-else class="h-4 w-4" />
           </button>
 
           <div
             v-if="openDownloadMenuKey === String(model.id)"
-            class="absolute right-0 top-9 z-30 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
+            :ref="(element) => setDownloadMenuRef(model.id, element)"
+            class="absolute right-0 z-30 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
+            :class="downloadMenuPlacementFor(model) === 'up' ? 'bottom-9' : 'top-9'"
+            :data-placement="downloadMenuPlacementFor(model)"
             data-asset-card-download-menu
           >
             <div class="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
@@ -393,9 +410,13 @@ function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
                   </span>
                 </span>
                 <span class="inline-flex shrink-0 items-center gap-1 rounded-sm border border-border px-2 py-0.5 font-semibold text-muted-foreground">
-                  <Check v-if="downloadForVersion(version)?.state === 'complete'" class="h-3.5 w-3.5 text-secondary" />
+                  <Check v-if="downloadForVersion(version)?.state === 'complete'" class="h-3.5 w-3.5 text-success" />
                   <LoaderCircle v-else-if="downloadForVersion(version)?.state === 'downloading' || isVersionQueuing(model, version)" class="h-3.5 w-3.5 animate-spin text-accent" />
-                  <Clock v-else-if="downloadForVersion(version)" class="h-3.5 w-3.5 text-accent" />
+                  <Clock
+                    v-else-if="downloadForVersion(version)"
+                    class="h-3.5 w-3.5"
+                    :class="downloadForVersion(version)?.state === 'queued' ? 'text-secondary' : 'text-accent'"
+                  />
                   {{
                     downloadForVersion(version)?.state === 'complete'
                       ? 'Re-download'
@@ -466,7 +487,7 @@ function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
         <span
           v-if="hasDownloadedVersion(model) || activeDownloadForModel(model)"
           class="shrink-0 rounded-sm border px-2 py-1 font-semibold"
-          :class="hasDownloadedVersion(model) ? 'border-secondary/40 bg-secondary/15 text-secondary' : 'border-accent/35 bg-accent/15 text-accent'"
+          :class="hasDownloadedVersion(model) ? 'border-success/40 bg-success/15 text-success' : activeDownloadForModel(model)?.state === 'queued' ? 'border-secondary/40 bg-secondary/15 text-secondary' : 'border-accent/35 bg-accent/15 text-accent'"
         >
           {{ hasDownloadedVersion(model) ? 'Downloaded' : downloadStatusLabel(activeDownloadForModel(model)) }}
         </span>

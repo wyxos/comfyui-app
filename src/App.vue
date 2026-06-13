@@ -1,18 +1,26 @@
 <script setup lang="ts">
 import { Download } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import AssetDownloadsPanel from './components/AssetDownloadsPanel.vue'
 import ConfirmationProvider from './components/ConfirmationProvider.vue'
 import { useAssetDownloadSummary } from './composables/useAssetDownloads'
 
 const downloadsSheetOpen = ref(false)
+const route = useRoute()
 
 const { counts: downloadCounts } = useAssetDownloadSummary()
 const downloadBadgeCount = computed(() => {
   return downloadCounts.value.active || downloadCounts.value.attention || downloadCounts.value.visibleComplete
 })
 
-const navGroups = [
+type NavGroup = {
+  label: string
+  to: string
+  activeRouteNames?: string[]
+}
+
+const navGroups: NavGroup[] = [
   {
     label: 'Generate',
     to: '/',
@@ -20,6 +28,7 @@ const navGroups = [
   {
     label: 'Assets',
     to: '/assets',
+    activeRouteNames: ['assets', 'assets-hidden'],
   },
   {
     label: 'Downloads',
@@ -38,6 +47,10 @@ const navGroups = [
     to: '/settings',
   },
 ]
+
+function isNavActive(group: NavGroup, isExactActive: boolean) {
+  return group.activeRouteNames?.includes(String(route.name)) ?? isExactActive
+}
 </script>
 
 <template>
@@ -57,7 +70,7 @@ const navGroups = [
               :href="href"
               class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-ring/25"
               :class="
-                isExactActive
+                isNavActive(group, isExactActive)
                   ? 'border-secondary bg-secondary text-secondary-foreground shadow-[0_0_0_1px_rgba(255,198,0,0.3)]'
                   : 'border-transparent text-muted-foreground hover:border-accent/40 hover:bg-accent/10 hover:text-accent'
               "

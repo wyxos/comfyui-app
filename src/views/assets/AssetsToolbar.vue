@@ -22,6 +22,8 @@ const {
   downloadActionError,
   downloadActionNotice,
   creatorFilterLabel,
+  isHiddenRoute,
+  hiddenModelCount,
   selectedBaseModelSet,
   selectedBaseModelLabel,
   isUsingDefaultBaseModels,
@@ -37,7 +39,34 @@ const {
 
 <template>
   <section class="shrink-0 border-b border-border bg-card/78 px-4 py-4 sm:px-6">
-    <div class="flex flex-col gap-3">
+    <div
+      v-if="isHiddenRoute"
+      class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div class="min-w-0">
+        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          Assets
+        </p>
+        <h1 class="mt-1 truncate text-lg font-semibold tracking-tight text-card-foreground">
+          Hidden models
+        </h1>
+        <p class="mt-1 text-sm text-muted-foreground">
+          {{ hiddenModelCount }} hidden
+        </p>
+      </div>
+
+      <router-link
+        to="/assets"
+        class="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-secondary/40 bg-secondary/10 px-3 text-sm font-semibold text-secondary transition hover:border-secondary hover:bg-secondary hover:text-secondary-foreground focus:outline-none focus:ring-2 focus:ring-ring/25"
+      >
+        Search assets
+      </router-link>
+    </div>
+
+    <div
+      v-else
+      class="flex flex-col gap-3"
+    >
       <div class="flex flex-col gap-3 xl:flex-row xl:items-center">
         <label
           class="sr-only"
@@ -165,6 +194,18 @@ const {
           >
             API key
           </span>
+          <router-link
+            to="/assets/hidden"
+            class="inline-flex h-9 items-center rounded-md border border-border bg-background px-3 text-muted-foreground transition hover:border-secondary/55 hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring/25"
+          >
+            Hidden
+            <span
+              v-if="hiddenModelCount"
+              class="ml-1 text-secondary"
+            >
+              {{ hiddenModelCount }}
+            </span>
+          </router-link>
           <span
             v-if="downloadActionError"
             class="rounded-sm border border-destructive/35 bg-destructive/10 px-2 py-1 text-destructive"

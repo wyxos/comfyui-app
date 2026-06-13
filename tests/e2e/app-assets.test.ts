@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { DEFAULT_BASE_MODELS } from '../../src/views/assets/assetViewTypes'
+import {
+  BLACKLIST_STORAGE_KEY,
+  DEFAULT_BASE_MODELS,
+  PAGE_SIZE,
+} from '../../src/views/assets/assetViewTypes'
 import { createMockDownload, createMockModel } from '../fixtures/mockApi'
 import { renderCompanionApp } from './appFlowTestUtils'
 
@@ -7,6 +11,14 @@ function clickHostButton(host: HTMLElement, label: string, index = 0) {
   const trigger = host.querySelectorAll<HTMLButtonElement>(`button[aria-label="${label}"]`)[index]
   expect(trigger).toBeDefined()
   trigger?.click()
+}
+
+function hostButtonByText(host: HTMLElement, label: string) {
+  const trigger = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find(
+    (button) => button.textContent?.trim() === label,
+  )
+  expect(trigger).toBeDefined()
+  return trigger as HTMLButtonElement
 }
 
 function openDownloadsSheet(host: HTMLElement) {
@@ -32,7 +44,7 @@ describe('companion app e2e flows', () => {
     await expect.element(previewDialog.getByText('sample prompt', { exact: true })).toBeVisible()
     await screen.getByRole('button', { name: 'Close image preview' }).click()
 
-    await screen.getByRole('button', { name: 'Download', exact: true }).click()
+    await screen.getByRole('button', { name: 'Download for Mock Detail LoRA', exact: true }).click()
 
     openDownloadsSheet(host)
     await vi.waitFor(() => {
@@ -51,7 +63,7 @@ describe('companion app e2e flows', () => {
     })
 
     clickHostButton(host, 'Close asset downloads')
-    clickHostButton(host, 'Blacklist Mock Detail LoRA')
+    clickHostButton(host, 'Hide Mock Detail LoRA')
     await vi.waitFor(() => {
       expect(host.textContent).toContain('No Civitai models matched "detail".')
     })
@@ -99,12 +111,91 @@ describe('companion app e2e flows', () => {
     await tagged.cleanup()
   })
 
+  it('loads locally hidden assets on a dedicated route and restores them', async () => {
+    const hiddenModel = createMockModel({ id: 505, name: 'Hidden Detail LoRA' })
+    const visibleModel = createMockModel({ id: 606, name: 'Visible Detail LoRA' })
+    window.localStorage.setItem(BLACKLIST_STORAGE_KEY, JSON.stringify([505]))
+
+    const hidden = await renderCompanionApp('/assets/hidden', {
+      models: [hiddenModel, visibleModel],
+    }, {
+      preserveLocalStorage: true,
+    })
+
+    await vi.waitFor(() => {
+      expect(
+        hidden.api.calls.some(
+          (call) => call.path === '/api/civitai/models' && call.search.get('ids') === '505',
+        ),
+      ).toBe(true)
+    })
+    await expect.element(hidden.screen.getByText('Hidden Detail LoRA')).toBeVisible()
+    expect(hidden.host.textContent).not.toContain('Visible Detail LoRA')
+
+    await hidden.screen.getByRole('button', { name: 'Show Hidden Detail LoRA' }).click()
+
+    await vi.waitFor(() => {
+      expect(window.localStorage.getItem(BLACKLIST_STORAGE_KEY)).toBe('[]')
+      expect(hidden.host.textContent).toContain('No hidden Civitai models yet.')
+    })
+  })
+
+  it('unhides a hidden model after its download is queued', async () => {
+    const hiddenModel = createMockModel({ id: 505, name: 'Hidden Download LoRA' })
+    window.localStorage.setItem(BLACKLIST_STORAGE_KEY, JSON.stringify([505]))
+
+    const hidden = await renderCompanionApp('/assets/hidden', {
+      models: [hiddenModel],
+    }, {
+      preserveLocalStorage: true,
+    })
+
+    await expect.element(hidden.screen.getByText('Hidden Download LoRA')).toBeVisible()
+    await hidden.screen.getByRole('button', { name: 'Download for Hidden Download LoRA' }).click()
+
+    await vi.waitFor(() => {
+      expect(
+        hidden.api.calls.some(
+          (call) => call.method === 'POST' && call.path === '/api/civitai/downloads',
+        ),
+      ).toBe(true)
+      expect(window.localStorage.getItem(BLACKLIST_STORAGE_KEY)).toBe('[]')
+      expect(hidden.host.textContent).toContain('No hidden Civitai models yet.')
+    })
+  })
+
+  it('fills hidden asset pages from later IDs when some hidden models cannot be loaded', async () => {
+    const hiddenIds = Array.from({ length: 30 }, (_unused, index) => index + 1)
+    const missingIds = new Set([5, 9, 13, 17])
+    const hiddenModels = hiddenIds
+      .filter((id) => !missingIds.has(id))
+      .map((id) => createMockModel({ id, name: `Hidden Fill ${id}` }))
+    window.localStorage.setItem(BLACKLIST_STORAGE_KEY, JSON.stringify(hiddenIds))
+
+    const hidden = await renderCompanionApp('/assets/hidden', {
+      models: hiddenModels,
+    }, {
+      preserveLocalStorage: true,
+    })
+
+    await vi.waitFor(() => {
+      expect(hidden.host.querySelectorAll('article')).toHaveLength(PAGE_SIZE)
+    })
+    const hiddenSearchCalls = hidden.api.calls.filter((call) => call.path === '/api/civitai/models')
+
+    expect(hiddenSearchCalls[0]?.search.get('ids')).toBe(hiddenIds.slice(0, PAGE_SIZE).join(','))
+    expect(hiddenSearchCalls[1]?.search.get('ids')).toBe(hiddenIds.slice(PAGE_SIZE).join(','))
+    expect(hidden.host.textContent).toContain('Hidden Fill 28')
+    expect(hidden.host.textContent).not.toContain('Hidden Fill 29')
+  })
+
   it('covers asset filters, empty results, route pagination, metadata, and download panel actions', async () => {
     const empty = await renderCompanionApp('/assets?q=missing', { models: [] })
 
     await vi.waitFor(() => {
       expect(empty.host.textContent).toContain('No Civitai models matched "missing".')
     })
+    await empty.cleanup()
 
     const filtered = await renderCompanionApp('/assets?q=detail&types=LORA&nsfw=1&sort=Newest&period=Week&baseModels=all', {
       civitaiConfigured: true,
@@ -155,21 +246,23 @@ describe('companion app e2e flows', () => {
       ],
     })
 
-    await expect.element(filtered.screen.getByText('API key')).toBeVisible()
-    await expect.element(filtered.screen.getByText('Mock Detail LoRA')).toBeVisible()
-    await expect.element(filtered.screen.getByText('Mock Detail No Preview')).toBeVisible()
-    await expect.element(filtered.screen.getByText('2 results')).toBeVisible()
-    await expect.element(filtered.screen.getByText('Page 1')).toBeVisible()
+    await vi.waitFor(() => {
+      expect(filtered.host.textContent).toContain('API key')
+      expect(filtered.host.textContent).toContain('Mock Detail LoRA')
+      expect(filtered.host.textContent).toContain('Mock Detail No Preview')
+      expect(filtered.host.textContent).toContain('2 results')
+      expect(filtered.host.textContent).toContain('Page 1')
+      expect(filtered.host.textContent).toContain('No preview available')
+    })
     expect(filtered.host.textContent).not.toContain('2 results · Page 1')
-    await expect.element(filtered.screen.getByText('No preview available')).toBeVisible()
     const noPreviewButton = document.querySelector<HTMLButtonElement>(
       'button[aria-label="Mock Detail No Preview has no preview available"]',
     )
     expect(noPreviewButton?.disabled).toBe(true)
-    await expect.element(filtered.screen.getByRole('button', { name: 'Latest', exact: true })).toBeVisible()
-    await expect.element(filtered.screen.getByRole('button', { name: 'Latest LoRA' })).toBeVisible()
-    await expect.element(filtered.screen.getByRole('button', { name: 'Latest checkpoints' })).toBeVisible()
-    await expect.element(filtered.screen.getByRole('button', { name: 'Highest rated checkpoints' })).toBeVisible()
+    expect(hostButtonByText(filtered.host, 'Latest')).toBeDefined()
+    expect(hostButtonByText(filtered.host, 'Latest LoRA')).toBeDefined()
+    expect(hostButtonByText(filtered.host, 'Latest checkpoints')).toBeDefined()
+    expect(hostButtonByText(filtered.host, 'Highest rated checkpoints')).toBeDefined()
 
     const searchCall = filtered.api.calls.find((call) => call.path === '/api/civitai/models')
     expect(searchCall?.search.get('types')).toBe('LORA')
@@ -179,10 +272,12 @@ describe('companion app e2e flows', () => {
     expect(searchCall?.search.get('primaryFileOnly')).toBeNull()
     expect(searchCall?.search.getAll('baseModels')).toEqual([])
 
-    await filtered.screen.getByRole('button', { name: 'Open Mock Detail LoRA image preview' }).click()
-    await expect.element(filtered.screen.getByText('Negative prompt')).toBeVisible()
-    await expect.element(filtered.screen.getByText('blur', { exact: true }).first()).toBeVisible()
-    await filtered.screen.getByRole('button', { name: 'Close image preview' }).click()
+    clickHostButton(filtered.host, 'Open Mock Detail LoRA image preview')
+    await vi.waitFor(() => {
+      expect(filtered.host.textContent).toContain('Negative prompt')
+      expect(filtered.host.textContent).toContain('blur')
+    })
+    clickHostButton(filtered.host, 'Close image preview')
 
     openDownloadsSheet(filtered.host)
     await vi.waitFor(() => {
@@ -206,7 +301,7 @@ describe('companion app e2e flows', () => {
     })
 
     const modelSearchCallsBeforePreset = filtered.api.calls.filter((call) => call.path === '/api/civitai/models').length
-    await filtered.screen.getByRole('button', { name: 'Highest rated checkpoints' }).click()
+    hostButtonByText(filtered.host, 'Highest rated checkpoints').click()
     await vi.waitFor(() => {
       expect(filtered.api.calls.filter((call) => call.path === '/api/civitai/models').length).toBeGreaterThan(
         modelSearchCallsBeforePreset,

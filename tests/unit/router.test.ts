@@ -11,6 +11,7 @@ describe('router', () => {
       'home',
       'guidelines',
       'assets',
+      'assets-hidden',
       'downloads',
       'library',
       'jobs',
@@ -24,5 +25,13 @@ describe('router', () => {
     await router.isReady()
 
     expect(router.currentRoute.value.name).toBe('jobs')
+  })
+
+  it('routes hidden assets to the assets view', async () => {
+    const router = createAppRouter(createMemoryHistory())
+    await router.push('/assets/hidden')
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('assets-hidden')
   })
 })

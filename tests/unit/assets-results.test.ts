@@ -50,6 +50,8 @@ function mountAssetsResults(viewOverrides: Partial<AssetsViewContext> = {}) {
     activeModelId: ref(''),
     activeModelVersionId: ref(''),
     activeUsername: ref(''),
+    isHiddenRoute: computed(() => false),
+    hiddenModelCount: computed(() => 0),
     openDownloadMenuKey: ref(''),
     visibleModels: computed(() => [model]),
     hasRenderableState: computed(() => true),
@@ -88,6 +90,7 @@ function mountAssetsResults(viewOverrides: Partial<AssetsViewContext> = {}) {
     handleDownloadClick: vi.fn(),
     modelUrl: () => 'https://civitai.com/models/101',
     blacklistModel: vi.fn(),
+    restoreHiddenModel: vi.fn(),
     creatorFilterHref: () => '',
     goToPage: vi.fn(),
     openImageModal,
@@ -189,6 +192,96 @@ describe('AssetsResults', () => {
         'border',
       ]))
     }
+  })
+
+  it('raises the open download menu card above sibling cards', () => {
+    const { wrapper } = mountAssetsResults({
+      openDownloadMenuKey: ref('101'),
+    })
+
+    const card = wrapper.get('article')
+    const menu = wrapper.get('[data-asset-card-download-menu]')
+
+    expect(card.classes()).toEqual(expect.arrayContaining(['relative', 'z-10']))
+    expect(menu.classes()).toContain('z-30')
+  })
+
+  it('opens the version menu upward when the trigger is near the listing bottom edge', async () => {
+    const openDownloadMenuKey = ref('')
+    const handleDownloadClick = vi.fn(() => {
+      openDownloadMenuKey.value = '101'
+    })
+    const { wrapper } = mountAssetsResults({
+      handleDownloadClick,
+      openDownloadMenuKey,
+    })
+    const scrollContainer = wrapper.get('[data-assets-results-scroll]').element as HTMLElement
+    const downloadButton = wrapper.get('[data-asset-card-download-button]').element as HTMLElement
+
+    vi.spyOn(scrollContainer, 'getBoundingClientRect').mockReturnValue({
+      bottom: 400,
+      height: 400,
+      left: 0,
+      right: 800,
+      top: 0,
+      width: 800,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+    vi.spyOn(downloadButton, 'getBoundingClientRect').mockReturnValue({
+      bottom: 392,
+      height: 32,
+      left: 730,
+      right: 762,
+      top: 360,
+      width: 32,
+      x: 730,
+      y: 360,
+      toJSON: () => ({}),
+    })
+
+    await wrapper.get('[data-asset-card-download-button]').trigger('click')
+    await nextTick()
+    await nextTick()
+
+    const menu = wrapper.get('[data-asset-card-download-menu]')
+
+    expect(handleDownloadClick).toHaveBeenCalled()
+    expect(menu.attributes('data-placement')).toBe('up')
+    expect(menu.classes()).toContain('bottom-9')
+    expect(menu.classes()).not.toContain('top-9')
+  })
+
+  it('colors queued and downloaded asset status badges by state', () => {
+    const { wrapper: downloadedWrapper } = mountAssetsResults({
+      hasDownloadedVersion: () => true,
+    })
+    const downloadedBadge = downloadedWrapper
+      .findAll('[data-asset-card-badges] > span')
+      .find((node) => node.text() === 'Downloaded')
+
+    expect(downloadedBadge?.classes()).toEqual(expect.arrayContaining([
+      'border-success/40',
+      'bg-success/15',
+      'text-success',
+    ]))
+
+    const queuedDownload = { id: 'queued-download', state: 'queued' } as unknown as ReturnType<AssetsViewContext['activeDownloadForModel']>
+    const { wrapper: queuedWrapper } = mountAssetsResults({
+      activeDownloadForModel: () => queuedDownload,
+      downloadStatusLabel: () => 'Queued',
+    })
+    const queuedBadge = queuedWrapper
+      .findAll('[data-asset-card-badges] > span')
+      .find((node) => node.text() === 'Queued')
+
+    expect(queuedBadge?.classes()).toEqual(expect.arrayContaining([
+      'border-secondary/40',
+      'bg-secondary/15',
+      'text-secondary',
+    ]))
+    expect(queuedBadge?.classes()).not.toContain('text-accent')
   })
 
   it('cycles list-card preview images without opening the modal', async () => {

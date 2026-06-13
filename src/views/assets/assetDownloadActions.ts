@@ -28,6 +28,7 @@ type DownloadActionState = {
   watchDownload?: (payload: WatchDownloadPayload) => Promise<unknown>
   unwatchDownload?: (id: string) => Promise<unknown>
   confirm: ConfirmDialogFn
+  onDownloadQueued?: (model: CivitaiModel) => void
 }
 
 type QueueAssetDownloadOptions = {
@@ -183,8 +184,14 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     return !existingState || existingState === 'error' || existingState === 'cancelled' || existingState === 'deleted'
   }
 
+  function canWatchMissingVersion(version: CivitaiModelVersion | null | undefined) {
+    return canWatchVersion(version) && !watchedDownloadForVersion(version)
+  }
+
   function queueableMissingVersionsForModel(model: CivitaiModel) {
-    return versionsForModel(model).filter((version) => canQueueMissingVersion(version))
+    return versionsForModel(model).filter((version) =>
+      canQueueMissingVersion(version) || canWatchMissingVersion(version),
+    )
   }
 
   function clearDownloadActionNotice() {
@@ -223,6 +230,18 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     }
 
     return `Watching ${fileName}.`
+  }
+
+  function bulkQueueNotice(queuedCount: number, watchCount: number, modelName: string) {
+    if (queuedCount > 0 && watchCount > 0) {
+      return `Queued ${queuedCount} download${queuedCount === 1 ? '' : 's'} and watching ${watchCount} version${watchCount === 1 ? '' : 's'} for ${modelName}.`
+    }
+
+    if (watchCount > 0) {
+      return `Watching ${watchCount} version${watchCount === 1 ? '' : 's'} for ${modelName}.`
+    }
+
+    return `Queued ${queuedCount} version${queuedCount === 1 ? '' : 's'} for ${modelName}.`
   }
 
   function downloadPayloadForVersion(
@@ -281,6 +300,7 @@ export function createAssetDownloadActions(state: DownloadActionState) {
       if (showNotice) {
         state.downloadActionNotice.value = watchedDownloadNotice(payload, file?.name ?? version.name ?? `Version ${version.id}`)
       }
+      state.onDownloadQueued?.(model)
       return true
     } catch (caughtError) {
       state.downloadActionError.value = caughtError instanceof Error ? caughtError.message : 'Could not watch download.'
@@ -400,6 +420,7 @@ export function createAssetDownloadActions(state: DownloadActionState) {
       if (showNotice) {
         state.downloadActionNotice.value = queueDownloadNotice(payload, file.name)
       }
+      state.onDownloadQueued?.(model)
       return true
     } catch (caughtError) {
       state.downloadActionError.value = caughtError instanceof Error ? caughtError.message : 'Could not queue download.'
@@ -423,13 +444,19 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     clearDownloadActionError()
     clearDownloadActionNotice()
     let queuedCount = 0
+    let watchCount = 0
     for (const version of versions) {
+      const isWatchAction = canWatchMissingVersion(version) && !canQueueMissingVersion(version)
       if (await queueAssetDownload(model, version, { closeMenu: false, showNotice: false })) {
-        queuedCount += 1
+        if (isWatchAction) {
+          watchCount += 1
+        } else {
+          queuedCount += 1
+        }
       }
     }
-    if (queuedCount > 0) {
-      state.downloadActionNotice.value = `Queued ${queuedCount} version${queuedCount === 1 ? '' : 's'} for ${model.name}.`
+    if (queuedCount > 0 || watchCount > 0) {
+      state.downloadActionNotice.value = bulkQueueNotice(queuedCount, watchCount, model.name)
     }
     state.openDownloadMenuKey.value = ''
   }

@@ -12,6 +12,8 @@ const {
   activeModelId,
   activeModelVersionId,
   activeUsername,
+  isHiddenRoute,
+  hiddenModelCount,
   visibleModels,
   hasRenderableState,
   resultSummary,
@@ -69,7 +71,13 @@ const {
       aria-live="polite"
     >
       <div class="rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">
-        <template v-if="activeModelVersionId">
+        <template v-if="isHiddenRoute && hiddenModelCount < 1">
+          No hidden Civitai models yet.
+        </template>
+        <template v-else-if="isHiddenRoute">
+          No hidden Civitai models could be loaded.
+        </template>
+        <template v-else-if="activeModelVersionId">
           No Civitai model found for version #{{ activeModelVersionId }}.
         </template>
         <template v-else-if="activeModelId">

@@ -19,6 +19,7 @@ export type AssetSearchState = {
   currentPage: Ref<number>
   error: Ref<string>
   hasStoredCivitaiApiKey: Ref<boolean>
+  hiddenModelIds: Ref<number[]>
   includeNsfw: Ref<boolean>
   loading: Ref<boolean>
   modelIdQuery: Ref<string>
@@ -34,6 +35,7 @@ export type AssetSearchState = {
   selectedPeriod: Ref<ModelPeriod>
   selectedSort: Ref<ModelSort>
   selectedType: Ref<ModelTypeFilter>
+  showHiddenOnly: ComputedRef<boolean>
   tagQuery: Ref<string>
   totalItems: Ref<number>
   totalPages: Ref<number>

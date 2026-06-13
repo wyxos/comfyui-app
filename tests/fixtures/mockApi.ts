@@ -319,7 +319,11 @@ export function installMockApi(options: MockApiOptions = {}) {
 
     if (url.pathname === '/api/civitai/models' && method === 'GET') {
       const query = url.searchParams.get('query')?.toLowerCase() ?? ''
-      const modelId = Number.parseInt(url.searchParams.get('modelId') ?? url.searchParams.get('ids') ?? '', 10)
+      const modelIds = (url.searchParams.get('ids') ?? '')
+        .split(',')
+        .map((id) => Number.parseInt(id.trim(), 10))
+        .filter((id) => Number.isSafeInteger(id) && id > 0)
+      const modelId = Number.parseInt(url.searchParams.get('modelId') ?? '', 10)
       const modelVersionId = Number.parseInt(
         url.searchParams.get('modelVersionId') ?? url.searchParams.get('versionId') ?? '',
         10,
@@ -329,12 +333,13 @@ export function installMockApi(options: MockApiOptions = {}) {
       const filtered = models.filter((model) => {
         const matchesQuery = !query || String(model.name).toLowerCase().includes(query)
         const matchesModelId = !Number.isSafeInteger(modelId) || model.id === modelId
+        const matchesModelIds = !modelIds.length || modelIds.includes(Number(model.id))
         const matchesModelVersionId =
           !Number.isSafeInteger(modelVersionId) ||
           (Array.isArray(model.modelVersions) && model.modelVersions.some((version) => version.id === modelVersionId))
         const matchesUsername = !username || String(model.creator?.username ?? '').toLowerCase() === username
         const matchesType = !type || model.type === type
-        return matchesQuery && matchesModelId && matchesModelVersionId && matchesUsername && matchesType
+        return matchesQuery && matchesModelId && matchesModelIds && matchesModelVersionId && matchesUsername && matchesType
       })
 
       return jsonResponse({

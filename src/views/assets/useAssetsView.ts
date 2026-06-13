@@ -7,7 +7,6 @@ import { createAssetDownloadActions } from './assetDownloadActions'
 import { createAssetSearchController } from './assetSearchController'
 import {
   ASSET_SEARCH_PRESETS,
-  BLACKLIST_STORAGE_KEY,
   DEFAULT_BASE_MODEL_LABEL,
   DEFAULT_BASE_MODELS,
   DEFAULT_PERIOD,
@@ -45,8 +44,8 @@ import {
 import {
   areSameBaseModels,
   normalizeBaseModels,
-  normalizeBlacklistedModelIds,
 } from './assetRouteHelpers'
+import { useHiddenAssetModels } from './useHiddenAssetModels'
 
 export function useAssetsView() {
 const route = useRoute()
@@ -58,7 +57,6 @@ const selectedSort = ref<ModelSort>(DEFAULT_SORT)
 const selectedPeriod = ref<ModelPeriod>(DEFAULT_PERIOD)
 const selectedBaseModels = ref<BaseModelFilter[]>([...DEFAULT_BASE_MODELS])
 const models = ref<CivitaiModel[]>([])
-const blacklistedModelIds = ref<number[]>([])
 const loading = ref(false)
 const error = ref('')
 const searched = ref(false)
@@ -84,6 +82,20 @@ const queuingDownloadKey = ref('')
 const downloadActionError = ref('')
 const downloadActionNotice = ref('')
 const confirm = useConfirmDialog()
+const showHiddenOnly = computed(() => route.name === 'assets-hidden' || route.path === '/assets/hidden')
+const {
+  blacklistedModelIds,
+  blacklistedModelIdSet,
+  blacklistModel,
+  hiddenModelCount,
+  loadBlacklistedModels,
+  restoreHiddenModel,
+} = useHiddenAssetModels({
+  activeImageModel,
+  closeImageModal,
+  models,
+  openDownloadMenuKey,
+})
 
 const {
   downloadByVersionId,
@@ -119,9 +131,9 @@ const {
   watchedByVersionId,
   watchDownload,
   confirm,
+  onDownloadQueued: unhideModelAfterDownload,
 })
 
-const blacklistedModelIdSet = computed(() => new Set(blacklistedModelIds.value))
 const {
   applySearchPreset,
   cleanup: cleanupSearchController,
@@ -143,6 +155,7 @@ const {
   currentPage,
   error,
   hasStoredCivitaiApiKey,
+  hiddenModelIds: blacklistedModelIds,
   includeNsfw,
   loading,
   modelIdQuery,
@@ -159,12 +172,24 @@ const {
   selectedPeriod,
   selectedSort,
   selectedType,
+  showHiddenOnly,
   totalItems,
   totalPages,
 })
-const visibleModels = computed(() => models.value.filter((model) => !blacklistedModelIdSet.value.has(model.id)))
-const hasRenderableState = computed(() => loading.value || error.value || searched.value || visibleModels.value.length > 0)
+const visibleModels = computed(() =>
+  models.value.filter((model) =>
+    showHiddenOnly.value
+      ? blacklistedModelIdSet.value.has(model.id)
+      : !blacklistedModelIdSet.value.has(model.id),
+  ),
+)
+const hasRenderableState = computed(() =>
+  showHiddenOnly.value || loading.value || error.value || searched.value || visibleModels.value.length > 0,
+)
 const hasSearchInput = computed(() => {
+  if (showHiddenOnly.value) {
+    return hiddenModelCount.value > 0
+  }
   return (
     searched.value ||
     query.value.trim().length >= 2 ||
@@ -184,11 +209,9 @@ const activeLookupLabel = computed(() => {
   if (activeModelVersionId.value) {
     return `version #${activeModelVersionId.value}`
   }
-
   if (activeModelId.value) {
     return `model #${activeModelId.value}`
   }
-
   return ''
 })
 const creatorFilterLabel = computed(() => {
@@ -202,11 +225,9 @@ const selectedBaseModelLabel = computed(() => {
   if (!selectedBaseModels.value.length) {
     return 'All base models'
   }
-
   if (areSameBaseModels(selectedBaseModels.value, DEFAULT_BASE_MODELS)) {
     return DEFAULT_BASE_MODEL_LABEL
   }
-
   return `${selectedBaseModels.value.length} base model${selectedBaseModels.value.length === 1 ? '' : 's'}`
 })
 const isUsingDefaultBaseModels = computed(() =>
@@ -214,59 +235,55 @@ const isUsingDefaultBaseModels = computed(() =>
 )
 const resultSummary = computed(() => {
   if (loading.value) {
+    if (showHiddenOnly.value) {
+      return 'Loading hidden models'
+    }
     if (activeLookupLabel.value) {
       return `Loading Civitai ${activeLookupLabel.value}`
     }
-
     if (activeUsername.value) {
       return `Loading @${activeUsername.value}`
     }
-
     if (activeTag.value) {
       return `Loading #${activeTag.value}`
     }
-
     if (activeQuery.value) {
       return `Searching "${activeQuery.value}"`
     }
-
     if (typeFilterLabel.value) {
       return `Loading ${typeFilterLabel.value}`
     }
-
     return 'Loading'
   }
-
+  if (showHiddenOnly.value) {
+    if (hiddenModelCount.value > 0) {
+      return `${formatNumber(hiddenModelCount.value)} hidden model${hiddenModelCount.value === 1 ? '' : 's'}`
+    }
+    return 'No hidden models'
+  }
   if (totalItems.value > 0) {
     return `${formatNumber(totalItems.value)} result${totalItems.value === 1 ? '' : 's'}`
   }
-
   if (models.value.length) {
     return `${models.value.length} shown`
   }
-
   if (searched.value) {
     if (activeLookupLabel.value) {
       return `No Civitai ${activeLookupLabel.value}`
     }
-
     if (activeUsername.value) {
       return `No models by @${activeUsername.value}`
     }
-
     if (activeTag.value) {
       return `No models tagged "${activeTag.value}"`
     }
-
     if (activeQuery.value) {
       return `No matches for "${activeQuery.value}"`
     }
-
     if (typeFilterLabel.value) {
       return `No ${typeFilterLabel.value} models found`
     }
   }
-
   return ''
 })
 const canGoPrevious = computed(() => currentPage.value > 1 && !loading.value)
@@ -274,38 +291,40 @@ const canGoNext = computed(() => {
   if (loading.value) {
     return false
   }
-
   if (nextCursor.value) {
     return true
   }
-
   if (totalPages.value > 0) {
     return currentPage.value < totalPages.value
   }
-
   return false
 })
 const pageCount = computed(() => {
   if (totalPages.value > 0) {
     return totalPages.value
   }
-
   if (nextCursor.value) {
     return currentPage.value + 1
   }
-
   return Math.max(1, currentPage.value)
 })
 const pageCountExact = computed(() => totalPages.value > 0)
 const pageLabel = computed(() => {
+  if (showHiddenOnly.value) {
+    if (!hiddenModelCount.value) {
+      return ''
+    }
+    if (totalPages.value > 1) {
+      return `Page ${currentPage.value} of ${totalPages.value}`
+    }
+    return `Page ${currentPage.value}`
+  }
   if (!searched.value || !hasSearchInput.value) {
     return ''
   }
-
   if (totalPages.value > 1) {
     return `Page ${currentPage.value} of ${totalPages.value}`
   }
-
   return `Page ${currentPage.value}`
 })
 function toggleBaseModelFilter(baseModel: BaseModelFilter) {
@@ -318,62 +337,32 @@ function toggleBaseModelFilter(baseModel: BaseModelFilter) {
 function resetDefaultBaseModels() {
   selectedBaseModels.value = [...DEFAULT_BASE_MODELS]
 }
-
 function clearBaseModelFilters() {
   selectedBaseModels.value = []
 }
-
-function loadBlacklistedModels() {
-  try {
-    blacklistedModelIds.value = normalizeBlacklistedModelIds(
-      JSON.parse(window.localStorage.getItem(BLACKLIST_STORAGE_KEY) ?? '[]'),
-    )
-  } catch {
-    blacklistedModelIds.value = []
-  }
-}
-
-function persistBlacklistedModels() {
-  window.localStorage.setItem(BLACKLIST_STORAGE_KEY, JSON.stringify(blacklistedModelIds.value))
-}
-
-function blacklistModel(model: CivitaiModel) {
-  if (!blacklistedModelIdSet.value.has(model.id)) {
-    blacklistedModelIds.value = normalizeBlacklistedModelIds([...blacklistedModelIds.value, model.id])
-    persistBlacklistedModels()
-  }
-
-  models.value = models.value.filter((item) => item.id !== model.id)
-  openDownloadMenuKey.value = ''
-
-  if (activeImageModel.value?.id === model.id) {
-    closeImageModal()
-  }
-}
-
 function openImageModal(model: CivitaiModel, initialImageIndex = 0) {
   const version = firstVersion(model)
   if (!version || !imagesForVersion(version).length) {
     return
   }
-
   activeImageInitialIndex.value = initialImageIndex
   activeImageModel.value = model
 }
-
 function closeImageModal() {
   activeImageModel.value = null
   activeImageInitialIndex.value = 0
 }
-
+function unhideModelAfterDownload(model: CivitaiModel) {
+  if (blacklistedModelIdSet.value.has(model.id)) {
+    restoreHiddenModel(model)
+  }
+}
 async function deleteAssetDownload(download: AssetPreviewDownload) {
   if (!download.id) {
     downloadActionError.value = 'No download record was found for this file.'
     return
   }
-
   downloadActionError.value = ''
-
   try {
     await deleteDownloadedFile(download.id)
   } catch (caughtError) {
@@ -424,6 +413,8 @@ onBeforeUnmount(() => {
     downloadActionError,
     downloadActionNotice,
     visibleModels,
+    isHiddenRoute: showHiddenOnly,
+    hiddenModelCount,
     hasRenderableState,
     creatorFilterLabel,
     selectedBaseModelSet,
@@ -471,6 +462,7 @@ onBeforeUnmount(() => {
     clearBaseModelFilters,
     applySearchPreset,
     blacklistModel,
+    restoreHiddenModel,
     creatorFilterHref,
     filterByCreator,
     clearCreatorFilter,

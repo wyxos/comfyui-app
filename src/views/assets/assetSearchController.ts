@@ -18,7 +18,10 @@ import {
 import { createAssetSearchActions } from './assetSearchActions'
 import { createAssetSearchNavigation } from './assetSearchNavigation'
 import type { AssetSearchState } from './assetSearchControllerTypes'
+import { createHiddenAssetSearch } from './assetHiddenSearch'
 import {
+  DEFAULT_PERIOD,
+  DEFAULT_SORT,
   PAGE_SIZE,
   type CivitaiModelsResponse,
 } from './assetViewTypes'
@@ -35,6 +38,16 @@ export function createAssetSearchController(state: AssetSearchState) {
     state,
     () => defaultIncludeNsfw,
   )
+  const searchHiddenModels = createHiddenAssetSearch(state, {
+    getActiveController: () => activeController,
+    getLastSearchKey: () => lastSearchKey,
+    setActiveController: (controller) => {
+      activeController = controller
+    },
+    setLastSearchKey: (key) => {
+      lastSearchKey = key
+    },
+  })
   const actions = createAssetSearchActions(state, {
     clearDebounce: () => window.clearTimeout(debounceId),
     cursorHistory,
@@ -223,6 +236,31 @@ export function createAssetSearchController(state: AssetSearchState) {
     const routePeriod = parseRoutePeriod(state.route.query.period)
     const routeBaseModels = parseRouteBaseModels(state.route.query.baseModels)
 
+    if (state.showHiddenOnly.value) {
+      routeSyncVersion = syncVersion
+      suppressQueryWatch = true
+      state.query.value = ''
+      state.modelIdQuery.value = ''
+      state.modelVersionIdQuery.value = ''
+      state.tagQuery.value = ''
+      state.includeNsfw.value = routeNsfw
+      state.primaryFileOnly.value = false
+      state.selectedType.value = ''
+      state.selectedSort.value = DEFAULT_SORT
+      state.selectedPeriod.value = DEFAULT_PERIOD
+      state.selectedBaseModels.value = routeBaseModels
+      state.activeUsername.value = ''
+      window.clearTimeout(debounceId)
+
+      void nextTick().then(() => {
+        if (routeSyncVersion === syncVersion) {
+          suppressQueryWatch = false
+        }
+      })
+      void searchHiddenModels(routePage)
+      return
+    }
+
     routeSyncVersion = syncVersion
     suppressQueryWatch = true
     state.query.value = routeQuery
@@ -383,6 +421,8 @@ export function createAssetSearchController(state: AssetSearchState) {
 
     watch(
       () => [
+        state.route.name,
+        state.route.path,
         state.route.query.q,
         state.route.query.page,
         state.route.query.nsfw,
@@ -397,6 +437,7 @@ export function createAssetSearchController(state: AssetSearchState) {
         state.route.query.sort,
         state.route.query.period,
         state.route.query.baseModels,
+        state.hiddenModelIds.value.join(','),
       ],
       syncFromRoute,
     )

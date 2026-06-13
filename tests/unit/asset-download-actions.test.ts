@@ -74,6 +74,60 @@ describe('createAssetDownloadActions', () => {
     expect(downloadActionNotice.value).toBe('Queued 2 versions for Multi version checkpoint.')
   })
 
+  it('queues downloadable versions and watches early access versions from queue all', async () => {
+    const queueDownload = vi.fn().mockResolvedValue({ ok: true })
+    const watchDownload = vi.fn().mockResolvedValue({ ok: true })
+    const downloadActionNotice = ref('')
+    const { createAssetDownloadActions } = await import('../../src/views/assets/assetDownloadActions')
+    const actions = createAssetDownloadActions({
+      downloadByVersionId: computed(() => new Map()),
+      downloadActionError: ref(''),
+      downloadActionNotice,
+      openDownloadMenuKey: ref('101'),
+      queuingDownloadKey: ref(''),
+      queueDownload,
+      watchDownload,
+      watchedByVersionId: computed(() => new Map()),
+    } as never)
+    const lockedVersion = {
+      ...modelVersion(202, 'locked-v2.safetensors'),
+      availability: 'EarlyAccess',
+      covered: false,
+      files: [{
+        id: 302,
+        name: 'locked-v2.safetensors',
+        type: 'Model',
+        primary: true,
+      }],
+    }
+    const model = {
+      id: 101,
+      name: 'Mixed availability checkpoint',
+      type: 'Checkpoint',
+      nsfw: false,
+      modelVersions: [
+        modelVersion(201, 'v1.safetensors'),
+        lockedVersion,
+      ],
+    }
+
+    expect(actions.queueableMissingVersionsForModel(model)).toHaveLength(2)
+
+    await actions.queueMissingVersionsForModel(model)
+
+    expect(queueDownload).toHaveBeenCalledTimes(1)
+    expect(queueDownload).toHaveBeenCalledWith(expect.objectContaining({
+      versionId: 201,
+      file: expect.objectContaining({ name: 'v1.safetensors' }),
+    }))
+    expect(watchDownload).toHaveBeenCalledTimes(1)
+    expect(watchDownload).toHaveBeenCalledWith(expect.objectContaining({
+      versionId: 202,
+      file: expect.objectContaining({ name: 'locked-v2.safetensors' }),
+    }))
+    expect(downloadActionNotice.value).toBe('Queued 1 download and watching 1 version for Mixed availability checkpoint.')
+  })
+
   it('watches early access versions instead of rejecting them as unavailable downloads', async () => {
     const queueDownload = vi.fn()
     const watchDownload = vi.fn().mockResolvedValue({
