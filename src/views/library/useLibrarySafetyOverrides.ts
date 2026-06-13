@@ -5,6 +5,7 @@ import type { LibraryModelItem } from './libraryModelHelpers'
 type LibrarySafetyOptions = {
   selectedModel: Ref<LibraryModelItem | null>
   refreshDownloads: () => Promise<unknown> | unknown
+  refreshWatchedDownloads?: () => Promise<unknown> | unknown
   refreshControlNets: () => Promise<unknown> | unknown
 }
 
@@ -90,8 +91,13 @@ export function useLibrarySafetyOverrides(options: LibrarySafetyOptions) {
   }
 
   async function refreshAfterSave(model: LibraryModelItem) {
-    if (model.itemKind === 'controlnet') {
+    if (model.librarySource === 'controlnet') {
       await options.refreshControlNets()
+      return
+    }
+
+    if (model.librarySource === 'watched' && options.refreshWatchedDownloads) {
+      await options.refreshWatchedDownloads()
       return
     }
 

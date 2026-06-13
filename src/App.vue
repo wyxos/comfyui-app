@@ -28,7 +28,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Assets',
     to: '/assets',
-    activeRouteNames: ['assets', 'assets-hidden'],
+    activeRouteNames: ['assets'],
   },
   {
     label: 'Downloads',

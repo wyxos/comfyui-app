@@ -82,9 +82,7 @@ const queuingDownloadKey = ref('')
 const downloadActionError = ref('')
 const downloadActionNotice = ref('')
 const confirm = useConfirmDialog()
-const showHiddenOnly = computed(() => route.name === 'assets-hidden' || route.path === '/assets/hidden')
 const {
-  blacklistedModelIds,
   blacklistedModelIdSet,
   blacklistModel,
   hiddenModelCount,
@@ -155,7 +153,6 @@ const {
   currentPage,
   error,
   hasStoredCivitaiApiKey,
-  hiddenModelIds: blacklistedModelIds,
   includeNsfw,
   loading,
   modelIdQuery,
@@ -172,24 +169,16 @@ const {
   selectedPeriod,
   selectedSort,
   selectedType,
-  showHiddenOnly,
   totalItems,
   totalPages,
 })
 const visibleModels = computed(() =>
-  models.value.filter((model) =>
-    showHiddenOnly.value
-      ? blacklistedModelIdSet.value.has(model.id)
-      : !blacklistedModelIdSet.value.has(model.id),
-  ),
+  models.value.filter((model) => !blacklistedModelIdSet.value.has(model.id)),
 )
 const hasRenderableState = computed(() =>
-  showHiddenOnly.value || loading.value || error.value || searched.value || visibleModels.value.length > 0,
+  loading.value || error.value || searched.value || visibleModels.value.length > 0,
 )
 const hasSearchInput = computed(() => {
-  if (showHiddenOnly.value) {
-    return hiddenModelCount.value > 0
-  }
   return (
     searched.value ||
     query.value.trim().length >= 2 ||
@@ -235,9 +224,6 @@ const isUsingDefaultBaseModels = computed(() =>
 )
 const resultSummary = computed(() => {
   if (loading.value) {
-    if (showHiddenOnly.value) {
-      return 'Loading hidden models'
-    }
     if (activeLookupLabel.value) {
       return `Loading Civitai ${activeLookupLabel.value}`
     }
@@ -254,12 +240,6 @@ const resultSummary = computed(() => {
       return `Loading ${typeFilterLabel.value}`
     }
     return 'Loading'
-  }
-  if (showHiddenOnly.value) {
-    if (hiddenModelCount.value > 0) {
-      return `${formatNumber(hiddenModelCount.value)} hidden model${hiddenModelCount.value === 1 ? '' : 's'}`
-    }
-    return 'No hidden models'
   }
   if (totalItems.value > 0) {
     return `${formatNumber(totalItems.value)} result${totalItems.value === 1 ? '' : 's'}`
@@ -310,15 +290,6 @@ const pageCount = computed(() => {
 })
 const pageCountExact = computed(() => totalPages.value > 0)
 const pageLabel = computed(() => {
-  if (showHiddenOnly.value) {
-    if (!hiddenModelCount.value) {
-      return ''
-    }
-    if (totalPages.value > 1) {
-      return `Page ${currentPage.value} of ${totalPages.value}`
-    }
-    return `Page ${currentPage.value}`
-  }
   if (!searched.value || !hasSearchInput.value) {
     return ''
   }
@@ -413,7 +384,6 @@ onBeforeUnmount(() => {
     downloadActionError,
     downloadActionNotice,
     visibleModels,
-    isHiddenRoute: showHiddenOnly,
     hiddenModelCount,
     hasRenderableState,
     creatorFilterLabel,
@@ -462,7 +432,6 @@ onBeforeUnmount(() => {
     clearBaseModelFilters,
     applySearchPreset,
     blacklistModel,
-    restoreHiddenModel,
     creatorFilterHref,
     filterByCreator,
     clearCreatorFilter,

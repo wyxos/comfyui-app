@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   BLACKLIST_STORAGE_KEY,
   DEFAULT_BASE_MODELS,
-  PAGE_SIZE,
 } from '../../src/views/assets/assetViewTypes'
 import { createMockDownload, createMockModel } from '../fixtures/mockApi'
 import { renderCompanionApp } from './appFlowTestUtils'
@@ -111,12 +110,12 @@ describe('companion app e2e flows', () => {
     await tagged.cleanup()
   })
 
-  it('loads locally hidden assets on a dedicated route and restores them', async () => {
+  it('loads hidden assets through the library hidden filter and restores them', async () => {
     const hiddenModel = createMockModel({ id: 505, name: 'Hidden Detail LoRA' })
     const visibleModel = createMockModel({ id: 606, name: 'Visible Detail LoRA' })
     window.localStorage.setItem(BLACKLIST_STORAGE_KEY, JSON.stringify([505]))
 
-    const hidden = await renderCompanionApp('/assets/hidden', {
+    const hidden = await renderCompanionApp('/library?source=hidden', {
       models: [hiddenModel, visibleModel],
     }, {
       preserveLocalStorage: true,
@@ -129,6 +128,8 @@ describe('companion app e2e flows', () => {
         ),
       ).toBe(true)
     })
+    const hiddenSearchCall = hidden.api.calls.find((call) => call.path === '/api/civitai/models')
+    expect(hiddenSearchCall?.search.get('nsfw')).toBe('true')
     await expect.element(hidden.screen.getByText('Hidden Detail LoRA')).toBeVisible()
     expect(hidden.host.textContent).not.toContain('Visible Detail LoRA')
 
@@ -136,22 +137,26 @@ describe('companion app e2e flows', () => {
 
     await vi.waitFor(() => {
       expect(window.localStorage.getItem(BLACKLIST_STORAGE_KEY)).toBe('[]')
-      expect(hidden.host.textContent).toContain('No hidden Civitai models yet.')
+      expect(hidden.host.textContent).toContain('No hidden models match the current filters.')
     })
   })
 
-  it('unhides a hidden model after its download is queued', async () => {
+  it('unhides a hidden library model after its download is queued', async () => {
     const hiddenModel = createMockModel({ id: 505, name: 'Hidden Download LoRA' })
     window.localStorage.setItem(BLACKLIST_STORAGE_KEY, JSON.stringify([505]))
 
-    const hidden = await renderCompanionApp('/assets/hidden', {
+    const hidden = await renderCompanionApp('/library?source=hidden', {
       models: [hiddenModel],
     }, {
       preserveLocalStorage: true,
     })
 
     await expect.element(hidden.screen.getByText('Hidden Download LoRA')).toBeVisible()
-    await hidden.screen.getByRole('button', { name: 'Download for Hidden Download LoRA' }).click()
+    clickHostButton(hidden.host, 'Open Hidden Download LoRA preview')
+    await vi.waitFor(() => {
+      expect(hidden.host.textContent).toContain('Model versions')
+    })
+    hostButtonByText(hidden.host, 'Download').click()
 
     await vi.waitFor(() => {
       expect(
@@ -160,33 +165,8 @@ describe('companion app e2e flows', () => {
         ),
       ).toBe(true)
       expect(window.localStorage.getItem(BLACKLIST_STORAGE_KEY)).toBe('[]')
-      expect(hidden.host.textContent).toContain('No hidden Civitai models yet.')
+      expect(hidden.host.textContent).toContain('No hidden models match the current filters.')
     })
-  })
-
-  it('fills hidden asset pages from later IDs when some hidden models cannot be loaded', async () => {
-    const hiddenIds = Array.from({ length: 30 }, (_unused, index) => index + 1)
-    const missingIds = new Set([5, 9, 13, 17])
-    const hiddenModels = hiddenIds
-      .filter((id) => !missingIds.has(id))
-      .map((id) => createMockModel({ id, name: `Hidden Fill ${id}` }))
-    window.localStorage.setItem(BLACKLIST_STORAGE_KEY, JSON.stringify(hiddenIds))
-
-    const hidden = await renderCompanionApp('/assets/hidden', {
-      models: hiddenModels,
-    }, {
-      preserveLocalStorage: true,
-    })
-
-    await vi.waitFor(() => {
-      expect(hidden.host.querySelectorAll('article')).toHaveLength(PAGE_SIZE)
-    })
-    const hiddenSearchCalls = hidden.api.calls.filter((call) => call.path === '/api/civitai/models')
-
-    expect(hiddenSearchCalls[0]?.search.get('ids')).toBe(hiddenIds.slice(0, PAGE_SIZE).join(','))
-    expect(hiddenSearchCalls[1]?.search.get('ids')).toBe(hiddenIds.slice(PAGE_SIZE).join(','))
-    expect(hidden.host.textContent).toContain('Hidden Fill 28')
-    expect(hidden.host.textContent).not.toContain('Hidden Fill 29')
   })
 
   it('covers asset filters, empty results, route pagination, metadata, and download panel actions', async () => {

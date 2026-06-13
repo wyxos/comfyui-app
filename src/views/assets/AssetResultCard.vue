@@ -8,7 +8,6 @@ import {
   Clock,
   Download,
   ExternalLink,
-  Eye,
   Image as ImageIcon,
   LoaderCircle,
   MessageCircle,
@@ -54,9 +53,7 @@ const {
   queueableMissingVersionsForModel,
   handleDownloadClick,
   modelUrl,
-  isHiddenRoute,
   blacklistModel,
-  restoreHiddenModel,
   creatorFilterHref,
   openImageModal,
 } = useProvidedAssetsView()
@@ -327,18 +324,6 @@ function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
             <ExternalLink class="h-4 w-4" />
           </a>
           <button
-            v-if="isHiddenRoute"
-            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-secondary/35 bg-secondary/10 text-secondary transition hover:border-secondary hover:bg-secondary hover:text-secondary-foreground focus:outline-none focus:ring-2 focus:ring-ring/35"
-            type="button"
-            data-asset-card-show-button
-            :aria-label="`Show ${model.name}`"
-            :title="`Show ${model.name}`"
-            @click="restoreHiddenModel(model)"
-          >
-            <Eye class="h-4 w-4" />
-          </button>
-          <button
-            v-else
             class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-destructive/35 bg-destructive/10 text-destructive transition hover:border-destructive/70 hover:bg-destructive hover:text-destructive-foreground focus:outline-none focus:ring-2 focus:ring-destructive/35"
             type="button"
             data-asset-card-hide-button

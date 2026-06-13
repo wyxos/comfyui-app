@@ -13,6 +13,7 @@ import {
   parseRequestBody,
 } from './mockApiData'
 import type { FetchCall, MockApiOptions, MockDownload, MockJob, MockModel } from './mockApiData'
+import { handleMockWatchedDownloads } from './mockWatchedDownloads'
 
 export { createMockDownload, createMockJob, createMockModel } from './mockApiData'
 
@@ -45,6 +46,7 @@ export function installMockApi(options: MockApiOptions = {}) {
   let includeNsfwDefault = options.includeNsfwDefault ?? false
   let jobs: MockJob[] = [...(options.jobs ?? [])]
   let downloads: MockDownload[] = [...(options.downloads ?? [])]
+  let watchedDownloads: MockDownload[] = [...(options.watchedDownloads ?? [])]
   let models = [...(options.models ?? [createMockModel()])]
   let inputImageUploadCount = 0
   const failures = options.failures ?? {}
@@ -67,6 +69,7 @@ export function installMockApi(options: MockApiOptions = {}) {
       visibleComplete: downloads.filter((download) => download.state === 'complete' && !download.dismissedAt).length,
     }
   }
+  const watchedDownloadsStore = { get: () => watchedDownloads, set: (nextDownloads: MockDownload[]) => { watchedDownloads = nextDownloads } }
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), 'http://companion.test')
@@ -376,6 +379,11 @@ export function installMockApi(options: MockApiOptions = {}) {
       })
     }
 
+    const watchedDownloadsResponse = handleMockWatchedDownloads(watchedDownloadsStore, url.pathname, method, body)
+    if (watchedDownloadsResponse) {
+      return watchedDownloadsResponse
+    }
+
     if (url.pathname === '/api/civitai/downloads/panel' && method === 'GET') {
       return jsonResponse({
         ok: true,
@@ -475,6 +483,12 @@ export function installMockApi(options: MockApiOptions = {}) {
     },
     setDownloads(nextDownloads: MockDownload[]) {
       downloads = nextDownloads
+    },
+    get watchedDownloads() {
+      return watchedDownloads
+    },
+    setWatchedDownloads(nextDownloads: MockDownload[]) {
+      watchedDownloads = nextDownloads
     },
     get models() {
       return models

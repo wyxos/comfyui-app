@@ -21,6 +21,7 @@ export type MockApiOptions = {
   models?: MockModel[]
   jobs?: MockJob[]
   downloads?: MockDownload[]
+  watchedDownloads?: MockDownload[]
   civitaiConfigured?: boolean
   includeNsfwDefault?: boolean
   generateJobState?: string

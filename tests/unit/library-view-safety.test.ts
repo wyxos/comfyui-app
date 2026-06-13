@@ -3,6 +3,8 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { computed, defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createMemoryHistory } from 'vue-router'
+import { createAppRouter } from '../../src/router'
 
 function jsonResponse(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -67,11 +69,13 @@ describe('LibraryView safety overrides', () => {
     vi.doMock('../../src/composables/useAssetDownloads', () => ({
       useAssetDownloads: () => ({
         downloads,
+        watchedDownloads: ref([]),
         activeDownloads: computed(() => []),
         completedDownloads: computed(() => downloads.value.filter((item) => item.state === 'complete')),
         loading: ref(false),
         error: ref(''),
         refreshDownloads,
+        refreshWatchedDownloads: vi.fn(),
       }),
     }))
     vi.doMock('../../src/composables/useAppSettings', () => ({
@@ -105,9 +109,13 @@ describe('LibraryView safety overrides', () => {
       },
     })
 
+    const router = createAppRouter(createMemoryHistory())
+    await router.push('/library')
+    await router.isReady()
     const { default: LibraryView } = await import('../../src/views/LibraryView.vue')
     const wrapper = mount(LibraryView, {
       global: {
+        plugins: [router],
         stubs: {
           AssetPreviewModal: AssetPreviewModalStub,
         },

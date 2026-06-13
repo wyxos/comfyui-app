@@ -11,7 +11,7 @@ describe('router', () => {
       'home',
       'guidelines',
       'assets',
-      'assets-hidden',
+      undefined,
       'downloads',
       'library',
       'jobs',
@@ -27,11 +27,12 @@ describe('router', () => {
     expect(router.currentRoute.value.name).toBe('jobs')
   })
 
-  it('routes hidden assets to the assets view', async () => {
+  it('redirects the retired hidden assets URL to the library hidden filter', async () => {
     const router = createAppRouter(createMemoryHistory())
     await router.push('/assets/hidden')
     await router.isReady()
 
-    expect(router.currentRoute.value.name).toBe('assets-hidden')
+    expect(router.currentRoute.value.name).toBe('library')
+    expect(router.currentRoute.value.query.source).toBe('hidden')
   })
 })

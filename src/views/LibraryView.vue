@@ -1,48 +1,55 @@
 <script setup lang="ts">
-import {
-  FileDown,
-  LoaderCircle,
-  Search,
-} from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import AssetPreviewModal from '../components/asset-preview/AssetPreviewModal.vue'
 import { useAssetPreviewDownloadActions } from '../components/asset-preview/useAssetPreviewDownloadActions'
 import UiPaginatedCardGrid from '../components/ui/UiPaginatedCardGrid.vue'
-import UiPreviewCard from '../components/ui/UiPreviewCard.vue'
 import { fetchAppSettings } from '../composables/useAppSettings'
 import { useAssetDownloads } from '../composables/useAssetDownloads'
+import LibraryHeader from './library/LibraryHeader.vue'
+import LibraryModelCard from './library/LibraryModelCard.vue'
 import {
   baseModelLabelsFor,
   compatibilityForDownload,
   controlNetBaseModelLabel,
   controlNetDisplayName,
+  hiddenLibraryItemForModel,
   isCheckpointOrLora,
   isVideoPreview,
   modelHasNsfw,
   modelTypeLabel,
   normalizedModelType,
+  parseLibrarySourceFilter,
   previewFor,
-  typeFilters,
+  watchedPreviewPathsFor,
+  watchedPreviewUrlFor,
   type ControlNetLibraryItem,
   type ControlNetResponse,
+  type HiddenLibraryItem,
+  type LibrarySourceFilter,
   type LibraryModelItem,
   type LibraryTypeFilter,
 } from './library/libraryModelHelpers'
+import { useHiddenLibraryModels } from './library/useHiddenLibraryModels'
 import { useLibrarySafetyOverrides } from './library/useLibrarySafetyOverrides'
 
 const PAGE_SIZE = 40
+const route = useRoute()
 
 const {
   completedDownloads,
+  watchedDownloads,
   loading,
   error,
   refreshDownloads,
-} = useAssetDownloads()
+  refreshWatchedDownloads,
+} = useAssetDownloads({ includeWatched: true })
 const {
   queuingDownloadKey,
   downloadForVersion,
   downloadStatusLabel,
   queueAssetDownload,
+  downloadActionError,
   deleteAssetDownload,
   repairDownloadPreviews,
   modelDownloadKey,
@@ -51,6 +58,7 @@ const {
 const query = ref('')
 const includeNsfw = ref(false)
 const typeFilter = ref<LibraryTypeFilter>('all')
+const sourceFilter = ref<LibrarySourceFilter>(parseLibrarySourceFilter(route.query.source))
 const baseModelFilter = ref('all')
 const currentPage = ref(1)
 const selectedModel = ref<LibraryModelItem | null>(null)
@@ -70,8 +78,18 @@ const {
 } = useLibrarySafetyOverrides({
   selectedModel,
   refreshDownloads,
+  refreshWatchedDownloads,
   refreshControlNets,
 })
+const {
+  hiddenError,
+  hiddenLoading,
+  hiddenModelIds,
+  hiddenModelIdSet,
+  hiddenModels,
+  refreshHiddenModels,
+  restoreHiddenModelId,
+} = useHiddenLibraryModels()
 
 const downloadedModels = computed<LibraryModelItem[]>(() => {
   return completedDownloads.value
@@ -79,19 +97,48 @@ const downloadedModels = computed<LibraryModelItem[]>(() => {
     .map((item) => ({
       ...item,
       itemKind: normalizedModelType(item) as 'checkpoint' | 'lora',
+      librarySource: 'downloaded' as const,
       compatibility: compatibilityForDownload(item),
     }))
     .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
 })
+
+const completedDownloadKeys = computed(() =>
+  new Set(completedDownloads.value.map((item) => modelVersionKey(item.modelId, item.versionId))),
+)
+const watchedModels = computed<LibraryModelItem[]>(() => {
+  return watchedDownloads.value
+    .filter((item) => item.state !== 'cancelled')
+    .filter((item) => isCheckpointOrLora(item))
+    .filter((item) => !completedDownloadKeys.value.has(modelVersionKey(item.modelId, item.versionId)))
+    .map((item) => ({
+      ...item,
+      itemKind: normalizedModelType(item) as 'checkpoint' | 'lora',
+      librarySource: 'watched' as const,
+      compatibility: compatibilityForDownload(item),
+      previewUrl: watchedPreviewUrlFor(item),
+      previewPaths: watchedPreviewPathsFor(item),
+    }))
+    .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
+})
+const hiddenLibraryModels = computed<LibraryModelItem[]>(() =>
+  hiddenModels.value
+    .map((model) => hiddenLibraryItemForModel(model))
+    .filter((item): item is HiddenLibraryItem => Boolean(item))
+)
 const libraryModels = computed(() =>
-  [...downloadedModels.value, ...controlNetModels.value]
+  [...downloadedModels.value, ...watchedModels.value, ...hiddenLibraryModels.value, ...controlNetModels.value]
     .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0)),
 )
 
 const filteredModels = computed(() => {
   const search = query.value.trim().toLowerCase()
   return libraryModels.value.filter((item) => {
-    if (!includeNsfw.value && modelHasNsfw(item)) {
+    if (!matchesSourceFilter(item)) {
+      return false
+    }
+
+    if (shouldHideForSafety(item)) {
       return false
     }
 
@@ -141,12 +188,19 @@ const typeCounts = computed(() => ({
   checkpoint: libraryModels.value.filter((item) => item.itemKind === 'checkpoint').length,
   lora: libraryModels.value.filter((item) => item.itemKind === 'lora').length,
   controlnet: libraryModels.value.filter((item) => item.itemKind === 'controlnet').length,
+  hidden: libraryModels.value.filter((item) => item.librarySource === 'hidden').length,
+  hiddenStored: hiddenModelIds.value.length,
+  watched: libraryModels.value.filter((item) => item.librarySource === 'watched').length,
 }))
 const baseModelOptions = computed(() => {
   const counts = new Map<string, number>()
   let scopedTotal = 0
   for (const item of libraryModels.value) {
-    if (!includeNsfw.value && modelHasNsfw(item)) {
+    if (!matchesSourceFilter(item)) {
+      continue
+    }
+
+    if (shouldHideForSafety(item)) {
       continue
     }
 
@@ -166,7 +220,7 @@ const baseModelOptions = computed(() => {
       .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
   ]
 })
-watch([query, typeFilter, baseModelFilter, includeNsfw], () => {
+watch([query, typeFilter, sourceFilter, baseModelFilter, includeNsfw], () => {
   currentPage.value = 1
 })
 
@@ -180,6 +234,13 @@ watch(pageCount, (nextPageCount) => {
   currentPage.value = Math.min(currentPage.value, nextPageCount)
 })
 
+watch(
+  () => route.query.source,
+  (value) => {
+    sourceFilter.value = parseLibrarySourceFilter(value)
+  },
+)
+
 watch(controlNetModels, () => {
   if (selectedModel.value?.itemKind !== 'controlnet') {
     return
@@ -192,10 +253,41 @@ function goToPage(page: number) {
   currentPage.value = Math.max(1, Math.min(page, pageCount.value))
 }
 
+function modelVersionKey(modelId: number, versionId: number) {
+  return `${modelId}:${versionId}`
+}
+
+function matchesSourceFilter(item: LibraryModelItem) {
+  return sourceFilter.value === 'all' || item.librarySource === sourceFilter.value
+}
+
+function shouldHideForSafety(item: LibraryModelItem) {
+  return sourceFilter.value !== 'hidden' && !includeNsfw.value && modelHasNsfw(item)
+}
+
 function openModelPreview(item: LibraryModelItem) {
   compatibilitySaveError.value = ''
   resetSafetyErrors()
   selectedModel.value = item
+}
+
+function selectedCivitaiModel(item: LibraryModelItem | null) {
+  return item && 'civitaiModel' in item ? item.civitaiModel : null
+}
+
+function restoreLibraryHiddenModel(item: LibraryModelItem) {
+  if (item.librarySource === 'hidden') {
+    restoreHiddenModelId(item.modelId)
+  }
+}
+
+async function queueLibraryAssetDownload(model: Parameters<typeof queueAssetDownload>[0], version: Parameters<typeof queueAssetDownload>[1]) {
+  const wasHidden = hiddenModelIdSet.value.has(model.id)
+  await queueAssetDownload(model, version)
+
+  if (wasHidden && !downloadActionError.value) {
+    restoreHiddenModelId(model.id)
+  }
 }
 
 function closeModelPreview() {
@@ -227,6 +319,7 @@ async function refreshControlNets() {
     controlNetModels.value = (payload.controlNets ?? []).map((controlNet) => ({
       id: `controlnet:${controlNet.name}`,
       itemKind: 'controlnet',
+      librarySource: 'controlnet',
       modelName: controlNetDisplayName(controlNet),
       modelType: 'ControlNet',
       modelId: controlNet.compatibility?.modelId ?? null,
@@ -247,7 +340,7 @@ async function refreshControlNets() {
 }
 
 async function refreshLibrary() {
-  await Promise.allSettled([refreshDownloads(), refreshControlNets()])
+  await Promise.allSettled([refreshDownloads(), refreshWatchedDownloads(), refreshControlNets(), refreshHiddenModels()])
 }
 
 async function saveControlNetCompatibility(payload: {
@@ -298,99 +391,18 @@ onMounted(() => {
 
 <template>
   <main class="flex h-full min-h-0 flex-col bg-background text-foreground">
-    <section class="border-b border-border bg-card/82 px-4 py-3 sm:px-6">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="min-w-0">
-          <h1 class="text-base font-semibold tracking-normal">Library</h1>
-          <p class="mt-1 text-xs text-muted-foreground">
-            {{ typeCounts.all }} local models, {{ typeCounts.checkpoint }} checkpoints, {{ typeCounts.lora }} LoRAs, {{ typeCounts.controlnet }} ControlNets
-          </p>
-        </div>
-
-        <button
-          class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold text-card-foreground transition hover:border-secondary/60 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
-          type="button"
-          :disabled="loading"
-          @click="refreshLibrary"
-        >
-          <LoaderCircle
-            v-if="loading"
-            class="h-4 w-4 animate-spin"
-          />
-          <FileDown
-            v-else
-            class="h-4 w-4"
-          />
-          Refresh
-        </button>
-      </div>
-
-      <div class="mt-3 flex flex-wrap items-center gap-2">
-        <label class="relative min-w-[16rem] flex-1 sm:max-w-md">
-          <span class="sr-only">Search library</span>
-          <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            v-model="query"
-            class="h-9 w-full rounded-md border border-input bg-primary px-9 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-ring/25"
-            type="search"
-            placeholder="Search downloaded model, version, file, path"
-          >
-        </label>
-
-        <div
-          class="flex h-9 overflow-hidden rounded-md border border-border"
-          role="group"
-          aria-label="Library type filter"
-        >
-          <button
-            v-for="option in typeFilters"
-            :key="option.value"
-            class="border-r border-border px-3 text-xs font-semibold last:border-r-0"
-            :class="typeFilter === option.value ? 'bg-secondary text-secondary-foreground' : 'bg-background text-muted-foreground hover:bg-accent/10 hover:text-accent'"
-            type="button"
-            @click="typeFilter = option.value"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-
-        <div
-          class="flex min-h-9 max-w-full flex-wrap overflow-hidden rounded-md border border-border"
-          role="group"
-          aria-label="Library base model filter"
-        >
-          <button
-            v-for="option in baseModelOptions"
-            :key="option.value"
-            class="border-r border-b border-border px-3 py-2 text-xs font-semibold last:border-r-0"
-            :class="baseModelFilter === option.value ? 'bg-secondary text-secondary-foreground' : 'bg-background text-muted-foreground hover:bg-accent/10 hover:text-accent'"
-            type="button"
-            :aria-label="`Show ${option.label} base models`"
-            @click="baseModelFilter = option.value"
-          >
-            {{ option.label }}
-            <span class="ml-1 text-[10px] opacity-70">{{ option.count }}</span>
-          </button>
-        </div>
-
-        <label class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground transition hover:border-secondary/55 hover:text-foreground">
-          <input
-            v-model="includeNsfw"
-            class="h-4 w-4 accent-secondary"
-            type="checkbox"
-            aria-label="Include NSFW library models"
-          >
-          NSFW
-        </label>
-      </div>
-
-      <p
-        v-if="error || controlNetLoadingError"
-        class="mt-3 inline-flex rounded-sm border border-destructive/45 bg-destructive/16 px-3 py-2 text-xs font-semibold text-destructive"
-      >
-        {{ error || controlNetLoadingError }}
-      </p>
-    </section>
+    <LibraryHeader
+      v-model:base-model-filter="baseModelFilter"
+      v-model:include-nsfw="includeNsfw"
+      v-model:query="query"
+      v-model:source-filter="sourceFilter"
+      v-model:type-filter="typeFilter"
+      :base-model-options="baseModelOptions"
+      :error-message="error || controlNetLoadingError || hiddenError || downloadActionError"
+      :loading="loading || hiddenLoading"
+      :type-counts="typeCounts"
+      @refresh="refreshLibrary"
+    />
 
     <UiPaginatedCardGrid
       :items-present="pagedModels.length > 0"
@@ -401,55 +413,22 @@ onMounted(() => {
       next-label="Next library page"
       @go-to-page="goToPage"
     >
-      <UiPreviewCard
+      <LibraryModelCard
         v-for="item in pagedModels"
         :key="item.id"
-        tag="button"
-        :aria-label="`Open ${item.modelName} preview`"
-        :preview-url="previewFor(item)"
-        :is-video-preview="isVideoPreview(item)"
-        :preview-label="`${item.modelName} preview`"
-        :title="item.modelName"
-        min-height-class="min-h-[20rem]"
-        media-class="h-64"
-        @click="openModelPreview(item)"
-      >
-        <template #placeholder>
-          <FileDown class="h-8 w-8 text-primary-foreground/35" />
-          <span class="text-xs font-semibold uppercase tracking-[0.16em] text-primary-foreground/68">
-            No preview available
-          </span>
-        </template>
-
-        <template #media-overlay>
-          <div class="absolute right-3 top-3 flex flex-wrap justify-end gap-2">
-            <span
-              v-if="modelHasNsfw(item)"
-              class="rounded-sm border border-destructive/50 bg-destructive/90 px-2 py-1 text-[11px] font-semibold text-destructive-foreground shadow-sm backdrop-blur-sm"
-            >
-              NSFW
-            </span>
-            <span class="rounded-sm border border-primary-foreground/12 bg-primary/85 px-2 py-1 text-[11px] font-semibold text-primary-foreground/82 shadow-sm backdrop-blur-sm">
-              {{ modelTypeLabel(item) }}
-            </span>
-          </div>
-        </template>
-
-        <h2
-          class="truncate text-sm font-semibold leading-5 text-card-foreground"
-          :title="item.modelName"
-        >
-          {{ item.modelName }}
-        </h2>
-      </UiPreviewCard>
+        :item="item"
+        @open="openModelPreview"
+        @restore="restoreLibraryHiddenModel"
+      />
 
       <template #empty>
-        No local models match the current filters.
+        {{ sourceFilter === 'watched' ? 'No watched models match the current filters.' : sourceFilter === 'hidden' ? 'No hidden models match the current filters.' : 'No library models match the current filters.' }}
       </template>
     </UiPaginatedCardGrid>
 
     <AssetPreviewModal
       :open="Boolean(selectedModel)"
+      :model="selectedCivitaiModel(selectedModel)"
       :model-id="selectedModel?.modelId ?? null"
       :version-id="selectedModel?.versionId ?? null"
       :preview-url="selectedModel ? previewFor(selectedModel) : null"
@@ -463,7 +442,7 @@ onMounted(() => {
       :queuing-download-key="queuingDownloadKey"
       :download-for-version="downloadForVersion"
       :download-status-label="downloadStatusLabel"
-      :queue-asset-download="queueAssetDownload"
+      :queue-asset-download="queueLibraryAssetDownload"
       :delete-asset-download="deleteAssetDownload"
       :repair-download-previews="repairDownloadPreviews"
       :model-download-key="modelDownloadKey"

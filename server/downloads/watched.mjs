@@ -274,21 +274,22 @@ export function scheduleWatchedDownloadsPersist(immediate = false, delayMs = 750
   }, delayMs)
 }
 
-export async function addWatchedCivitaiDownload(body) {
+export async function addWatchedCivitaiDownload(body, options = {}) {
   await ensureWatchedDownloadsLoaded()
   const normalized = normalizeWatchedDownloadBody(body)
   const now = Date.now()
   const existing = watchedDownloads.get(normalized.id)
+  const lastStatus = safeTrim(options.lastStatus) || 'Waiting for Civitai to expose a downloadable file.'
   const item = {
     ...(existing ?? {}),
     ...normalized,
     state: 'watching',
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
-    lastCheckedAt: existing?.lastCheckedAt ?? null,
-    nextCheckAt: existing?.nextCheckAt ?? nextCheckAfter(now),
+    lastCheckedAt: options.lastCheckedAt ?? existing?.lastCheckedAt ?? null,
+    nextCheckAt: options.nextCheckAt ?? existing?.nextCheckAt ?? nextCheckAfter(now),
     queuedDownloadId: existing?.queuedDownloadId ?? null,
-    lastStatus: 'Waiting for Civitai to expose a downloadable file.',
+    lastStatus,
     lastError: null,
   }
 

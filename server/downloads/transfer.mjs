@@ -6,10 +6,10 @@ import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { civitaiDownloadSegmentCount, civitaiSegmentStallTimeoutMs, civitaiSegmentedDownloadMinBytes } from '../config.mjs'
 import { safeTrim } from '../shared.mjs'
-import { getStoredCivitaiApiKey } from '../settings.mjs'
 import { scheduleDownloadsPersist } from './state.mjs'
 import { getCivitaiSha256Hash } from './hash-metadata.mjs'
 import { refreshDownloadedSidecarsInBackground, safeUnlink, statFileIfExists } from './metadata.mjs'
+import { assertSegmentContentRange, buildCivitaiDownloadRequest, parseContentRangeTotal } from './request.mjs'
 
 const progressPersistDelayMs = 15000
 
@@ -19,37 +19,6 @@ export function updateDownloadProgress(download, bytesDownloaded, totalBytes) {
   download.progressPercent = totalBytes > 0 ? Math.min(100, Math.round((bytesDownloaded / totalBytes) * 1000) / 10) : null
   download.updatedAt = Date.now()
   scheduleDownloadsPersist(false, progressPersistDelayMs)
-}
-
-export async function buildCivitaiDownloadHeaders(rangeStart = 0, rangeEnd = null) {
-  const headers = {
-    Accept: 'application/octet-stream',
-  }
-  const apiKey = await getStoredCivitaiApiKey()
-
-  if (apiKey) {
-    headers.Authorization = `Bearer ${apiKey}`
-  }
-
-  if (rangeStart > 0 || Number.isInteger(rangeEnd)) {
-    headers.Range = `bytes=${rangeStart}-${Number.isInteger(rangeEnd) ? rangeEnd : ''}`
-  }
-
-  return headers
-}
-
-export function parseContentRangeTotal(contentRange) {
-  if (!contentRange) {
-    return null
-  }
-
-  const match = /^bytes\s+\d+-\d+\/(\d+)$/i.exec(contentRange.trim())
-  if (!match) {
-    return null
-  }
-
-  const totalBytes = Number.parseInt(match[1], 10)
-  return Number.isSafeInteger(totalBytes) && totalBytes > 0 ? totalBytes : null
 }
 
 function buildSegmentRanges(totalBytes, requestedSegmentCount = civitaiDownloadSegmentCount) {
@@ -157,9 +126,9 @@ export async function probeCivitaiSegmentedDownload(download) {
     return null
   }
 
-  const headers = await buildCivitaiDownloadHeaders(0, 0)
-  const response = await fetch(download.downloadUrl, {
-    headers,
+  const request = await buildCivitaiDownloadRequest(download.downloadUrl, 0, 0)
+  const response = await fetch(request.url, {
+    headers: request.headers,
     signal: download.abortController.signal,
     redirect: 'follow',
   })
@@ -192,12 +161,16 @@ export async function hashFileSha256(filePath) {
 }
 
 export async function verifyCivitaiDownloadHash(download) {
+  await verifyCivitaiDownloadPathHash(download, download.targetPath)
+}
+
+async function verifyCivitaiDownloadPathHash(download, filePath) {
   const expectedHash = getExpectedCivitaiSha256(download)
   if (!expectedHash) {
     return
   }
 
-  const actualHash = await hashFileSha256(download.targetPath)
+  const actualHash = await hashFileSha256(filePath)
   if (actualHash === expectedHash) {
     return
   }
@@ -227,12 +200,20 @@ export async function markCivitaiDownloadComplete(download) {
 }
 
 export async function finishCivitaiDownload(download, totalBytes, bytesDownloaded) {
+  try {
+    await verifyCivitaiDownloadPathHash(download, download.partialPath)
+  } catch (error) {
+    if (error?.code === 'hash-mismatch') {
+      await safeUnlink(download.partialPath)
+    }
+    throw error
+  }
+
   await safeUnlink(download.targetPath)
   await rename(download.partialPath, download.targetPath)
   download.bytesDownloaded = totalBytes || bytesDownloaded
   download.totalBytes = totalBytes || bytesDownloaded
   download.progressPercent = 100
-  await verifyCivitaiDownloadHash(download)
   download.state = 'complete'
   download.finishedAt = Date.now()
   download.updatedAt = Date.now()
@@ -242,7 +223,7 @@ export async function finishCivitaiDownload(download, totalBytes, bytesDownloade
 
 export async function downloadCivitaiFileSingle(download, partialStats) {
   const rangeStart = partialStats?.size ?? 0
-  let headers = await buildCivitaiDownloadHeaders(rangeStart)
+  let request = await buildCivitaiDownloadRequest(download.downloadUrl, rangeStart)
   download.transferMode = rangeStart > 0 ? 'single-resume' : 'single'
   download.state = 'downloading'
   download.error = null
@@ -251,8 +232,8 @@ export async function downloadCivitaiFileSingle(download, partialStats) {
   download.bytesDownloaded = rangeStart
   scheduleDownloadsPersist(true)
 
-  let response = await fetch(download.downloadUrl, {
-    headers,
+  let response = await fetch(request.url, {
+    headers: request.headers,
     signal: download.abortController.signal,
     redirect: 'follow',
   })
@@ -261,9 +242,9 @@ export async function downloadCivitaiFileSingle(download, partialStats) {
   if (rangeStart > 0 && response.status !== 206) {
     await response.body?.cancel?.()
     await safeUnlink(download.partialPath)
-    headers = await buildCivitaiDownloadHeaders(0)
-    response = await fetch(download.downloadUrl, {
-      headers,
+    request = await buildCivitaiDownloadRequest(download.downloadUrl, 0)
+    response = await fetch(request.url, {
+      headers: request.headers,
       signal: download.abortController.signal,
       redirect: 'follow',
     })
@@ -308,9 +289,9 @@ export async function downloadCivitaiSegment(download, fileHandle, range, segmen
   }
 
   const rangeStart = range.start + resumeOffset
-  const headers = await buildCivitaiDownloadHeaders(rangeStart, range.end)
-  const response = await fetch(download.downloadUrl, {
-    headers,
+  const request = await buildCivitaiDownloadRequest(download.downloadUrl, rangeStart, range.end)
+  const response = await fetch(request.url, {
+    headers: request.headers,
     signal: download.abortController.signal,
     redirect: 'follow',
   })
@@ -318,6 +299,7 @@ export async function downloadCivitaiSegment(download, fileHandle, range, segmen
   if (response.status !== 206 || !response.body) {
     throw await createCivitaiDownloadError(response, `Civitai segment ${range.index + 1}`)
   }
+  assertSegmentContentRange(response, { ...range, start: rangeStart }, totalBytes)
 
   const reader = response.body.getReader()
   let position = rangeStart

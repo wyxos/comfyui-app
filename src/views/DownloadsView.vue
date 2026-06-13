@@ -9,7 +9,7 @@ import {
 } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import { fetchAppSettings } from '../composables/useAppSettings'
-import { useAssetDownloads, type AssetDownloadItem } from '../composables/useAssetDownloads'
+import { useAssetDownloads, type AssetDownloadItem, type WatchedAssetDownloadItem } from '../composables/useAssetDownloads'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import DownloadsTableRow from './downloads/DownloadsTableRow.vue'
 
@@ -25,6 +25,7 @@ const statusFilters = [
   { label: 'All', value: 'all' },
   { label: 'Downloaded', value: 'downloaded' },
   { label: 'Active', value: 'active' },
+  { label: 'Watched', value: 'watched' },
   { label: 'Needs attention', value: 'attention' },
   { label: 'Deleted', value: 'deleted' },
 ] as const
@@ -33,18 +34,21 @@ type DownloadTypeFilter = (typeof typeFilters)[number]['value']
 type DownloadStatusFilter = (typeof statusFilters)[number]['value']
 type DownloadAction = 'pause' | 'resume' | 'cancel' | 'delete' | 'redownload'
 type DownloadActionRunner = (id: string) => Promise<unknown>
+type DownloadViewRowItem = Omit<AssetDownloadItem, 'state'> & { state: AssetDownloadItem['state'] | 'watched' }
 
 const {
   downloads,
+  watchedDownloads,
   loading,
   error,
   refreshDownloads,
+  refreshWatchedDownloads,
   pauseDownload,
   resumeDownload,
   cancelDownload,
   deleteDownloadedFile,
   redownloadDownload,
-} = useAssetDownloads()
+} = useAssetDownloads({ includeWatched: true })
 
 const query = ref('')
 const typeFilter = ref<DownloadTypeFilter>('all')
@@ -61,10 +65,21 @@ const modelDownloads = computed(() => {
     .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
 })
 
+const watchedModelDownloads = computed(() => {
+  return watchedDownloads.value
+    .filter((item) => isWatchedCheckpointOrLora(item))
+    .map((item) => watchedDownloadToRowItem(item))
+    .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
+})
+
+const filterSourceDownloads = computed(() => {
+  return statusFilter.value === 'watched' ? watchedModelDownloads.value : modelDownloads.value
+})
+
 const filteredDownloads = computed(() => {
   const search = query.value.trim().toLowerCase()
 
-  return modelDownloads.value.filter((item) => {
+  return filterSourceDownloads.value.filter((item) => {
     if (typeFilter.value !== 'all' && normalizedModelType(item) !== typeFilter.value) {
       return false
     }
@@ -109,6 +124,7 @@ const statusCounts = computed(() => ({
   all: modelDownloads.value.length,
   downloaded: modelDownloads.value.filter((item) => statusGroup(item) === 'downloaded').length,
   active: modelDownloads.value.filter((item) => statusGroup(item) === 'active').length,
+  watched: watchedModelDownloads.value.length,
   attention: modelDownloads.value.filter((item) => statusGroup(item) === 'attention').length,
   deleted: modelDownloads.value.filter((item) => statusGroup(item) === 'deleted').length,
 }))
@@ -130,9 +146,56 @@ function isCheckpointOrLora(item: AssetDownloadItem) {
   return Boolean(normalizedModelType(item))
 }
 
-function statusGroup(item: AssetDownloadItem): Exclude<DownloadStatusFilter, 'all'> {
+function isWatchedCheckpointOrLora(item: WatchedAssetDownloadItem) {
+  return Boolean(normalizedWatchedModelType(item))
+}
+
+function normalizedWatchedModelType(item: WatchedAssetDownloadItem) {
+  const normalized = item.modelType.trim().toLowerCase()
+  return normalized === 'checkpoint' ? 'checkpoint' : normalized === 'lora' ? 'lora' : ''
+}
+
+function watchedPreviewUrl(item: WatchedAssetDownloadItem) {
+  const imageUrl = item.previewImage?.url
+  if (typeof imageUrl === 'string' && imageUrl.trim()) {
+    return imageUrl
+  }
+
+  const preview = item.previewImages?.find((image) => typeof image?.url === 'string' && image.url.trim())
+  return typeof preview?.url === 'string' ? preview.url : ''
+}
+
+function watchedDownloadToRowItem(item: WatchedAssetDownloadItem): DownloadViewRowItem {
+  const previewUrl = watchedPreviewUrl(item)
+  return {
+    id: item.id,
+    state: 'watched',
+    modelId: item.modelId,
+    modelName: item.modelName,
+    modelType: item.modelType,
+    modelNsfw: item.modelNsfw,
+    modelMetadata: item.modelMetadata as AssetDownloadItem['modelMetadata'],
+    versionId: item.versionId,
+    versionName: item.versionName,
+    baseModel: item.baseModel,
+    fileId: item.fileId,
+    fileName: item.fileName,
+    previewUrl: previewUrl || null,
+    previewPaths: previewUrl ? [{ url: previewUrl, mediaType: 'image' }] : [],
+    targetPath: item.lastStatus || 'Waiting for Civitai',
+    error: item.lastError,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt ?? item.lastCheckedAt ?? item.createdAt ?? 0,
+  }
+}
+
+function statusGroup(item: DownloadViewRowItem): Exclude<DownloadStatusFilter, 'all'> {
   if (item.state === 'complete') {
     return 'downloaded'
+  }
+
+  if (item.state === 'watched') {
+    return 'watched'
   }
 
   if (item.state === 'queued' || item.state === 'downloading' || item.state === 'paused') {
@@ -146,7 +209,7 @@ function statusGroup(item: AssetDownloadItem): Exclude<DownloadStatusFilter, 'al
   return 'attention'
 }
 
-async function runDownloadAction(item: AssetDownloadItem, action: DownloadAction, runner: DownloadActionRunner) {
+async function runDownloadAction(item: DownloadViewRowItem, action: DownloadAction, runner: DownloadActionRunner) {
   if (actionKey.value) {
     return
   }
@@ -200,6 +263,10 @@ async function loadAppSettingsDefaults() {
   }
 }
 
+async function refreshDownloadLists() {
+  await Promise.allSettled([refreshDownloads(), refreshWatchedDownloads()])
+}
+
 onMounted(() => {
   void loadAppSettingsDefaults()
 })
@@ -212,7 +279,7 @@ onMounted(() => {
         <div class="min-w-0">
           <h1 class="text-base font-semibold tracking-normal">Downloads</h1>
           <p class="mt-1 text-xs text-muted-foreground">
-            {{ statusCounts.downloaded }} downloaded, {{ statusCounts.active }} active, {{ statusCounts.deleted }} deleted
+            {{ statusCounts.downloaded }} downloaded, {{ statusCounts.active }} active, {{ statusCounts.watched }} watched, {{ statusCounts.deleted }} deleted
           </p>
         </div>
 
@@ -220,7 +287,7 @@ onMounted(() => {
           class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold text-card-foreground transition hover:border-secondary/60 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
           type="button"
           :disabled="loading"
-          @click="refreshDownloads"
+          @click="refreshDownloadLists"
         >
           <LoaderCircle
             v-if="loading"
@@ -274,6 +341,7 @@ onMounted(() => {
             class="border-r border-border px-3 text-xs font-semibold last:border-r-0"
             :class="statusFilter === option.value ? 'bg-secondary text-secondary-foreground' : 'bg-background text-muted-foreground hover:bg-accent/10 hover:text-accent'"
             type="button"
+            :aria-label="`Show ${option.label.toLowerCase()} downloads`"
             @click="statusFilter = option.value"
           >
             {{ option.label }}

@@ -1,8 +1,6 @@
-import { civitaiModelVersionsUrl } from '../config.mjs'
 import { parseInteger } from '../civitai-query.mjs'
-import { normalizeOptionalBoolean, safeTrim, tryParseJson } from '../shared.mjs'
+import { normalizeOptionalBoolean, safeTrim } from '../shared.mjs'
 import {
-  buildCivitaiRequestHeaders,
   normalizeDownloadFile,
   normalizeDownloadModelMetadata,
   normalizePreviewImage,
@@ -10,6 +8,12 @@ import {
   sanitizeModelFilename,
 } from './metadata.mjs'
 import { enqueueCivitaiDownload } from './queue.mjs'
+import {
+  civitaiEarlyAccessStatus,
+  fetchCivitaiVersion,
+  isVersionDownloadable,
+  normalizedAvailability,
+} from './civitai-version.mjs'
 
 export function pollIntervalMs() {
   return Math.max(
@@ -39,15 +43,6 @@ export function normalizeModelType(value) {
   return ''
 }
 
-function normalizedAvailability(value) {
-  return safeTrim(value).toLowerCase()
-}
-
-function isVersionDownloadable(version) {
-  const availability = normalizedAvailability(version?.availability)
-  return !availability || availability === 'public' || (availability === 'earlyaccess' && version?.covered === true)
-}
-
 function modelFileCandidates(version) {
   return Array.isArray(version?.files) ? version.files.map((file) => normalizeDownloadFile(file)) : []
 }
@@ -67,12 +62,17 @@ function chooseModelFile(version, watchedItem) {
     ?? normalizeDownloadFile(watchedItem?.file)
 }
 
-function unavailableReason(version, file) {
+function unavailableReason(version, file, now) {
   if (!file?.name) {
     return 'No primary model file is available yet.'
   }
 
-  if (!isVersionDownloadable(version)) {
+  const earlyAccessStatus = civitaiEarlyAccessStatus(version, now)
+  if (earlyAccessStatus) {
+    return earlyAccessStatus
+  }
+
+  if (!isVersionDownloadable(version, now)) {
     return normalizedAvailability(version?.availability) === 'earlyaccess'
       ? 'Early access locked'
       : 'Version unavailable'
@@ -83,28 +83,6 @@ function unavailableReason(version, file) {
   }
 
   return ''
-}
-
-async function fetchCivitaiVersion(versionId) {
-  const upstreamUrl = new URL(`${civitaiModelVersionsUrl.toString().replace(/\/$/, '')}/${versionId}`)
-  const response = await fetch(upstreamUrl, {
-    headers: await buildCivitaiRequestHeaders('application/json'),
-    redirect: 'follow',
-  })
-  const text = await response.text()
-  if (!response.ok) {
-    const error = new Error(`Civitai returned ${response.status}.`)
-    error.statusCode = response.status
-    error.payload = text ? tryParseJson(text) ?? text.slice(0, 1000) : null
-    throw error
-  }
-
-  const payload = tryParseJson(text)
-  if (!payload || typeof payload !== 'object') {
-    throw new Error('Civitai returned an invalid model version response.')
-  }
-
-  return payload
 }
 
 function enqueuePayloadForWatchedVersion(item, version, file) {
@@ -160,7 +138,7 @@ export async function checkWatchedDownloadItem(item, now) {
   }
 
   const file = chooseModelFile(version, item)
-  const reason = unavailableReason(version, file)
+  const reason = unavailableReason(version, file, now)
   if (reason) {
     item.state = 'watching'
     item.lastStatus = reason

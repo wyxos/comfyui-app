@@ -26,8 +26,12 @@ export const routes: RouteRecordRaw[] = [
   },
   {
     path: '/assets/hidden',
-    name: 'assets-hidden',
-    component: AssetsView,
+    redirect: {
+      name: 'library',
+      query: {
+        source: 'hidden',
+      },
+    },
   },
   {
     path: '/downloads',

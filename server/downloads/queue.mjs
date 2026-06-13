@@ -5,11 +5,93 @@ import { buildDownloadId, normalizeDownloadFile, normalizeDownloadModelMetadata,
 import { downloadCivitaiFile, verifyCivitaiDownloadHash } from './transfer.mjs'
 import { parseInteger } from '../civitai-query.mjs'
 import { resolveInsideRoot } from '../model-paths.mjs'
+import { civitaiEarlyAccessStatus, fetchCivitaiVersion, isCivitaiEarlyAccessLocked } from './civitai-version.mjs'
 
 let downloadQueueActive = false
 
 export function resetDownloadQueueRuntimeState() {
   downloadQueueActive = false
+}
+
+function shouldProbeEarlyAccessHandoff(error) {
+  const statusCode = Number.parseInt(error?.statusCode, 10)
+  if (statusCode !== 401 && statusCode !== 403) {
+    return false
+  }
+
+  const message = safeTrim(error?.message).toLowerCase()
+  return (
+    message.includes('requires you to be logged in') ||
+    message.includes('creator of this asset') ||
+    message.includes('early access')
+  )
+}
+
+function versionFileForDownload(download, version) {
+  const files = Array.isArray(version?.files) ? version.files.map((file) => normalizeDownloadFile(file)) : []
+  const downloadFileId = download?.fileId === null || download?.fileId === undefined ? '' : String(download.fileId)
+  const downloadFileName = safeTrim(download?.fileName)
+
+  return files.find((file) => downloadFileId && String(file.id) === downloadFileId)
+    ?? files.find((file) => downloadFileName && file.name === downloadFileName)
+    ?? null
+}
+
+function watchedPayloadForDownload(download, version) {
+  const model = version?.model && typeof version.model === 'object' ? version.model : null
+  const versionFile = versionFileForDownload(download, version)
+  const fileName = sanitizeModelFilename(download.fileName || versionFile?.name)
+
+  return {
+    modelId: parseInteger(model?.id) ?? download.modelId,
+    modelName: safeTrim(model?.name) || download.modelName,
+    modelType: safeTrim(model?.type) || download.modelType,
+    modelNsfw: model?.nsfw ?? download.modelNsfw ?? null,
+    modelMetadata: model ?? download.modelMetadata,
+    versionId: parseInteger(version?.id) ?? download.versionId,
+    versionName: safeTrim(version?.name) || download.versionName,
+    baseModel: safeTrim(version?.baseModel) || download.baseModel,
+    file: {
+      ...(versionFile ?? {}),
+      id: download.fileId ?? versionFile?.id,
+      name: fileName,
+      type: download.fileType || versionFile?.type || 'Model',
+      primary: versionFile?.primary ?? true,
+      sizeKb: download.fileSizeKb ?? versionFile?.sizeKb ?? null,
+      downloadUrl: download.downloadUrl ?? versionFile?.downloadUrl,
+      hashes: download.hashes ?? versionFile?.hashes ?? {},
+    },
+    trainedWords: Array.isArray(version?.trainedWords) ? version.trainedWords.filter((word) => typeof word === 'string') : download.trainedWords,
+    previewImage: normalizePreviewImage(version?.images?.[0]) ?? download.previewImage,
+    previewImages: normalizePreviewImages([
+      ...(Array.isArray(version?.images) ? version.images : []),
+      ...(Array.isArray(download.previewImages) ? download.previewImages : []),
+      download.previewImage,
+    ]),
+  }
+}
+
+async function moveEarlyAccessDownloadToWatch(download, error) {
+  if (!shouldProbeEarlyAccessHandoff(error) || !download?.versionId) {
+    return false
+  }
+
+  try {
+    const version = await fetchCivitaiVersion(download.versionId)
+    if (!isCivitaiEarlyAccessLocked(version)) {
+      return false
+    }
+
+    const { addWatchedCivitaiDownload } = await import('./watched.mjs')
+    await addWatchedCivitaiDownload(watchedPayloadForDownload(download, version), {
+      lastCheckedAt: Date.now(),
+      lastStatus: civitaiEarlyAccessStatus(version),
+    })
+    civitaiDownloads.delete(download.id)
+    return true
+  } catch {
+    return false
+  }
 }
 
 export async function processDownloadQueue() {
@@ -37,6 +119,10 @@ export async function processDownloadQueue() {
     if (error?.name === 'AbortError') {
       download.state = 'paused'
       download.updatedAt = Date.now()
+      return
+    }
+
+    if (await moveEarlyAccessDownloadToWatch(download, error)) {
       return
     }
 

@@ -13,8 +13,11 @@ import {
 import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import type { AssetDownloadItem, AssetDownloadState } from '../../composables/useAssetDownloads'
 
+type DownloadTableRowState = AssetDownloadState | 'watched'
+type DownloadTableRowItem = Omit<AssetDownloadItem, 'state'> & { state: DownloadTableRowState }
+
 const props = withDefaults(defineProps<{
-  item: AssetDownloadItem
+  item: DownloadTableRowItem
   actionKey: string
   blurNsfwPreview?: boolean
 }>(), {
@@ -22,16 +25,16 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  pause: [item: AssetDownloadItem]
-  resume: [item: AssetDownloadItem]
-  cancel: [item: AssetDownloadItem]
-  redownload: [item: AssetDownloadItem]
-  'delete-file': [item: AssetDownloadItem]
+  pause: [item: DownloadTableRowItem]
+  resume: [item: DownloadTableRowItem]
+  cancel: [item: DownloadTableRowItem]
+  redownload: [item: DownloadTableRowItem]
+  'delete-file': [item: DownloadTableRowItem]
 }>()
 
 type DownloadAction = 'pause' | 'resume' | 'cancel' | 'delete' | 'redownload'
 
-const statusToneClass: Record<AssetDownloadState, string> = {
+const statusToneClass: Record<DownloadTableRowState, string> = {
   queued: 'border-accent/35 bg-accent/10 text-accent',
   downloading: 'border-accent/35 bg-accent/10 text-accent',
   paused: 'border-secondary/45 bg-secondary/10 text-secondary',
@@ -39,18 +42,19 @@ const statusToneClass: Record<AssetDownloadState, string> = {
   error: 'border-destructive/45 bg-destructive/10 text-destructive',
   cancelled: 'border-muted bg-muted text-muted-foreground',
   deleted: 'border-border bg-background text-muted-foreground',
+  watched: 'border-secondary/45 bg-secondary/10 text-secondary',
 }
 
-function normalizedModelType(item: AssetDownloadItem) {
+function normalizedModelType(item: DownloadTableRowItem) {
   const normalized = item.modelType.trim().toLowerCase()
   return normalized === 'checkpoint' ? 'checkpoint' : normalized === 'lora' ? 'lora' : ''
 }
 
-function modelTypeLabel(item: AssetDownloadItem) {
+function modelTypeLabel(item: DownloadTableRowItem) {
   return normalizedModelType(item) === 'lora' ? 'LoRA' : 'Checkpoint'
 }
 
-function statusLabel(item: AssetDownloadItem) {
+function statusLabel(item: DownloadTableRowItem) {
   if (item.state === 'complete') {
     return 'Downloaded'
   }
@@ -73,6 +77,10 @@ function statusLabel(item: AssetDownloadItem) {
     return 'Deleted'
   }
 
+  if (item.state === 'watched') {
+    return 'Watched'
+  }
+
   if (item.state === 'error') {
     return 'Failed'
   }
@@ -80,7 +88,7 @@ function statusLabel(item: AssetDownloadItem) {
   return 'Cancelled'
 }
 
-function progressWidth(item: AssetDownloadItem) {
+function progressWidth(item: DownloadTableRowItem) {
   if (item.state === 'complete') {
     return '100%'
   }
@@ -88,11 +96,11 @@ function progressWidth(item: AssetDownloadItem) {
   return `${Math.max(0, Math.min(100, item.progressPercent ?? 0))}%`
 }
 
-function previewFor(item: AssetDownloadItem) {
+function previewFor(item: DownloadTableRowItem) {
   return item.previewUrl ?? item.previewPaths?.find((preview) => preview.url)?.url ?? ''
 }
 
-function isVideoPreview(item: AssetDownloadItem) {
+function isVideoPreview(item: DownloadTableRowItem) {
   return item.previewPaths?.some((preview) => preview.url === previewFor(item) && preview.mediaType === 'video') ?? false
 }
 
@@ -113,11 +121,15 @@ function isNsfwValue(value: unknown) {
   return false
 }
 
-function shouldBlurPreview(item: AssetDownloadItem) {
+function shouldBlurPreview(item: DownloadTableRowItem) {
   return props.blurNsfwPreview && isNsfwValue(item.modelNsfw ?? item.modelMetadata?.nsfw)
 }
 
-function formatFileSize(item: AssetDownloadItem) {
+function formatFileSize(item: DownloadTableRowItem) {
+  if (item.state === 'watched') {
+    return 'Pending'
+  }
+
   const bytes = item.fileSizeKb ? item.fileSizeKb * 1024 : item.totalBytes || item.bytesDownloaded || 0
   if (!bytes) {
     return 'Unknown'
@@ -147,15 +159,15 @@ function formatDate(value: number | null | undefined) {
   }).format(new Date(value))
 }
 
-function canDeleteFile(item: AssetDownloadItem) {
+function canDeleteFile(item: DownloadTableRowItem) {
   return item.state === 'complete'
 }
 
-function canRedownload(item: AssetDownloadItem) {
-  return item.state !== 'downloading' && item.state !== 'queued'
+function canRedownload(item: DownloadTableRowItem) {
+  return item.state !== 'downloading' && item.state !== 'queued' && item.state !== 'watched'
 }
 
-function civitaiModelUrl(item: AssetDownloadItem) {
+function civitaiModelUrl(item: DownloadTableRowItem) {
   if (!item.modelId) {
     return ''
   }
@@ -171,6 +183,14 @@ function civitaiModelUrl(item: AssetDownloadItem) {
 
 function isBusy(action: DownloadAction) {
   return props.actionKey === `${action}:${props.item.id}`
+}
+
+function pathLabel(item: DownloadTableRowItem) {
+  if (item.state === 'watched') {
+    return item.targetPath || 'Waiting for Civitai'
+  }
+
+  return item.targetPath || 'Unknown target path'
 }
 </script>
 
@@ -255,10 +275,11 @@ function isBusy(action: DownloadAction) {
 
     <td class="max-w-[22rem] px-3 py-2">
       <p
-        class="truncate font-mono text-[11px] text-muted-foreground"
-        :title="item.targetPath || 'Unknown target path'"
+        class="truncate text-[11px] text-muted-foreground"
+        :class="item.state === 'watched' ? '' : 'font-mono'"
+        :title="pathLabel(item)"
       >
-        {{ item.targetPath || 'Unknown target path' }}
+        {{ pathLabel(item) }}
       </p>
       <p
         v-if="item.error"
@@ -312,7 +333,7 @@ function isBusy(action: DownloadAction) {
         </button>
 
         <button
-          v-if="item.state !== 'complete' && item.state !== 'deleted' && item.state !== 'cancelled'"
+          v-if="item.state !== 'complete' && item.state !== 'deleted' && item.state !== 'cancelled' && item.state !== 'watched'"
           class="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-border text-muted-foreground transition hover:border-destructive/70 hover:text-destructive disabled:cursor-wait disabled:opacity-60"
           type="button"
           :disabled="Boolean(actionKey)"

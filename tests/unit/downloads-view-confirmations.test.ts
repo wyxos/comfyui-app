@@ -30,11 +30,13 @@ describe('DownloadsView confirmations', () => {
     vi.doMock('../../src/composables/useAssetDownloads', () => ({
       useAssetDownloads: () => ({
         downloads,
+        watchedDownloads: ref([]),
         activeDownloads: computed(() => []),
         completedDownloads: computed(() => downloads.value),
         loading: ref(false),
         error: ref(''),
         refreshDownloads: vi.fn(),
+        refreshWatchedDownloads: vi.fn(),
         pauseDownload: vi.fn(),
         resumeDownload: vi.fn(),
         cancelDownload: vi.fn(),
