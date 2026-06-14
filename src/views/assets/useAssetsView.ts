@@ -1,9 +1,10 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import type { AssetPreviewDownload } from '../../components/asset-preview/assetPreviewTypes'
 import { useAssetDownloads } from '../../composables/useAssetDownloads'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
-import { createAssetDownloadActions } from './assetDownloadActions'
+import { createAssetDownloadActions, type DownloadActionToast } from './assetDownloadActions'
 import { createAssetSearchController } from './assetSearchController'
 import {
   ASSET_SEARCH_PRESETS,
@@ -80,8 +81,6 @@ const activeImageModel = ref<CivitaiModel | null>(null)
 const activeImageInitialIndex = ref(0)
 const openDownloadMenuKey = ref('')
 const queuingDownloadKey = ref('')
-const downloadActionError = ref('')
-const downloadActionNotice = ref('')
 const confirm = useConfirmDialog()
 const {
   blacklistedModelIdSet,
@@ -105,6 +104,15 @@ const {
   deleteDownloadedFile,
 } = useAssetDownloads({ includeWatched: true })
 
+function showDownloadToast({ message, variant }: DownloadActionToast) {
+  if (variant === 'error') {
+    toast.error(message)
+    return
+  }
+
+  toast.success(message)
+}
+
 const {
   activeDownloadForModel,
   canQueueVersion: canActOnVersionDownload,
@@ -120,8 +128,6 @@ const {
   queueableMissingVersionsForModel,
   versionDownloadButtonLabel,
 } = createAssetDownloadActions({
-  downloadActionError,
-  downloadActionNotice,
   downloadByVersionId,
   openDownloadMenuKey,
   queueDownload,
@@ -131,6 +137,7 @@ const {
   watchDownload,
   confirm,
   onDownloadQueued: unhideModelAfterDownload,
+  showDownloadToast,
 })
 
 const {
@@ -332,14 +339,17 @@ function unhideModelAfterDownload(model: CivitaiModel) {
 }
 async function deleteAssetDownload(download: AssetPreviewDownload) {
   if (!download.id) {
-    downloadActionError.value = 'No download record was found for this file.'
+    showDownloadToast({ message: 'No download record was found for this file.', variant: 'error' })
     return
   }
-  downloadActionError.value = ''
+
   try {
     await deleteDownloadedFile(download.id)
   } catch (caughtError) {
-    downloadActionError.value = caughtError instanceof Error ? caughtError.message : 'Could not delete downloaded file.'
+    showDownloadToast({
+      message: caughtError instanceof Error ? caughtError.message : 'Could not delete downloaded file.',
+      variant: 'error',
+    })
   }
 }
 
@@ -384,8 +394,6 @@ onBeforeUnmount(() => {
     activeImageInitialIndex,
     openDownloadMenuKey,
     queuingDownloadKey,
-    downloadActionError,
-    downloadActionNotice,
     visibleModels,
     hiddenModelCount,
     hasRenderableState,

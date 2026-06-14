@@ -17,11 +17,14 @@ import {
 } from './assetModelHelpers'
 import type { CivitaiModel, CivitaiModelVersion } from './assetViewTypes'
 
+export type DownloadActionToast = {
+  message: string
+  variant: 'success' | 'error'
+}
+
 type DownloadActionState = {
   downloadByVersionId: ComputedRef<Map<number, AssetDownloadItem[]>>
   watchedByVersionId?: ComputedRef<Map<number, WatchedAssetDownloadItem[]>>
-  downloadActionError: Ref<string>
-  downloadActionNotice: Ref<string>
   openDownloadMenuKey: Ref<string>
   queuingDownloadKey: Ref<string>
   queueDownload: (payload: QueueDownloadPayload) => Promise<unknown>
@@ -29,6 +32,7 @@ type DownloadActionState = {
   unwatchDownload?: (id: string) => Promise<unknown>
   confirm: ConfirmDialogFn
   onDownloadQueued?: (model: CivitaiModel) => void
+  showDownloadToast?: (toast: DownloadActionToast) => void
 }
 
 type QueueAssetDownloadOptions = {
@@ -194,12 +198,12 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     )
   }
 
-  function clearDownloadActionNotice() {
-    state.downloadActionNotice.value = ''
+  function showDownloadNotice(message: string) {
+    state.showDownloadToast?.({ message, variant: 'success' })
   }
 
-  function clearDownloadActionError() {
-    state.downloadActionError.value = ''
+  function showDownloadError(message: string) {
+    state.showDownloadToast?.({ message, variant: 'error' })
   }
 
   function queueDownloadNotice(payload: unknown, fallbackFileName: string) {
@@ -281,16 +285,11 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     { closeMenu = true, showNotice = true }: QueueAssetDownloadOptions = {},
   ) {
     if (!state.watchDownload) {
-      state.downloadActionError.value = 'This Civitai version is early access and is not covered by the saved account API key.'
-      clearDownloadActionNotice()
+      showDownloadError('This Civitai version is early access and is not covered by the saved account API key.')
       return false
     }
 
     state.queuingDownloadKey.value = key
-    clearDownloadActionError()
-    if (showNotice) {
-      clearDownloadActionNotice()
-    }
 
     try {
       const payload = await state.watchDownload(downloadPayloadForVersion(model, version, file))
@@ -298,13 +297,12 @@ export function createAssetDownloadActions(state: DownloadActionState) {
         state.openDownloadMenuKey.value = ''
       }
       if (showNotice) {
-        state.downloadActionNotice.value = watchedDownloadNotice(payload, file?.name ?? version.name ?? `Version ${version.id}`)
+        showDownloadNotice(watchedDownloadNotice(payload, file?.name ?? version.name ?? `Version ${version.id}`))
       }
       state.onDownloadQueued?.(model)
       return true
     } catch (caughtError) {
-      state.downloadActionError.value = caughtError instanceof Error ? caughtError.message : 'Could not watch download.'
-      clearDownloadActionNotice()
+      showDownloadError(caughtError instanceof Error ? caughtError.message : 'Could not watch download.')
       return false
     } finally {
       if (state.queuingDownloadKey.value === key) {
@@ -324,10 +322,6 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     }
 
     state.queuingDownloadKey.value = key
-    clearDownloadActionError()
-    if (showNotice) {
-      clearDownloadActionNotice()
-    }
 
     try {
       await state.unwatchDownload(watchedDownload.id)
@@ -335,12 +329,11 @@ export function createAssetDownloadActions(state: DownloadActionState) {
         state.openDownloadMenuKey.value = ''
       }
       if (showNotice) {
-        state.downloadActionNotice.value = `Stopped watching ${watchedDownload.fileName || version.name || `Version ${version.id}`}.`
+        showDownloadNotice(`Stopped watching ${watchedDownload.fileName || version.name || `Version ${version.id}`}.`)
       }
       return true
     } catch (caughtError) {
-      state.downloadActionError.value = caughtError instanceof Error ? caughtError.message : 'Could not stop watching download.'
-      clearDownloadActionNotice()
+      showDownloadError(caughtError instanceof Error ? caughtError.message : 'Could not stop watching download.')
       return false
     } finally {
       if (state.queuingDownloadKey.value === key) {
@@ -357,8 +350,7 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     const file = primaryFileForVersion(version)
     const key = modelDownloadKey(model, version)
     if (!file?.name) {
-      state.downloadActionError.value = 'No model file listed.'
-      clearDownloadActionNotice()
+      showDownloadError('No model file listed.')
       return false
     }
 
@@ -377,14 +369,12 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     }
 
     if (!file.downloadUrl) {
-      state.downloadActionError.value = 'No downloadable model file listed.'
-      clearDownloadActionNotice()
+      showDownloadError('No downloadable model file listed.')
       return false
     }
 
     if (unavailableLabel) {
-      state.downloadActionError.value = `This Civitai version is not downloadable: ${unavailableLabel}.`
-      clearDownloadActionNotice()
+      showDownloadError(`This Civitai version is not downloadable: ${unavailableLabel}.`)
       return false
     }
 
@@ -404,10 +394,6 @@ export function createAssetDownloadActions(state: DownloadActionState) {
     }
 
     state.queuingDownloadKey.value = key
-    clearDownloadActionError()
-    if (showNotice) {
-      clearDownloadActionNotice()
-    }
 
     try {
       const payload = await state.queueDownload({
@@ -418,13 +404,12 @@ export function createAssetDownloadActions(state: DownloadActionState) {
         state.openDownloadMenuKey.value = ''
       }
       if (showNotice) {
-        state.downloadActionNotice.value = queueDownloadNotice(payload, file.name)
+        showDownloadNotice(queueDownloadNotice(payload, file.name))
       }
       state.onDownloadQueued?.(model)
       return true
     } catch (caughtError) {
-      state.downloadActionError.value = caughtError instanceof Error ? caughtError.message : 'Could not queue download.'
-      clearDownloadActionNotice()
+      showDownloadError(caughtError instanceof Error ? caughtError.message : 'Could not queue download.')
       return false
     } finally {
       if (state.queuingDownloadKey.value === key) {
@@ -436,13 +421,10 @@ export function createAssetDownloadActions(state: DownloadActionState) {
   async function queueMissingVersionsForModel(model: CivitaiModel) {
     const versions = queueableMissingVersionsForModel(model)
     if (!versions.length) {
-      state.downloadActionError.value = 'No missing downloadable versions found.'
-      clearDownloadActionNotice()
+      showDownloadError('No missing downloadable versions found.')
       return
     }
 
-    clearDownloadActionError()
-    clearDownloadActionNotice()
     let queuedCount = 0
     let watchCount = 0
     for (const version of versions) {
@@ -456,7 +438,7 @@ export function createAssetDownloadActions(state: DownloadActionState) {
       }
     }
     if (queuedCount > 0 || watchCount > 0) {
-      state.downloadActionNotice.value = bulkQueueNotice(queuedCount, watchCount, model.name)
+      showDownloadNotice(bulkQueueNotice(queuedCount, watchCount, model.name))
     }
     state.openDownloadMenuKey.value = ''
   }

@@ -19,8 +19,6 @@ const {
   selectedPeriod,
   selectedBaseModels,
   hasStoredCivitaiApiKey,
-  downloadActionError,
-  downloadActionNotice,
   creatorFilterLabel,
   hiddenModelCount,
   selectedBaseModelSet,
@@ -178,18 +176,6 @@ const {
               {{ hiddenModelCount }}
             </span>
           </router-link>
-          <span
-            v-if="downloadActionError"
-            class="rounded-sm border border-destructive/35 bg-destructive/10 px-2 py-1 text-destructive"
-          >
-            {{ downloadActionError }}
-          </span>
-          <span
-            v-else-if="downloadActionNotice"
-            class="rounded-sm border border-secondary/35 bg-secondary/10 px-2 py-1 text-secondary"
-          >
-            {{ downloadActionNotice }}
-          </span>
         </div>
       </div>
 

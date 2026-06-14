@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import 'vue-sonner/style.css'
 import { Download } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import AssetDownloadsPanel from './components/AssetDownloadsPanel.vue'
 import ConfirmationProvider from './components/ConfirmationProvider.vue'
+import { Toaster } from './components/ui/sonner'
 import { useAssetDownloadSummary } from './composables/useAssetDownloads'
 
 const downloadsSheetOpen = ref(false)
@@ -130,5 +132,10 @@ function isNavActive(group: NavGroup, isExactActive: boolean) {
       @close="downloadsSheetOpen = false"
     />
   </div>
+  <Toaster
+    position="bottom-center"
+    rich-colors
+    close-button
+  />
   </ConfirmationProvider>
 </template>

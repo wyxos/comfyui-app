@@ -4,7 +4,7 @@ import { computed, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 
 describe('createAssetDownloadActions', () => {
-  it('shows a success notice after queuing one version', async () => {
+  it('shows a success toast after queuing one version', async () => {
     const queueDownload = vi.fn().mockResolvedValue({
       ok: true,
       item: {
@@ -12,12 +12,11 @@ describe('createAssetDownloadActions', () => {
         fileName: 'v1.safetensors',
       },
     })
-    const downloadActionNotice = ref('')
+    const showDownloadToast = vi.fn()
     const { createAssetDownloadActions } = await import('../../src/views/assets/assetDownloadActions')
     const actions = createAssetDownloadActions({
       downloadByVersionId: computed(() => new Map()),
-      downloadActionError: ref(''),
-      downloadActionNotice,
+      showDownloadToast,
       openDownloadMenuKey: ref(''),
       queuingDownloadKey: ref(''),
       queueDownload,
@@ -31,20 +30,22 @@ describe('createAssetDownloadActions', () => {
       modelVersions: [modelVersion(201, 'v1.safetensors')],
     }, modelVersion(201, 'v1.safetensors'))
 
-    expect(downloadActionNotice.value).toBe('Queued v1.safetensors.')
+    expect(showDownloadToast).toHaveBeenCalledWith({
+      message: 'Queued v1.safetensors.',
+      variant: 'success',
+    })
   })
 
   it('queues all missing model versions without redownloading completed versions', async () => {
     const queueDownload = vi.fn().mockResolvedValue({ ok: true })
-    const downloadActionNotice = ref('')
+    const showDownloadToast = vi.fn()
     const { createAssetDownloadActions } = await import('../../src/views/assets/assetDownloadActions')
     const actions = createAssetDownloadActions({
       downloadByVersionId: computed(() => new Map([
         [202, [{ id: 'complete-version', state: 'complete', versionId: 202 }]],
         [203, [{ id: 'failed-version', state: 'error', versionId: 203 }]],
       ])),
-      downloadActionError: ref(''),
-      downloadActionNotice,
+      showDownloadToast,
       openDownloadMenuKey: ref('101'),
       queuingDownloadKey: ref(''),
       queueDownload,
@@ -71,18 +72,20 @@ describe('createAssetDownloadActions', () => {
       versionId: 203,
       file: expect.objectContaining({ name: 'v3.safetensors' }),
     }))
-    expect(downloadActionNotice.value).toBe('Queued 2 versions for Multi version checkpoint.')
+    expect(showDownloadToast).toHaveBeenCalledWith({
+      message: 'Queued 2 versions for Multi version checkpoint.',
+      variant: 'success',
+    })
   })
 
   it('queues downloadable versions and watches early access versions from queue all', async () => {
     const queueDownload = vi.fn().mockResolvedValue({ ok: true })
     const watchDownload = vi.fn().mockResolvedValue({ ok: true })
-    const downloadActionNotice = ref('')
+    const showDownloadToast = vi.fn()
     const { createAssetDownloadActions } = await import('../../src/views/assets/assetDownloadActions')
     const actions = createAssetDownloadActions({
       downloadByVersionId: computed(() => new Map()),
-      downloadActionError: ref(''),
-      downloadActionNotice,
+      showDownloadToast,
       openDownloadMenuKey: ref('101'),
       queuingDownloadKey: ref(''),
       queueDownload,
@@ -125,7 +128,10 @@ describe('createAssetDownloadActions', () => {
       versionId: 202,
       file: expect.objectContaining({ name: 'locked-v2.safetensors' }),
     }))
-    expect(downloadActionNotice.value).toBe('Queued 1 download and watching 1 version for Mixed availability checkpoint.')
+    expect(showDownloadToast).toHaveBeenCalledWith({
+      message: 'Queued 1 download and watching 1 version for Mixed availability checkpoint.',
+      variant: 'success',
+    })
   })
 
   it('watches early access versions instead of rejecting them as unavailable downloads', async () => {
@@ -137,13 +143,11 @@ describe('createAssetDownloadActions', () => {
         fileName: 'locked-v1.safetensors',
       },
     })
-    const downloadActionNotice = ref('')
-    const downloadActionError = ref('')
+    const showDownloadToast = vi.fn()
     const { createAssetDownloadActions } = await import('../../src/views/assets/assetDownloadActions')
     const actions = createAssetDownloadActions({
       downloadByVersionId: computed(() => new Map()),
-      downloadActionError,
-      downloadActionNotice,
+      showDownloadToast,
       openDownloadMenuKey: ref(''),
       queuingDownloadKey: ref(''),
       queueDownload,
@@ -188,8 +192,35 @@ describe('createAssetDownloadActions', () => {
         name: 'locked-v1.safetensors',
       }),
     }))
-    expect(downloadActionError.value).toBe('')
-    expect(downloadActionNotice.value).toBe('Watching locked-v1.safetensors.')
+    expect(showDownloadToast).toHaveBeenCalledWith({
+      message: 'Watching locked-v1.safetensors.',
+      variant: 'success',
+    })
+  })
+
+  it('shows an error toast when a download cannot be queued', async () => {
+    const showDownloadToast = vi.fn()
+    const { createAssetDownloadActions } = await import('../../src/views/assets/assetDownloadActions')
+    const actions = createAssetDownloadActions({
+      downloadByVersionId: computed(() => new Map()),
+      showDownloadToast,
+      openDownloadMenuKey: ref(''),
+      queuingDownloadKey: ref(''),
+      queueDownload: vi.fn(),
+    } as never)
+
+    await actions.queueAssetDownload({
+      id: 101,
+      name: 'Broken LoRA',
+      type: 'LORA',
+      nsfw: false,
+      modelVersions: [modelVersion(201, '')],
+    }, modelVersion(201, ''))
+
+    expect(showDownloadToast).toHaveBeenCalledWith({
+      message: 'No model file listed.',
+      variant: 'error',
+    })
   })
 
   it('shows watched early access state on single-version model cards', async () => {
@@ -207,8 +238,6 @@ describe('createAssetDownloadActions', () => {
     }
     const actions = createAssetDownloadActions({
       downloadByVersionId: computed(() => new Map()),
-      downloadActionError: ref(''),
-      downloadActionNotice: ref(''),
       openDownloadMenuKey: ref(''),
       queuingDownloadKey: ref(''),
       queueDownload: vi.fn(),
@@ -240,8 +269,6 @@ describe('createAssetDownloadActions', () => {
       downloadByVersionId: computed(() => new Map([
         [201, [{ id: 'complete-version', state: 'complete', versionId: 201, fileName: 'v1.safetensors' }]],
       ])),
-      downloadActionError: ref(''),
-      downloadActionNotice: ref(''),
       openDownloadMenuKey: ref(''),
       queuingDownloadKey: ref(''),
       queueDownload,
@@ -271,8 +298,6 @@ describe('createAssetDownloadActions', () => {
     const { createAssetDownloadActions } = await import('../../src/views/assets/assetDownloadActions')
     const actions = createAssetDownloadActions({
       downloadByVersionId: computed(() => new Map()),
-      downloadActionError: ref(''),
-      downloadActionNotice: ref(''),
       openDownloadMenuKey,
       queuingDownloadKey: ref(''),
       queueDownload,
