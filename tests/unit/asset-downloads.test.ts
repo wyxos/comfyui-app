@@ -389,7 +389,7 @@ describe('DownloadsView', () => {
       }),
     }))
     vi.doMock('../../src/composables/useAppSettings', () => ({
-      fetchAppSettings: vi.fn().mockResolvedValue({ includeNsfw: false }),
+      fetchAppSettings: vi.fn().mockResolvedValue({ includeNsfw: true, blurNsfwContent: false }),
     }))
     const confirm = vi.fn().mockResolvedValue(true)
     vi.doMock('../../src/composables/useConfirmDialog', () => ({
@@ -398,13 +398,14 @@ describe('DownloadsView', () => {
 
     const { default: DownloadsView } = await import('../../src/views/DownloadsView.vue')
     const wrapper = mount(DownloadsView)
+    await flushPromises()
 
     expect(wrapper.text()).toContain('Complete checkpoint')
     expect(wrapper.text()).toContain('Deleted lora')
     expect(wrapper.text()).not.toContain('Ignored embedding')
-    expect(wrapper.get('img[alt="Complete checkpoint preview"]').classes()).toContain('blur-sm')
+    expect(wrapper.get('img[alt="Complete checkpoint preview"]').classes()).not.toContain('blur-sm')
     const civitaiLink = wrapper.get('a[aria-label="Open Complete checkpoint on Civitai"]')
-    expect(civitaiLink.attributes('href')).toBe('https://civitai.com/models/1?modelVersionId=2')
+    expect(civitaiLink.attributes('href')).toBe('https://civitai.red/models/1?modelVersionId=2')
     expect(civitaiLink.attributes('target')).toBe('_blank')
     expect(civitaiLink.attributes('rel')).toContain('noreferrer')
 

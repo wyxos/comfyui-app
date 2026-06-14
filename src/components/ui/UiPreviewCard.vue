@@ -13,6 +13,7 @@ withDefaults(
     minHeightClass?: string
     cardClass?: string
     mediaClass?: string
+    mediaContentClass?: string
     bodyClass?: string
   }>(),
   {
@@ -25,6 +26,7 @@ withDefaults(
     minHeightClass: 'min-h-[18rem]',
     cardClass: '',
     mediaClass: 'h-44',
+    mediaContentClass: '',
     bodyClass: 'p-3',
   },
 )
@@ -56,7 +58,10 @@ const emit = defineEmits<{
           :is-video="isVideoPreview"
           :alt="previewLabel"
           :label="isVideoPreview ? 'Loading preview video...' : 'Loading preview image...'"
-          media-class="h-full w-auto max-w-none object-contain transition duration-300 group-hover:scale-[1.03]"
+          :media-class="[
+            'h-full w-auto max-w-none object-contain transition duration-300 group-hover:scale-[1.03]',
+            mediaContentClass,
+          ].filter(Boolean).join(' ')"
           loading-class="bg-muted text-muted-foreground"
           muted
           loop

@@ -42,6 +42,7 @@ const emit = defineEmits<{
 const searchInput = ref<HTMLInputElement | null>(null)
 const searchQuery = ref('')
 const includeNsfw = ref(false)
+const blurNsfwContent = ref(true)
 const selectedBaseModelFilter = ref('')
 const currentPage = ref(1)
 const previewIndexes = ref<Record<string, number>>({})
@@ -189,9 +190,15 @@ async function loadOpenDefaults(token: number) {
     if (props.open && token === openLoadToken && !includeNsfwTouched) {
       includeNsfw.value = settings.includeNsfw
     }
+    if (props.open && token === openLoadToken) {
+      blurNsfwContent.value = settings.blurNsfwContent !== false
+    }
   } catch {
     if (props.open && token === openLoadToken && !includeNsfwTouched) {
       includeNsfw.value = false
+    }
+    if (props.open && token === openLoadToken) {
+      blurNsfwContent.value = true
     }
   }
 }
@@ -221,6 +228,7 @@ watch(
       openLoadToken = token
       searchQuery.value = ''
       includeNsfw.value = false
+      blurNsfwContent.value = true
       selectedBaseModelFilter.value = ''
       previewIndexes.value = {}
       includeNsfwTouched = false
@@ -362,6 +370,7 @@ onBeforeUnmount(() => {
         :preview-count="optionPreviewCount(option)"
         :base-model-label="optionBaseModelBadgeLabel(option)"
         :has-nsfw="optionHasNsfw(option)"
+        :blur-nsfw-content="blurNsfwContent"
         @select="selectOption(option)"
         @show-preview="showOptionPreview(option, $event)"
       />

@@ -8,6 +8,7 @@ import { civitaiDownloadSegmentCount, civitaiSegmentStallTimeoutMs, civitaiSegme
 import { safeTrim } from '../shared.mjs'
 import { scheduleDownloadsPersist } from './state.mjs'
 import { getCivitaiSha256Hash } from './hash-metadata.mjs'
+import { createCivitaiHashMismatchError, isCivitaiHashMismatchError, recordCivitaiHashMismatch } from './hash-mismatch.mjs'
 import { refreshDownloadedSidecarsInBackground, safeUnlink, statFileIfExists } from './metadata.mjs'
 import { assertSegmentContentRange, buildCivitaiDownloadRequest, parseContentRangeTotal } from './request.mjs'
 
@@ -175,23 +176,37 @@ async function verifyCivitaiDownloadPathHash(download, filePath) {
     return
   }
 
-  const error = new Error(`Downloaded file hash mismatch. Expected ${expectedHash}, got ${actualHash}.`)
-  error.code = 'hash-mismatch'
-  throw error
+  throw createCivitaiHashMismatchError(expectedHash, actualHash)
 }
 
-export async function markCivitaiDownloadComplete(download) {
+export async function markCivitaiDownloadComplete(download, { allowHashMismatch = false } = {}) {
   const targetStats = await statFileIfExists(download.targetPath)
   if (!targetStats) {
     return false
   }
 
-  await verifyCivitaiDownloadHash(download)
+  let acceptedHashMismatch = false
+  try {
+    await verifyCivitaiDownloadHash(download)
+  } catch (error) {
+    if (!isCivitaiHashMismatchError(error) || (!allowHashMismatch && download.allowHashMismatch !== true)) {
+      recordCivitaiHashMismatch(download, error)
+      throw error
+    }
+
+    recordCivitaiHashMismatch(download, error, { accepted: true })
+    acceptedHashMismatch = true
+  }
   download.bytesDownloaded = targetStats.size
   download.totalBytes = targetStats.size
   download.progressPercent = 100
   download.state = 'complete'
   download.error = null
+  delete download.errorCode
+  delete download.allowHashMismatch
+  if (!acceptedHashMismatch) {
+    delete download.hashMismatch
+  }
   download.finishedAt = download.finishedAt ?? Date.now()
   download.updatedAt = Date.now()
   scheduleDownloadsPersist(true)
@@ -200,13 +215,20 @@ export async function markCivitaiDownloadComplete(download) {
 }
 
 export async function finishCivitaiDownload(download, totalBytes, bytesDownloaded) {
+  let acceptedHashMismatch = false
   try {
     await verifyCivitaiDownloadPathHash(download, download.partialPath)
   } catch (error) {
-    if (error?.code === 'hash-mismatch') {
+    if (isCivitaiHashMismatchError(error) && download.allowHashMismatch === true) {
+      recordCivitaiHashMismatch(download, error, { accepted: true })
+      acceptedHashMismatch = true
+    } else if (isCivitaiHashMismatchError(error)) {
+      recordCivitaiHashMismatch(download, error)
       await safeUnlink(download.partialPath)
+      throw error
+    } else {
+      throw error
     }
-    throw error
   }
 
   await safeUnlink(download.targetPath)
@@ -215,6 +237,12 @@ export async function finishCivitaiDownload(download, totalBytes, bytesDownloade
   download.totalBytes = totalBytes || bytesDownloaded
   download.progressPercent = 100
   download.state = 'complete'
+  download.error = null
+  delete download.errorCode
+  delete download.allowHashMismatch
+  if (!acceptedHashMismatch) {
+    delete download.hashMismatch
+  }
   download.finishedAt = Date.now()
   download.updatedAt = Date.now()
   scheduleDownloadsPersist(true)

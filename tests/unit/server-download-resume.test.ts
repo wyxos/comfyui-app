@@ -182,4 +182,43 @@ describe('Civitai download resume', () => {
     await expect(stat(download.targetPath)).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(stat(download.partialPath)).rejects.toMatchObject({ code: 'ENOENT' })
   })
+
+  it('keeps an explicitly accepted hash-mismatched download with a warning marker', async () => {
+    vi.resetModules()
+    process.env.CIVITAI_DOWNLOAD_SEGMENTS = '1'
+    const corruptBytes = Uint8Array.from([99, ...modelBytes.slice(1)])
+    const expectedHash = sha256(modelBytes)
+    const actualHash = sha256(corruptBytes)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(corruptBytes, {
+      status: 200,
+      headers: {
+        'Content-Length': String(corruptBytes.byteLength),
+      },
+    })))
+
+    const download = await makeDownload({
+      allowHashMismatch: true,
+      hashes: { SHA256: expectedHash },
+      hashMismatch: {
+        expectedSha256: expectedHash,
+        actualSha256: actualHash,
+        detectedAt: 10,
+      },
+    })
+    const { downloadCivitaiFile } = await import('../../server/downloads/transfer.mjs')
+
+    await downloadCivitaiFile(download)
+
+    await expect(readFile(download.targetPath)).resolves.toEqual(Buffer.from(corruptBytes))
+    await expect(stat(download.partialPath)).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(download.state).toBe('complete')
+    expect(download.error).toBeNull()
+    expect(download.allowHashMismatch).toBeUndefined()
+    expect(download.hashMismatch).toMatchObject({
+      expectedSha256: expectedHash,
+      actualSha256: actualHash,
+      accepted: true,
+    })
+    expect(typeof download.hashMismatch.keptAnywayAt).toBe('number')
+  })
 })

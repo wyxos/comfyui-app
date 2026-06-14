@@ -44,6 +44,7 @@ function modelImages(models: MockModel[]) {
 export function installMockApi(options: MockApiOptions = {}) {
   let civitaiConfigured = options.civitaiConfigured ?? false
   let includeNsfwDefault = options.includeNsfwDefault ?? false
+  let blurNsfwContentDefault = options.blurNsfwContentDefault ?? true
   let jobs: MockJob[] = [...(options.jobs ?? [])]
   let downloads: MockDownload[] = [...(options.downloads ?? [])]
   let watchedDownloads: MockDownload[] = [...(options.watchedDownloads ?? [])]
@@ -306,18 +307,13 @@ export function installMockApi(options: MockApiOptions = {}) {
     }
 
     if (url.pathname === '/api/settings/app' && method === 'GET') {
-      return jsonResponse({
-        ok: true,
-        includeNsfw: includeNsfwDefault,
-      })
+      return jsonResponse({ ok: true, includeNsfw: includeNsfwDefault, blurNsfwContent: blurNsfwContentDefault })
     }
 
     if (url.pathname === '/api/settings/app' && method === 'PUT') {
       includeNsfwDefault = Boolean((body as Record<string, unknown> | null)?.includeNsfw)
-      return jsonResponse({
-        ok: true,
-        includeNsfw: includeNsfwDefault,
-      })
+      blurNsfwContentDefault = (body as Record<string, unknown> | null)?.blurNsfwContent !== false
+      return jsonResponse({ ok: true, includeNsfw: includeNsfwDefault, blurNsfwContent: blurNsfwContentDefault })
     }
 
     if (url.pathname === '/api/civitai/models' && method === 'GET') {

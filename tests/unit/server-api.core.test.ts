@@ -136,15 +136,18 @@ describe('companion server API routes', () => {
         payload: expect.objectContaining({
           ok: true,
           includeNsfw: false,
+          blurNsfwContent: true,
         }),
       })
-      await expect(server.json('PUT', '/api/settings/app', { includeNsfw: true })).resolves.toMatchObject({
+      await expect(server.json('PUT', '/api/settings/app', { includeNsfw: true, blurNsfwContent: false })).resolves.toMatchObject({
         payload: expect.objectContaining({
           ok: true,
           includeNsfw: true,
+          blurNsfwContent: false,
         }),
       })
       expect(JSON.parse(await server.readConfigFile('settings.json')).preferences.includeNsfw).toBe(true)
+      expect(JSON.parse(await server.readConfigFile('settings.json')).preferences.blurNsfwContent).toBe(false)
 
       const civitaiModels = await server.request('/api/civitai/models?query=detail&limit=999&ignored=1')
       expect(civitaiModels.payload).toMatchObject({ items: [expect.objectContaining({ id: 101 })] })

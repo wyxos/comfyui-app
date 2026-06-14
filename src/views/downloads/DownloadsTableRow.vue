@@ -7,9 +7,11 @@ import {
   Pause,
   Play,
   RotateCcw,
+  ShieldCheck,
   Trash2,
   X,
 } from 'lucide-vue-next'
+import { civitaiModelWebUrl } from '../../components/asset-preview/assetPreviewHelpers'
 import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import type { AssetDownloadItem, AssetDownloadState } from '../../composables/useAssetDownloads'
 
@@ -28,11 +30,13 @@ const emit = defineEmits<{
   pause: [item: DownloadTableRowItem]
   resume: [item: DownloadTableRowItem]
   cancel: [item: DownloadTableRowItem]
+  'open-preview': [item: DownloadTableRowItem]
   redownload: [item: DownloadTableRowItem]
+  'keep-anyway': [item: DownloadTableRowItem]
   'delete-file': [item: DownloadTableRowItem]
 }>()
 
-type DownloadAction = 'pause' | 'resume' | 'cancel' | 'delete' | 'redownload'
+type DownloadAction = 'pause' | 'resume' | 'cancel' | 'delete' | 'redownload' | 'keep-anyway'
 
 const statusToneClass: Record<DownloadTableRowState, string> = {
   queued: 'border-accent/35 bg-accent/10 text-accent',
@@ -82,7 +86,7 @@ function statusLabel(item: DownloadTableRowItem) {
   }
 
   if (item.state === 'error') {
-    return 'Failed'
+    return isCivitaiHashMismatch(item) ? 'Hash mismatch' : 'Failed'
   }
 
   return 'Cancelled'
@@ -121,8 +125,16 @@ function isNsfwValue(value: unknown) {
   return false
 }
 
+function itemHasNsfw(item: DownloadTableRowItem) {
+  return isNsfwValue(item.modelNsfwOverride ?? item.modelMetadata?.modelNsfwOverride ?? item.modelNsfw ?? item.modelMetadata?.nsfw)
+}
+
 function shouldBlurPreview(item: DownloadTableRowItem) {
-  return props.blurNsfwPreview && isNsfwValue(item.modelNsfw ?? item.modelMetadata?.nsfw)
+  return props.blurNsfwPreview && itemHasNsfw(item)
+}
+
+function shouldBlurText(item: DownloadTableRowItem) {
+  return shouldBlurPreview(item)
 }
 
 function formatFileSize(item: DownloadTableRowItem) {
@@ -167,6 +179,35 @@ function canRedownload(item: DownloadTableRowItem) {
   return item.state !== 'downloading' && item.state !== 'queued' && item.state !== 'watched'
 }
 
+function isCivitaiHashMismatch(item: DownloadTableRowItem) {
+  const error = item.error ?? ''
+  return (
+    item.errorCode === 'civitai-hash-mismatch' ||
+    Boolean(item.hashMismatch?.expectedSha256 && item.hashMismatch?.actualSha256) ||
+    (
+      error.toLowerCase().includes('downloaded file hash mismatch') &&
+      /Expected\s+[A-F0-9]{64}/i.test(error) &&
+      /got\s+[A-F0-9]{64}/i.test(error)
+    )
+  )
+}
+
+function canKeepAnyway(item: DownloadTableRowItem) {
+  return item.state === 'error' && isCivitaiHashMismatch(item)
+}
+
+function hashMismatchNotice(item: DownloadTableRowItem) {
+  if (!item.hashMismatch?.expectedSha256 || !item.hashMismatch?.actualSha256) {
+    return ''
+  }
+
+  if (item.hashMismatch.accepted && item.state === 'complete') {
+    return 'Kept despite Civitai hash mismatch.'
+  }
+
+  return ''
+}
+
 function civitaiModelUrl(item: DownloadTableRowItem) {
   if (!item.modelId) {
     return ''
@@ -178,7 +219,8 @@ function civitaiModelUrl(item: DownloadTableRowItem) {
   }
 
   const query = params.toString()
-  return `https://civitai.com/models/${item.modelId}${query ? `?${query}` : ''}`
+  const url = civitaiModelWebUrl({ id: item.modelId, nsfw: itemHasNsfw(item), modelVersions: [] })
+  return `${url}${query ? `?${query}` : ''}`
 }
 
 function isBusy(action: DownloadAction) {
@@ -195,7 +237,7 @@ function pathLabel(item: DownloadTableRowItem) {
 </script>
 
 <template>
-  <tr class="bg-card/80 transition hover:bg-accent/5">
+  <tr class="group bg-card/80 transition hover:bg-accent/5">
     <td class="px-3 py-2">
       <div class="flex min-w-0 items-center gap-3">
         <div class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border bg-background">
@@ -223,14 +265,35 @@ function pathLabel(item: DownloadTableRowItem) {
         </div>
 
         <div class="min-w-0">
-          <p
-            class="truncate text-sm font-semibold text-card-foreground"
-            :title="item.modelName"
-          >
-            {{ item.modelName }}
-          </p>
+          <div class="flex min-w-0 items-center gap-1.5">
+            <button
+              class="min-w-0 truncate text-left text-sm font-semibold text-card-foreground transition hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25"
+              :class="shouldBlurText(item) ? 'blur-sm select-none' : ''"
+              data-download-title-button
+              type="button"
+              :title="item.modelName"
+              :aria-label="`Open ${item.modelName} preview`"
+              @click="emit('open-preview', item)"
+            >
+              {{ item.modelName }}
+            </button>
+            <a
+              v-if="civitaiModelUrl(item)"
+              class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-border text-muted-foreground transition hover:border-secondary/60 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25"
+              data-download-title-civitai-link
+              :href="civitaiModelUrl(item)"
+              target="_blank"
+              rel="noopener noreferrer"
+              :aria-label="`Open ${item.modelName} on Civitai`"
+              :title="`Open ${item.fileName} on Civitai`"
+              @click.stop
+            >
+              <ExternalLink class="h-3.5 w-3.5" />
+            </a>
+          </div>
           <p
             class="mt-0.5 truncate text-[11px] text-muted-foreground"
+            :class="shouldBlurText(item) ? 'blur-sm select-none' : ''"
             :title="`${item.versionName} - ${item.fileName}`"
           >
             {{ item.versionName }} - {{ item.fileName }}
@@ -288,14 +351,21 @@ function pathLabel(item: DownloadTableRowItem) {
       >
         {{ item.error }}
       </p>
+      <p
+        v-else-if="hashMismatchNotice(item)"
+        class="mt-1 truncate text-[11px] text-accent"
+        :title="hashMismatchNotice(item)"
+      >
+        {{ hashMismatchNotice(item) }}
+      </p>
     </td>
 
     <td class="px-3 py-2 text-muted-foreground">
       {{ formatDate(item.updatedAt) }}
     </td>
 
-    <td class="px-3 py-2">
-      <div class="flex justify-end gap-1.5">
+    <td class="sticky right-0 z-10 w-64 border-l border-border bg-card px-3 py-2 group-hover:bg-accent/5">
+      <div class="relative z-10 flex min-w-44 justify-end gap-1.5">
         <button
           v-if="item.state === 'downloading' || item.state === 'queued'"
           class="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-border text-muted-foreground transition hover:border-secondary/60 hover:text-secondary disabled:cursor-wait disabled:opacity-60"
@@ -350,17 +420,24 @@ function pathLabel(item: DownloadTableRowItem) {
           />
         </button>
 
-        <a
-          v-if="civitaiModelUrl(item)"
-          class="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-border text-muted-foreground transition hover:border-secondary/60 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25"
-          :href="civitaiModelUrl(item)"
-          target="_blank"
-          rel="noopener noreferrer"
-          :aria-label="`Open ${item.modelName} on Civitai`"
-          :title="`Open ${item.fileName} on Civitai`"
+        <button
+          v-if="canKeepAnyway(item)"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-border text-muted-foreground transition hover:border-secondary/60 hover:text-secondary disabled:cursor-wait disabled:opacity-60"
+          type="button"
+          :disabled="Boolean(actionKey)"
+          :aria-label="`Keep ${item.modelName} despite Civitai hash mismatch`"
+          :title="`Keep ${item.fileName} despite Civitai hash mismatch`"
+          @click="emit('keep-anyway', item)"
         >
-          <ExternalLink class="h-4 w-4" />
-        </a>
+          <LoaderCircle
+            v-if="isBusy('keep-anyway')"
+            class="h-4 w-4 animate-spin"
+          />
+          <ShieldCheck
+            v-else
+            class="h-4 w-4"
+          />
+        </button>
 
         <button
           v-if="canRedownload(item)"

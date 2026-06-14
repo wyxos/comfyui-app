@@ -15,6 +15,9 @@ const savedKeyPreview = ref<string | null>(null)
 const statusText = ref('Loading Civitai API key settings...')
 const loading = ref(false)
 const includeNsfwDefault = ref(false)
+const blurNsfwContentDefault = ref(true)
+const savedIncludeNsfwDefault = ref(false)
+const savedBlurNsfwContentDefault = ref(true)
 const appSettingsLoading = ref(false)
 const appSettingsStatusText = ref('Loading app settings...')
 
@@ -118,9 +121,10 @@ async function loadAppSettings() {
   try {
     const settings = await fetchAppSettings()
     includeNsfwDefault.value = settings.includeNsfw
-    appSettingsStatusText.value = settings.includeNsfw
-      ? 'NSFW listings are shown by default.'
-      : 'NSFW listings are hidden by default.'
+    blurNsfwContentDefault.value = settings.blurNsfwContent !== false
+    savedIncludeNsfwDefault.value = includeNsfwDefault.value
+    savedBlurNsfwContentDefault.value = blurNsfwContentDefault.value
+    appSettingsStatusText.value = appSettingsStatus(settings)
   } catch (error) {
     appSettingsStatusText.value =
       error instanceof Error ? error.message : 'Could not load app settings.'
@@ -129,18 +133,30 @@ async function loadAppSettings() {
   }
 }
 
-async function saveNsfwDefault() {
+function appSettingsStatus(settings: { includeNsfw: boolean, blurNsfwContent: boolean }) {
+  return [
+    settings.includeNsfw ? 'NSFW toggles default to on.' : 'NSFW toggles default to off.',
+    settings.blurNsfwContent ? 'NSFW content blur is on.' : 'NSFW content blur is off.',
+  ].join(' ')
+}
+
+async function saveContentDefaults() {
   appSettingsLoading.value = true
   appSettingsStatusText.value = 'Saving app settings...'
 
   try {
-    const settings = await saveAppSettings({ includeNsfw: includeNsfwDefault.value })
+    const settings = await saveAppSettings({
+      includeNsfw: includeNsfwDefault.value,
+      blurNsfwContent: blurNsfwContentDefault.value,
+    })
     includeNsfwDefault.value = settings.includeNsfw
-    appSettingsStatusText.value = settings.includeNsfw
-      ? 'NSFW listings are shown by default.'
-      : 'NSFW listings are hidden by default.'
+    blurNsfwContentDefault.value = settings.blurNsfwContent !== false
+    savedIncludeNsfwDefault.value = includeNsfwDefault.value
+    savedBlurNsfwContentDefault.value = blurNsfwContentDefault.value
+    appSettingsStatusText.value = appSettingsStatus(settings)
   } catch (error) {
-    includeNsfwDefault.value = !includeNsfwDefault.value
+    includeNsfwDefault.value = savedIncludeNsfwDefault.value
+    blurNsfwContentDefault.value = savedBlurNsfwContentDefault.value
     appSettingsStatusText.value =
       error instanceof Error ? error.message : 'Could not save app settings.'
   } finally {
@@ -245,10 +261,22 @@ onMounted(() => {
               class="h-4 w-4 accent-secondary"
               type="checkbox"
               :disabled="appSettingsLoading"
-              aria-label="Show NSFW by default"
-              @change="saveNsfwDefault"
+              aria-label="Default NSFW toggles on"
+              @change="saveContentDefaults"
             />
             NSFW
+          </label>
+
+          <label class="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground transition hover:border-secondary/55 hover:text-foreground">
+            <input
+              v-model="blurNsfwContentDefault"
+              class="h-4 w-4 accent-secondary"
+              type="checkbox"
+              :disabled="appSettingsLoading"
+              aria-label="Blur visible NSFW content"
+              @change="saveContentDefaults"
+            />
+            Blur NSFW
           </label>
         </div>
       </section>

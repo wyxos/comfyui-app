@@ -17,6 +17,7 @@ import {
   safeUnlink,
   statFileIfExists,
 } from '../downloads/metadata.mjs'
+import { isCivitaiHashMismatchDownload } from '../downloads/hash-mismatch.mjs'
 import { markCivitaiDownloadComplete } from '../downloads/transfer.mjs'
 import { enqueueCivitaiDownload, processDownloadQueue } from '../downloads/queue.mjs'
 import { parseInteger } from '../civitai-query.mjs'
@@ -130,7 +131,7 @@ async function removeDownloadedModelFiles(download) {
   download.previewPaths = []
 }
 
-function markDownloadReadyForRedownload(download) {
+function markDownloadReadyForRedownload(download, { allowHashMismatch = false, preserveHashMismatch = false } = {}) {
   download.state = 'queued'
   download.error = null
   download.dismissedAt = null
@@ -140,6 +141,15 @@ function markDownloadReadyForRedownload(download) {
   download.startedAt = null
   download.finishedAt = null
   download.updatedAt = Date.now()
+  if (allowHashMismatch) {
+    download.allowHashMismatch = true
+  } else {
+    delete download.allowHashMismatch
+  }
+  delete download.errorCode
+  if (!preserveHashMismatch) {
+    delete download.hashMismatch
+  }
 }
 
 export async function handleDownloadAction(downloadId, action, response, { compact = false } = {}) {
@@ -176,6 +186,22 @@ export async function handleDownloadAction(downloadId, action, response, { compa
     await safeUnlink(download.partialPath)
   } else if (action === 'repair-previews') {
     await refreshCompletedDownloadPreviews(download)
+  } else if (action === 'keep-anyway') {
+    if (!isCivitaiHashMismatchDownload(download)) {
+      return sendError(
+        response,
+        409,
+        'download-not-hash-mismatch',
+        'Only Civitai hash-mismatched downloads can be kept anyway.',
+      )
+    }
+
+    await safeUnlink(download.partialPath)
+    markDownloadReadyForRedownload(download, {
+      allowHashMismatch: true,
+      preserveHashMismatch: true,
+    })
+    void processDownloadQueue()
   } else if (action === 'delete-file') {
     try {
       await removeDownloadedModelFiles(download)

@@ -12,14 +12,21 @@ import {
   type LibraryModelItem,
 } from './libraryModelHelpers'
 
-defineProps<{
+const props = withDefaults(defineProps<{
   item: LibraryModelItem
-}>()
+  blurNsfwContent?: boolean
+}>(), {
+  blurNsfwContent: false,
+})
 
 defineEmits<{
   open: [item: LibraryModelItem]
   restore: [item: LibraryModelItem]
 }>()
+
+function shouldBlurNsfwContent() {
+  return props.blurNsfwContent && modelHasNsfw(props.item)
+}
 </script>
 
 <template>
@@ -32,6 +39,7 @@ defineEmits<{
     :title="item.modelName"
     min-height-class="min-h-[20rem]"
     media-class="h-64"
+    :media-content-class="shouldBlurNsfwContent() ? 'scale-110 blur-sm saturate-50' : ''"
     @click="item.librarySource === 'hidden' ? undefined : $emit('open', item)"
   >
     <template #placeholder>
@@ -70,6 +78,8 @@ defineEmits<{
     <div class="flex min-w-0 items-start justify-between gap-2">
       <h2
         class="min-w-0 truncate text-sm font-semibold leading-5 text-card-foreground"
+        :class="shouldBlurNsfwContent() ? 'blur-sm select-none' : ''"
+        data-library-card-title
         :title="item.modelName"
       >
         {{ item.modelName }}

@@ -8,10 +8,23 @@ import {
   Search,
 } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
+import AssetPreviewModal from '../components/asset-preview/AssetPreviewModal.vue'
 import { fetchAppSettings } from '../composables/useAppSettings'
-import { useAssetDownloads, type AssetDownloadItem, type WatchedAssetDownloadItem } from '../composables/useAssetDownloads'
+import { useAssetDownloads } from '../composables/useAssetDownloads'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import DownloadsTableRow from './downloads/DownloadsTableRow.vue'
+import {
+  isCheckpointOrLora,
+  isVideoPreviewDownload,
+  isWatchedCheckpointOrLora,
+  itemHasNsfw,
+  normalizedModelType,
+  previewForDownload,
+  rowModelTypeLabel,
+  statusGroup,
+  watchedDownloadToRowItem,
+  type DownloadViewRowItem,
+} from './downloads/downloadsViewHelpers'
 
 const PAGE_SIZE = 20
 
@@ -32,9 +45,8 @@ const statusFilters = [
 
 type DownloadTypeFilter = (typeof typeFilters)[number]['value']
 type DownloadStatusFilter = (typeof statusFilters)[number]['value']
-type DownloadAction = 'pause' | 'resume' | 'cancel' | 'delete' | 'redownload'
+type DownloadAction = 'pause' | 'resume' | 'cancel' | 'delete' | 'redownload' | 'keep-anyway'
 type DownloadActionRunner = (id: string) => Promise<unknown>
-type DownloadViewRowItem = Omit<AssetDownloadItem, 'state'> & { state: AssetDownloadItem['state'] | 'watched' }
 
 const {
   downloads,
@@ -48,6 +60,7 @@ const {
   cancelDownload,
   deleteDownloadedFile,
   redownloadDownload,
+  keepDownloadAnyway,
 } = useAssetDownloads({ includeWatched: true })
 
 const query = ref('')
@@ -56,7 +69,9 @@ const statusFilter = ref<DownloadStatusFilter>('all')
 const currentPage = ref(1)
 const actionKey = ref('')
 const actionError = ref('')
-const includeNsfwPreviews = ref(false)
+const includeNsfw = ref(false)
+const blurNsfwContent = ref(true)
+const selectedDownload = ref<DownloadViewRowItem | null>(null)
 const confirm = useConfirmDialog()
 
 const modelDownloads = computed(() => {
@@ -72,8 +87,16 @@ const watchedModelDownloads = computed(() => {
     .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
 })
 
+const visibleModelDownloads = computed(() => {
+  return modelDownloads.value.filter((item) => includeNsfw.value || !itemHasNsfw(item))
+})
+
+const visibleWatchedModelDownloads = computed(() => {
+  return watchedModelDownloads.value.filter((item) => includeNsfw.value || !itemHasNsfw(item))
+})
+
 const filterSourceDownloads = computed(() => {
-  return statusFilter.value === 'watched' ? watchedModelDownloads.value : modelDownloads.value
+  return statusFilter.value === 'watched' ? visibleWatchedModelDownloads.value : visibleModelDownloads.value
 })
 
 const filteredDownloads = computed(() => {
@@ -121,93 +144,21 @@ const visibleRangeLabel = computed(() => {
 })
 
 const statusCounts = computed(() => ({
-  all: modelDownloads.value.length,
-  downloaded: modelDownloads.value.filter((item) => statusGroup(item) === 'downloaded').length,
-  active: modelDownloads.value.filter((item) => statusGroup(item) === 'active').length,
-  watched: watchedModelDownloads.value.length,
-  attention: modelDownloads.value.filter((item) => statusGroup(item) === 'attention').length,
-  deleted: modelDownloads.value.filter((item) => statusGroup(item) === 'deleted').length,
+  all: visibleModelDownloads.value.length,
+  downloaded: visibleModelDownloads.value.filter((item) => statusGroup(item) === 'downloaded').length,
+  active: visibleModelDownloads.value.filter((item) => statusGroup(item) === 'active').length,
+  watched: visibleWatchedModelDownloads.value.length,
+  attention: visibleModelDownloads.value.filter((item) => statusGroup(item) === 'attention').length,
+  deleted: visibleModelDownloads.value.filter((item) => statusGroup(item) === 'deleted').length,
 }))
 
-watch([query, typeFilter, statusFilter], () => {
+watch([query, typeFilter, statusFilter, includeNsfw], () => {
   currentPage.value = 1
 })
 
 watch(pageCount, (nextPageCount) => {
   currentPage.value = Math.min(currentPage.value, nextPageCount)
 })
-
-function normalizedModelType(item: AssetDownloadItem) {
-  const normalized = item.modelType.trim().toLowerCase()
-  return normalized === 'checkpoint' ? 'checkpoint' : normalized === 'lora' ? 'lora' : ''
-}
-
-function isCheckpointOrLora(item: AssetDownloadItem) {
-  return Boolean(normalizedModelType(item))
-}
-
-function isWatchedCheckpointOrLora(item: WatchedAssetDownloadItem) {
-  return Boolean(normalizedWatchedModelType(item))
-}
-
-function normalizedWatchedModelType(item: WatchedAssetDownloadItem) {
-  const normalized = item.modelType.trim().toLowerCase()
-  return normalized === 'checkpoint' ? 'checkpoint' : normalized === 'lora' ? 'lora' : ''
-}
-
-function watchedPreviewUrl(item: WatchedAssetDownloadItem) {
-  const imageUrl = item.previewImage?.url
-  if (typeof imageUrl === 'string' && imageUrl.trim()) {
-    return imageUrl
-  }
-
-  const preview = item.previewImages?.find((image) => typeof image?.url === 'string' && image.url.trim())
-  return typeof preview?.url === 'string' ? preview.url : ''
-}
-
-function watchedDownloadToRowItem(item: WatchedAssetDownloadItem): DownloadViewRowItem {
-  const previewUrl = watchedPreviewUrl(item)
-  return {
-    id: item.id,
-    state: 'watched',
-    modelId: item.modelId,
-    modelName: item.modelName,
-    modelType: item.modelType,
-    modelNsfw: item.modelNsfw,
-    modelMetadata: item.modelMetadata as AssetDownloadItem['modelMetadata'],
-    versionId: item.versionId,
-    versionName: item.versionName,
-    baseModel: item.baseModel,
-    fileId: item.fileId,
-    fileName: item.fileName,
-    previewUrl: previewUrl || null,
-    previewPaths: previewUrl ? [{ url: previewUrl, mediaType: 'image' }] : [],
-    targetPath: item.lastStatus || 'Waiting for Civitai',
-    error: item.lastError,
-    createdAt: item.createdAt,
-    updatedAt: item.updatedAt ?? item.lastCheckedAt ?? item.createdAt ?? 0,
-  }
-}
-
-function statusGroup(item: DownloadViewRowItem): Exclude<DownloadStatusFilter, 'all'> {
-  if (item.state === 'complete') {
-    return 'downloaded'
-  }
-
-  if (item.state === 'watched') {
-    return 'watched'
-  }
-
-  if (item.state === 'queued' || item.state === 'downloading' || item.state === 'paused') {
-    return 'active'
-  }
-
-  if (item.state === 'deleted') {
-    return 'deleted'
-  }
-
-  return 'attention'
-}
 
 async function runDownloadAction(item: DownloadViewRowItem, action: DownloadAction, runner: DownloadActionRunner) {
   if (actionKey.value) {
@@ -238,6 +189,18 @@ async function runDownloadAction(item: DownloadViewRowItem, action: DownloadActi
     }
   }
 
+  if (action === 'keep-anyway') {
+    const confirmed = await confirm({
+      title: 'Keep hash-mismatched file?',
+      description: `Download ${item.fileName} again and keep it even if Civitai's served bytes still do not match its SHA-256 metadata.`,
+      confirmLabel: 'Keep anyway',
+      destructive: true,
+    })
+    if (!confirmed) {
+      return
+    }
+  }
+
   actionKey.value = `${action}:${item.id}`
   actionError.value = ''
   try {
@@ -255,11 +218,22 @@ function goToPage(page: number) {
   currentPage.value = Math.max(1, Math.min(page, pageCount.value))
 }
 
+function openDownloadPreview(item: DownloadViewRowItem) {
+  selectedDownload.value = item
+}
+
+function closeDownloadPreview() {
+  selectedDownload.value = null
+}
+
 async function loadAppSettingsDefaults() {
   try {
-    includeNsfwPreviews.value = (await fetchAppSettings()).includeNsfw
+    const settings = await fetchAppSettings()
+    includeNsfw.value = settings.includeNsfw
+    blurNsfwContent.value = settings.blurNsfwContent !== false
   } catch {
-    includeNsfwPreviews.value = false
+    includeNsfw.value = false
+    blurNsfwContent.value = true
   }
 }
 
@@ -347,6 +321,16 @@ onMounted(() => {
             {{ option.label }}
           </button>
         </div>
+
+        <label class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground transition hover:border-secondary/55 hover:text-foreground">
+          <input
+            v-model="includeNsfw"
+            class="h-4 w-4 accent-secondary"
+            type="checkbox"
+            aria-label="Include NSFW downloads"
+          >
+          NSFW
+        </label>
       </div>
 
       <p
@@ -379,7 +363,7 @@ onMounted(() => {
               <th class="w-28 px-3 py-2 font-semibold">Size</th>
               <th class="px-3 py-2 font-semibold">Path</th>
               <th class="w-36 px-3 py-2 font-semibold">Updated</th>
-              <th class="w-48 px-3 py-2 text-right font-semibold">Actions</th>
+              <th class="sticky right-0 z-20 w-64 border-l border-border bg-primary px-3 py-2 text-right font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-border">
@@ -388,11 +372,13 @@ onMounted(() => {
               :key="item.id"
               :item="item"
               :action-key="actionKey"
-              :blur-nsfw-preview="!includeNsfwPreviews"
+              :blur-nsfw-preview="blurNsfwContent"
+              @open-preview="openDownloadPreview"
               @pause="runDownloadAction($event, 'pause', pauseDownload)"
               @resume="runDownloadAction($event, 'resume', resumeDownload)"
               @cancel="runDownloadAction($event, 'cancel', cancelDownload)"
               @redownload="runDownloadAction($event, 'redownload', redownloadDownload)"
+              @keep-anyway="runDownloadAction($event, 'keep-anyway', keepDownloadAnyway)"
               @delete-file="runDownloadAction($event, 'delete', deleteDownloadedFile)"
             />
           </tbody>
@@ -426,5 +412,20 @@ onMounted(() => {
         </button>
       </div>
     </footer>
+
+    <AssetPreviewModal
+      :open="Boolean(selectedDownload)"
+      :model-id="selectedDownload?.modelId ?? null"
+      :version-id="selectedDownload?.versionId ?? null"
+      :preview-url="previewForDownload(selectedDownload)"
+      :is-video="isVideoPreviewDownload(selectedDownload)"
+      :title="selectedDownload?.modelName ?? 'Preview'"
+      :subtitle="selectedDownload?.versionName ?? null"
+      :kind-label="rowModelTypeLabel(selectedDownload)"
+      :model-type="selectedDownload?.modelType ?? null"
+      :base-model="selectedDownload?.baseModel ?? null"
+      :file-name="selectedDownload?.fileName ?? null"
+      @close="closeDownloadPreview"
+    />
   </main>
 </template>

@@ -389,6 +389,8 @@ async function redownloadDownload(id: string) {
   return postDownloadAction(`/api/civitai/downloads/${encodeURIComponent(id)}/redownload`)
 }
 
+async function keepDownloadAnyway(id: string) { return postDownloadAction(`/api/civitai/downloads/${encodeURIComponent(id)}/keep-anyway`) }
+
 async function repairDownloadPreviews(id: string) {
   return postDownloadAction(`/api/civitai/downloads/${encodeURIComponent(id)}/repair-previews`)
 }
@@ -443,6 +445,7 @@ export function useAssetDownloads(options: { autoStart?: boolean; includeWatched
     cancelDownload,
     deleteDownloadedFile,
     redownloadDownload,
+    keepDownloadAnyway,
     repairDownloadPreviews,
     clearDownloads,
     startPolling: subscription.start,

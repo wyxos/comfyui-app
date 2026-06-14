@@ -57,6 +57,7 @@ const {
 
 const query = ref('')
 const includeNsfw = ref(false)
+const blurNsfwContent = ref(true)
 const typeFilter = ref<LibraryTypeFilter>('all')
 const sourceFilter = ref<LibrarySourceFilter>(parseLibrarySourceFilter(route.query.source))
 const baseModelFilter = ref('all')
@@ -130,6 +131,9 @@ const libraryModels = computed(() =>
   [...downloadedModels.value, ...watchedModels.value, ...hiddenLibraryModels.value, ...controlNetModels.value]
     .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0)),
 )
+const nonHiddenLibraryModels = computed(() =>
+  libraryModels.value.filter((item) => item.librarySource !== 'hidden'),
+)
 
 const filteredModels = computed(() => {
   const search = query.value.trim().toLowerCase()
@@ -184,13 +188,13 @@ const visibleRangeLabel = computed(() => {
   return `${pageStart.value + 1}-${Math.min(pageEnd.value, filteredModels.value.length)} of ${filteredModels.value.length}`
 })
 const typeCounts = computed(() => ({
-  all: libraryModels.value.length,
-  checkpoint: libraryModels.value.filter((item) => item.itemKind === 'checkpoint').length,
-  lora: libraryModels.value.filter((item) => item.itemKind === 'lora').length,
-  controlnet: libraryModels.value.filter((item) => item.itemKind === 'controlnet').length,
+  all: nonHiddenLibraryModels.value.length,
+  checkpoint: nonHiddenLibraryModels.value.filter((item) => item.itemKind === 'checkpoint').length,
+  lora: nonHiddenLibraryModels.value.filter((item) => item.itemKind === 'lora').length,
+  controlnet: nonHiddenLibraryModels.value.filter((item) => item.itemKind === 'controlnet').length,
   hidden: libraryModels.value.filter((item) => item.librarySource === 'hidden').length,
   hiddenStored: hiddenModelIds.value.length,
-  watched: libraryModels.value.filter((item) => item.librarySource === 'watched').length,
+  watched: nonHiddenLibraryModels.value.filter((item) => item.librarySource === 'watched').length,
 }))
 const baseModelOptions = computed(() => {
   const counts = new Map<string, number>()
@@ -258,11 +262,19 @@ function modelVersionKey(modelId: number, versionId: number) {
 }
 
 function matchesSourceFilter(item: LibraryModelItem) {
+  if (sourceFilter.value === 'hidden') {
+    return item.librarySource === 'hidden'
+  }
+
+  if (item.librarySource === 'hidden') {
+    return false
+  }
+
   return sourceFilter.value === 'all' || item.librarySource === sourceFilter.value
 }
 
 function shouldHideForSafety(item: LibraryModelItem) {
-  return sourceFilter.value !== 'hidden' && !includeNsfw.value && modelHasNsfw(item)
+  return !includeNsfw.value && modelHasNsfw(item)
 }
 
 function openModelPreview(item: LibraryModelItem) {
@@ -298,9 +310,12 @@ function closeModelPreview() {
 
 async function loadAppSettingsDefaults() {
   try {
-    includeNsfw.value = (await fetchAppSettings()).includeNsfw
+    const settings = await fetchAppSettings()
+    includeNsfw.value = settings.includeNsfw
+    blurNsfwContent.value = settings.blurNsfwContent !== false
   } catch {
     includeNsfw.value = false
+    blurNsfwContent.value = true
   }
 }
 
@@ -417,6 +432,7 @@ onMounted(() => {
         v-for="item in pagedModels"
         :key="item.id"
         :item="item"
+        :blur-nsfw-content="blurNsfwContent"
         @open="openModelPreview"
         @restore="restoreLibraryHiddenModel"
       />

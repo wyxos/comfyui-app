@@ -45,6 +45,14 @@ export type AssetDownloadItem = {
   startedAt?: number | null
   finishedAt?: number | null
   error?: string | null
+  errorCode?: string | null
+  hashMismatch?: {
+    expectedSha256?: string | null
+    actualSha256?: string | null
+    detectedAt?: number | null
+    accepted?: boolean | null
+    keptAnywayAt?: number | null
+  } | null
   updatedAt: number
 }
 

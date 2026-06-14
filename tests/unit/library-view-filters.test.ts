@@ -232,7 +232,7 @@ describe('LibraryView filters', () => {
   })
 
   it('shows hidden Civitai models in the library hidden filter and restores them from storage', async () => {
-    const hiddenModel = createMockModel({ id: 505, name: 'Hidden Library LoRA', nsfw: true })
+    const hiddenModel = createMockModel({ id: 505, name: 'Hidden Library LoRA', nsfw: false })
     const visibleModel = createMockModel({ id: 606, name: 'Visible Library LoRA' })
     window.localStorage.setItem(BLACKLIST_STORAGE_KEY, JSON.stringify([505]))
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -304,6 +304,64 @@ describe('LibraryView filters', () => {
     expect(window.localStorage.getItem(BLACKLIST_STORAGE_KEY)).toBe('[]')
     expect(wrapper.text()).not.toContain('Hidden Library LoRA')
     expect(wrapper.text()).toContain('No hidden models match the current filters.')
+  })
+
+  it('filters hidden Library models with the local NSFW toggle', async () => {
+    const hiddenModel = createMockModel({ id: 505, name: 'Hidden NSFW Library LoRA', nsfw: true })
+    window.localStorage.setItem(BLACKLIST_STORAGE_KEY, JSON.stringify([505]))
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), 'http://companion.test')
+      if (url.pathname === '/api/settings/app') {
+        return jsonResponse({ ok: true, includeNsfw: false })
+      }
+      if (url.pathname === '/api/controlnets') {
+        return jsonResponse({ ok: true, controlNets: [] })
+      }
+      if (url.pathname === '/api/civitai/models') {
+        return jsonResponse({
+          items: [hiddenModel],
+          metadata: { totalItems: 1, totalPages: 1 },
+        })
+      }
+      return jsonResponse({ ok: false, message: `Unhandled ${url.pathname}` }, 500)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    vi.doMock('../../src/composables/useAssetDownloads', () => ({
+      useAssetDownloads: () => ({
+        downloads: ref([]),
+        watchedDownloads: ref([]),
+        activeDownloads: computed(() => []),
+        completedDownloads: computed(() => []),
+        loading: ref(false),
+        error: ref(''),
+        refreshDownloads: vi.fn(),
+        refreshWatchedDownloads: vi.fn(),
+      }),
+      useAssetDownloadSummary: () => ({
+        counts: computed(() => ({
+          active: 0,
+          attention: 0,
+          visibleComplete: 0,
+        })),
+      }),
+    }))
+
+    const router = createAppRouter(createMemoryHistory())
+    await router.push('/library?source=hidden')
+    await router.isReady()
+    const { default: LibraryView } = await import('../../src/views/LibraryView.vue')
+    const wrapper = mount(LibraryView, {
+      global: {
+        plugins: [router],
+      },
+    })
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('Hidden NSFW Library LoRA')
+    expect(wrapper.text()).toContain('No hidden models match the current filters.')
+    expect((wrapper.get('[aria-label="Include NSFW library models"]').element as HTMLInputElement).checked).toBe(false)
+    await wrapper.get('[aria-label="Include NSFW library models"]').setValue(true)
+    expect(wrapper.text()).toContain('Hidden NSFW Library LoRA')
+    expect(wrapper.text()).toContain('1-1 of 1')
   })
 
   it('keeps hidden model id batches inside the proxy query limit', async () => {

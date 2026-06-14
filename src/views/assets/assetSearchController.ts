@@ -64,9 +64,12 @@ export function createAssetSearchController(state: AssetSearchState) {
 
   async function syncAppSettingsDefaults() {
     try {
-      defaultIncludeNsfw = (await fetchAppSettings()).includeNsfw
+      const settings = await fetchAppSettings()
+      defaultIncludeNsfw = settings.includeNsfw
+      state.blurNsfwContent.value = settings.blurNsfwContent !== false
     } catch {
       defaultIncludeNsfw = false
+      state.blurNsfwContent.value = true
     }
   }
 

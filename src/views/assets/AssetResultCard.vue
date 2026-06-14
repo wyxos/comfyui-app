@@ -53,6 +53,7 @@ const {
   queueableMissingVersionsForModel,
   handleDownloadClick,
   modelUrl,
+  blurNsfwContent,
   blacklistModel,
   creatorFilterHref,
   openImageModal,
@@ -147,6 +148,9 @@ function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
   event.stopPropagation()
   blacklistModel(model)
 }
+function shouldBlurNsfwContent(model: CivitaiModel) {
+  return blurNsfwContent?.value === true && modelHasNsfw(model)
+}
 </script>
 
 <template>
@@ -177,7 +181,10 @@ function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
             v-if="isVideoPreview(activePreviewMediaFor(model))"
             :key="activePreviewUrlFor(model) ?? undefined"
             class="h-full w-auto max-w-none object-contain transition duration-300 group-hover:scale-[1.03]"
-            :class="isActivePreviewMediaReady(model) ? 'opacity-100' : 'opacity-0'"
+            :class="[
+              isActivePreviewMediaReady(model) ? 'opacity-100' : 'opacity-0',
+              shouldBlurNsfwContent(model) ? 'scale-110 blur-sm saturate-50' : '',
+            ]"
             :style="{ opacity: isActivePreviewMediaReady(model) ? 1 : 0 }"
             :src="activePreviewUrlFor(model) ?? undefined"
             muted
@@ -193,7 +200,10 @@ function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
             v-else-if="activePreviewUrlFor(model)"
             :key="activePreviewUrlFor(model) ?? undefined"
             class="h-full w-auto max-w-none object-contain transition duration-300 group-hover:scale-[1.03]"
-            :class="isActivePreviewMediaReady(model) ? 'opacity-100' : 'opacity-0'"
+            :class="[
+              isActivePreviewMediaReady(model) ? 'opacity-100' : 'opacity-0',
+              shouldBlurNsfwContent(model) ? 'scale-110 blur-sm saturate-50' : '',
+            ]"
             :style="{ opacity: isActivePreviewMediaReady(model) ? 1 : 0 }"
             :src="activePreviewUrlFor(model) ?? undefined"
             :alt="`${model.name} thumbnail`"
@@ -300,6 +310,7 @@ function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
         >
           <a
             class="block min-w-0 truncate text-base font-semibold leading-5 tracking-tight text-card-foreground transition hover:text-secondary"
+            :class="shouldBlurNsfwContent(model) ? 'blur-sm select-none' : ''"
             data-asset-card-title-link
             :href="modelUrl(model)"
             target="_blank"

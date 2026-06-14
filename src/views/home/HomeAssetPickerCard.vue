@@ -12,6 +12,7 @@ const props = defineProps<{
   previewCount: number
   baseModelLabel: string
   hasNsfw: boolean
+  blurNsfwContent?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -26,6 +27,7 @@ const titleLabel = computed(() =>
     ? `${props.option.label}\n${props.option.value}`
     : props.option.label,
 )
+const shouldBlurNsfwContent = computed(() => props.blurNsfwContent === true && props.hasNsfw)
 </script>
 
 <template>
@@ -39,6 +41,7 @@ const titleLabel = computed(() =>
     :is-video-preview="isVideoPreview"
     :preview-label="`${option.label} preview`"
     :title="titleLabel"
+    :media-content-class="shouldBlurNsfwContent ? 'scale-110 blur-sm saturate-50' : ''"
   >
     <template #placeholder>
       <ImageIcon
@@ -107,6 +110,8 @@ const titleLabel = computed(() =>
 
     <h3
       class="pointer-events-none relative z-20 truncate text-sm font-semibold leading-5 text-card-foreground transition group-hover:text-secondary"
+      :class="shouldBlurNsfwContent ? 'blur-sm select-none' : ''"
+      data-asset-picker-title
       :title="option.label"
     >
       {{ option.label }}

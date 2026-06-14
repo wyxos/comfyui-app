@@ -68,12 +68,33 @@ export function normalizeIncludeNsfw(value) {
   return false
 }
 
+export function normalizeBlurNsfwContent(value) {
+  if (value === undefined || value === null) {
+    return true
+  }
+
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'number') {
+    return value > 0
+  }
+
+  if (typeof value === 'string') {
+    return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase())
+  }
+
+  return true
+}
+
 export function serializeAppSettings(settings) {
   const preferences = normalizePlainObject(settings.preferences)
 
   return {
     ok: true,
     includeNsfw: normalizeIncludeNsfw(preferences.includeNsfw),
+    blurNsfwContent: normalizeBlurNsfwContent(preferences.blurNsfwContent),
   }
 }
 
@@ -86,7 +107,12 @@ export async function saveAppSettings(patch) {
   const preferences = normalizePlainObject(settings.preferences)
   settings.preferences = {
     ...preferences,
-    includeNsfw: normalizeIncludeNsfw(patch?.includeNsfw),
+    includeNsfw: patch?.includeNsfw === undefined
+      ? normalizeIncludeNsfw(preferences.includeNsfw)
+      : normalizeIncludeNsfw(patch.includeNsfw),
+    blurNsfwContent: patch?.blurNsfwContent === undefined
+      ? normalizeBlurNsfwContent(preferences.blurNsfwContent)
+      : normalizeBlurNsfwContent(patch.blurNsfwContent),
   }
 
   await writeSettings(settings)

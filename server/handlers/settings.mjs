@@ -97,8 +97,15 @@ export async function handlePutAppSettings(request, response) {
     return sendError(response, 400, 'invalid-include-nsfw', 'includeNsfw must be a boolean.')
   }
 
+  if (body.blurNsfwContent !== undefined && typeof body.blurNsfwContent !== 'boolean') {
+    return sendError(response, 400, 'invalid-blur-nsfw-content', 'blurNsfwContent must be a boolean.')
+  }
+
   try {
-    return sendJson(response, 200, await saveAppSettings({ includeNsfw: body.includeNsfw }))
+    return sendJson(response, 200, await saveAppSettings({
+      includeNsfw: body.includeNsfw,
+      blurNsfwContent: body.blurNsfwContent,
+    }))
   } catch (error) {
     return sendError(
       response,

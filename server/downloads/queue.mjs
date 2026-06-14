@@ -2,6 +2,7 @@ import { civitaiDownloads } from '../config.mjs'
 import { safeTrim } from '../shared.mjs'
 import { downloadsLoaded, ensureDownloadsLoaded, scheduleDownloadsPersist } from './state.mjs'
 import { buildDownloadId, normalizeDownloadFile, normalizeDownloadModelMetadata, normalizePreviewImage, normalizePreviewImages, refreshCompletedDownloadPreviews, resolveCivitaiDownloadTargetDir, safeUnlink, sanitizeModelFilename, statFileIfExists } from './metadata.mjs'
+import { isCivitaiHashMismatchError, recordCivitaiHashMismatch } from './hash-mismatch.mjs'
 import { downloadCivitaiFile, verifyCivitaiDownloadHash } from './transfer.mjs'
 import { parseInteger } from '../civitai-query.mjs'
 import { resolveInsideRoot } from '../model-paths.mjs'
@@ -127,6 +128,9 @@ export async function processDownloadQueue() {
     }
 
     download.state = 'error'
+    if (isCivitaiHashMismatchError(error)) {
+      recordCivitaiHashMismatch(download, error)
+    }
     download.error = error instanceof Error ? error.message : 'Download failed.'
     download.updatedAt = Date.now()
   } finally {
@@ -195,6 +199,9 @@ export async function enqueueCivitaiDownload(body) {
     if (forceRedownload) {
       existingDownload.state = 'queued'
       existingDownload.error = null
+      delete existingDownload.errorCode
+      delete existingDownload.hashMismatch
+      delete existingDownload.allowHashMismatch
       existingDownload.bytesDownloaded = 0
       existingDownload.progressPercent = 0
       existingDownload.startedAt = null
@@ -259,6 +266,9 @@ export async function enqueueCivitaiDownload(body) {
       await verifyCivitaiDownloadHash(download)
     } catch (error) {
       download.state = 'error'
+      if (isCivitaiHashMismatchError(error)) {
+        recordCivitaiHashMismatch(download, error)
+      }
       download.error = error instanceof Error ? error.message : 'Downloaded model file hash did not match Civitai metadata.'
     }
   }

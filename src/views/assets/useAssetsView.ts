@@ -52,6 +52,7 @@ const route = useRoute()
 const router = useRouter()
 const query = ref('')
 const includeNsfw = ref(false)
+const blurNsfwContent = ref(true)
 const selectedType = ref<ModelTypeFilter>('')
 const selectedSort = ref<ModelSort>(DEFAULT_SORT)
 const selectedPeriod = ref<ModelPeriod>(DEFAULT_PERIOD)
@@ -154,6 +155,7 @@ const {
   error,
   hasStoredCivitaiApiKey,
   includeNsfw,
+  blurNsfwContent,
   loading,
   modelIdQuery,
   modelVersionIdQuery,
@@ -358,6 +360,7 @@ onBeforeUnmount(() => {
     BASE_MODEL_OPTIONS: VISIBLE_BASE_MODEL_OPTIONS,
     query,
     includeNsfw,
+    blurNsfwContent,
     selectedType,
     selectedSort,
     selectedPeriod,

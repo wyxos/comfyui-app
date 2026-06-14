@@ -18,6 +18,7 @@ type SettingsFetchOptions = {
   configured?: boolean
   keyPreview?: string | null
   includeNsfw?: boolean
+  blurNsfwContent?: boolean
   getFailureMessage?: string
   saveFailureMessage?: string
 }
@@ -26,6 +27,7 @@ function installSettingsFetch(options: SettingsFetchOptions = {}) {
   let configured = options.configured ?? false
   let keyPreview = options.keyPreview ?? null
   let includeNsfw = options.includeNsfw ?? false
+  let blurNsfwContent = options.blurNsfwContent ?? true
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input)
@@ -36,13 +38,14 @@ function installSettingsFetch(options: SettingsFetchOptions = {}) {
     }
 
     if (path === '/api/settings/app' && method === 'GET') {
-      return jsonResponse({ ok: true, includeNsfw })
+      return jsonResponse({ ok: true, includeNsfw, blurNsfwContent })
     }
 
     if (path === '/api/settings/app' && method === 'PUT') {
-      const body = JSON.parse(String(init?.body ?? '{}')) as { includeNsfw?: boolean }
+      const body = JSON.parse(String(init?.body ?? '{}')) as { includeNsfw?: boolean, blurNsfwContent?: boolean }
       includeNsfw = body.includeNsfw === true
-      return jsonResponse({ ok: true, includeNsfw })
+      blurNsfwContent = body.blurNsfwContent === true
+      return jsonResponse({ ok: true, includeNsfw, blurNsfwContent })
     }
 
     if (path === '/api/settings/civitai' && method === 'GET') {
@@ -150,15 +153,16 @@ describe('SettingsView', () => {
     expect((wrapper.get('input[type="password"]').element as HTMLInputElement).value).toBe('abcdef1234')
   })
 
-  it('loads and persists the NSFW listing default', async () => {
-    const fetchMock = installSettingsFetch({ includeNsfw: false })
+  it('loads and persists the NSFW toggle and blur defaults', async () => {
+    const fetchMock = installSettingsFetch({ includeNsfw: false, blurNsfwContent: true })
 
     const wrapper = mount(SettingsView)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('NSFW listings are hidden by default.')
+    expect(wrapper.text()).toContain('NSFW toggles default to off.')
+    expect(wrapper.text()).toContain('NSFW content blur is on.')
 
-    await wrapper.get('input[aria-label="Show NSFW by default"]').setValue(true)
+    await wrapper.get('input[aria-label="Default NSFW toggles on"]').setValue(true)
     await flushPromises()
 
     expect(fetchMock).toHaveBeenLastCalledWith('/api/settings/app', {
@@ -166,8 +170,20 @@ describe('SettingsView', () => {
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
       },
-      body: JSON.stringify({ includeNsfw: true }),
+      body: JSON.stringify({ includeNsfw: true, blurNsfwContent: true }),
     })
-    expect(wrapper.text()).toContain('NSFW listings are shown by default.')
+    expect(wrapper.text()).toContain('NSFW toggles default to on.')
+
+    await wrapper.get('input[aria-label="Blur visible NSFW content"]').setValue(false)
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/settings/app', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ includeNsfw: true, blurNsfwContent: false }),
+    })
+    expect(wrapper.text()).toContain('NSFW content blur is off.')
   })
 })

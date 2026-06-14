@@ -1,10 +1,12 @@
 export type AppSettings = {
   includeNsfw: boolean
+  blurNsfwContent: boolean
 }
 
 type AppSettingsResponse = {
   ok?: boolean
   includeNsfw?: boolean
+  blurNsfwContent?: boolean
   message?: string
 }
 
@@ -17,6 +19,7 @@ async function parseAppSettingsResponse(response: Response): Promise<AppSettings
 
   return {
     includeNsfw: payload.includeNsfw === true,
+    blurNsfwContent: payload.blurNsfwContent !== false,
   }
 }
 
@@ -39,6 +42,7 @@ export async function saveAppSettings(settings: AppSettings): Promise<AppSetting
       },
       body: JSON.stringify({
         includeNsfw: settings.includeNsfw,
+        blurNsfwContent: settings.blurNsfwContent,
       }),
     }),
   )
