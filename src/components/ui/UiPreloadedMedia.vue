@@ -40,6 +40,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   ready: [src: string]
+  error: [src: string]
 }>()
 
 const imageElement = useTemplateRef<HTMLImageElement>('imageElement')
@@ -64,6 +65,15 @@ const markReady = () => {
 
   isReady.value = true
   emit('ready', props.src)
+}
+
+const markFailed = () => {
+  if (isReady.value) {
+    return
+  }
+
+  isReady.value = true
+  emit('error', props.src)
 }
 
 const checkCachedMedia = async () => {
@@ -114,6 +124,7 @@ watch(() => [props.src, props.isVideo] as const, checkCachedMedia, { immediate: 
       @loadedmetadata="markReady"
       @loadeddata="markReady"
       @canplay="markReady"
+      @error="markFailed"
     />
     <img
       v-else
@@ -123,6 +134,7 @@ watch(() => [props.src, props.isVideo] as const, checkCachedMedia, { immediate: 
       :src="src"
       :alt="alt"
       @load="markReady"
+      @error="markFailed"
     >
   </div>
 </template>

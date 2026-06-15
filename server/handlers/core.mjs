@@ -1,5 +1,5 @@
 import { civitaiModelsUrl, civitaiModelVersionsUrl, comfyUrl } from '../config.mjs'
-import { safeTrim, tryParseJson } from '../shared.mjs'
+import { safeTrim } from '../shared.mjs'
 import { readJsonBody, sendError, sendJson } from '../http.mjs'
 import { comfyFetchJson } from '../comfy-client.mjs'
 import { getStoredCivitaiApiKey } from '../settings.mjs'
@@ -14,6 +14,7 @@ import { serializeControlNetPreprocessors } from '../controlnet-options.mjs'
 import { comfySocketConnected } from '../comfy-socket.mjs'
 import { handleCivitaiImagesProxyWithFallback } from '../civitai-image-page.mjs'
 import { modelFromCivitaiVersionWithHydration } from '../civitai-model-lookup.mjs'
+import { fetchCivitaiJsonWithCache } from '../civitai-cache.mjs'
 
 export async function handleCheckpointList(response) {
   try {
@@ -209,12 +210,11 @@ export async function proxyCivitaiRequest(upstreamUrl, response, unavailableMess
   response.once('close', abortProxyRequest)
 
   try {
-    const proxyResponse = await fetch(upstreamUrl, {
+    const proxyResponse = await fetchCivitaiJsonWithCache(upstreamUrl, {
+      authScope: apiKey ? 'auth' : 'public',
       headers,
       signal: abortController.signal,
     })
-    const text = await proxyResponse.text()
-    const contentType = proxyResponse.headers.get('content-type') ?? 'application/json; charset=utf-8'
 
     if (!proxyResponse.ok) {
       return sendError(
@@ -222,17 +222,17 @@ export async function proxyCivitaiRequest(upstreamUrl, response, unavailableMess
         proxyResponse.status >= 500 ? 502 : proxyResponse.status,
         'civitai-request-failed',
         `Civitai returned ${proxyResponse.status}.`,
-        text ? tryParseJson(text) ?? text.slice(0, 1000) : null,
+        proxyResponse.text ? proxyResponse.payload ?? proxyResponse.text.slice(0, 1000) : null,
       )
     }
 
     response.writeHead(200, {
-      'Content-Type': contentType.includes('application/json')
+      'Content-Type': proxyResponse.contentType.includes('application/json')
         ? 'application/json; charset=utf-8'
-        : contentType,
+        : proxyResponse.contentType,
       'Cache-Control': 'no-store',
     })
-    response.end(text)
+    response.end(proxyResponse.text)
   } catch (error) {
     if (abortController.signal.aborted) {
       return
@@ -285,11 +285,11 @@ async function fetchCivitaiJson(upstreamUrl, response, unavailableMessage, reque
   response.once('close', abortProxyRequest)
 
   try {
-    const upstreamResponse = await fetch(upstreamUrl, {
+    const upstreamResponse = await fetchCivitaiJsonWithCache(upstreamUrl, {
+      authScope: apiKey ? 'auth' : 'public',
       headers,
       signal: abortController.signal,
     })
-    const text = await upstreamResponse.text()
 
     if (!upstreamResponse.ok) {
       sendError(
@@ -297,19 +297,19 @@ async function fetchCivitaiJson(upstreamUrl, response, unavailableMessage, reque
         upstreamResponse.status >= 500 ? 502 : upstreamResponse.status,
         'civitai-request-failed',
         `Civitai returned ${upstreamResponse.status}.`,
-        text ? tryParseJson(text) ?? text.slice(0, 1000) : null,
+        upstreamResponse.text ? upstreamResponse.payload ?? upstreamResponse.text.slice(0, 1000) : null,
       )
       return null
     }
 
-    const payload = tryParseJson(text)
+    const payload = upstreamResponse.payload
     if (!payload || typeof payload !== 'object') {
       sendError(
         response,
         502,
         'civitai-invalid-response',
         unavailableMessage,
-        text.slice(0, 1000),
+        upstreamResponse.text.slice(0, 1000),
       )
       return null
     }

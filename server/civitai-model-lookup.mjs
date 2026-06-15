@@ -1,6 +1,7 @@
 import { civitaiModelsUrl } from './config.mjs'
+import { fetchCivitaiJsonWithCache } from './civitai-cache.mjs'
 import { parseInteger } from './civitai-query.mjs'
-import { safeTrim, tryParseJson } from './shared.mjs'
+import { safeTrim } from './shared.mjs'
 import { getStoredCivitaiApiKey } from './settings.mjs'
 
 function parseCivitaiLookupId(value) {
@@ -73,7 +74,8 @@ async function fetchCivitaiJsonForHydration(upstreamUrl, request = null) {
   request?.once('aborted', abortProxyRequest)
 
   try {
-    const upstreamResponse = await fetch(upstreamUrl, {
+    const upstreamResponse = await fetchCivitaiJsonWithCache(upstreamUrl, {
+      authScope: apiKey ? 'auth' : 'public',
       headers,
       signal: abortController.signal,
     })
@@ -81,7 +83,7 @@ async function fetchCivitaiJsonForHydration(upstreamUrl, request = null) {
       return null
     }
 
-    const payload = tryParseJson(await upstreamResponse.text())
+    const payload = upstreamResponse.payload
     return payload && typeof payload === 'object' ? payload : null
   } catch {
     return null

@@ -1,3 +1,4 @@
+import { imageNsfwDetectedValue } from '../../components/asset-preview/assetPreviewHelpers'
 import type { AssetDownloadItem, WatchedAssetDownloadItem } from '../../composables/useAssetDownloads'
 
 export type DownloadViewRowItem = Omit<AssetDownloadItem, 'state'> & { state: AssetDownloadItem['state'] | 'watched' }
@@ -22,17 +23,59 @@ export function isWatchedCheckpointOrLora(item: WatchedAssetDownloadItem) {
 }
 
 export function watchedPreviewUrl(item: WatchedAssetDownloadItem) {
-  const imageUrl = item.previewImage?.url
-  if (typeof imageUrl === 'string' && imageUrl.trim()) {
-    return imageUrl
+  return watchedPreviewPaths(item)[0]?.url ?? ''
+}
+
+function watchedPreviewPath(image: Record<string, unknown> | null | undefined) {
+  const url = typeof image?.url === 'string' ? image.url.trim() : ''
+  if (!url) {
+    return null
   }
 
-  const preview = item.previewImages?.find((image) => typeof image?.url === 'string' && image.url.trim())
-  return typeof preview?.url === 'string' ? preview.url : ''
+  const mediaType = typeof image?.mediaType === 'string'
+    ? image.mediaType
+    : typeof image?.type === 'string'
+      ? image.type
+      : null
+  const nsfw = typeof image?.nsfw === 'boolean' || typeof image?.nsfw === 'string'
+    ? image.nsfw
+    : null
+
+  return {
+    url,
+    mediaType,
+    nsfw,
+    nsfwLevel: typeof image?.nsfwLevel === 'string' || typeof image?.nsfwLevel === 'number' ? image.nsfwLevel : null,
+  }
+}
+
+function watchedPreviewPaths(item: WatchedAssetDownloadItem) {
+  const seen = new Set<string>()
+  return [
+    watchedPreviewPath(item.previewImage),
+    ...(item.previewImages ?? []).map((image) => watchedPreviewPath(image)),
+  ].filter((path): path is NonNullable<ReturnType<typeof watchedPreviewPath>> => {
+    const url = path?.url ?? ''
+    if (!url || seen.has(url)) {
+      return false
+    }
+
+    seen.add(url)
+    return true
+  })
+}
+
+function previewPathForDownload(item: DownloadViewRowItem | null | undefined) {
+  return item?.previewPaths?.find((preview) => preview.url) ?? null
+}
+
+export function previewHasNsfw(item: DownloadViewRowItem | null | undefined) {
+  return imageNsfwDetectedValue(previewPathForDownload(item)) === true
 }
 
 export function watchedDownloadToRowItem(item: WatchedAssetDownloadItem): DownloadViewRowItem {
   const previewUrl = watchedPreviewUrl(item)
+  const previewPaths = watchedPreviewPaths(item)
   return {
     id: item.id,
     state: 'watched',
@@ -47,7 +90,7 @@ export function watchedDownloadToRowItem(item: WatchedAssetDownloadItem): Downlo
     fileId: item.fileId,
     fileName: item.fileName,
     previewUrl: previewUrl || null,
-    previewPaths: previewUrl ? [{ url: previewUrl, mediaType: 'image' }] : [],
+    previewPaths,
     targetPath: item.lastStatus || 'Waiting for Civitai',
     error: item.lastError,
     createdAt: item.createdAt,
@@ -93,12 +136,12 @@ export function statusGroup(item: DownloadViewRowItem): DownloadStatusGroup {
 }
 
 export function previewForDownload(item: DownloadViewRowItem | null) {
-  return item?.previewUrl ?? item?.previewPaths?.find((preview) => preview.url)?.url ?? null
+  return item?.previewUrl ?? previewPathForDownload(item)?.url ?? null
 }
 
 export function isVideoPreviewDownload(item: DownloadViewRowItem | null) {
   const previewUrl = previewForDownload(item)
-  return item?.previewPaths?.some((preview) => preview.url === previewUrl && preview.mediaType === 'video') ?? false
+  return previewPathForDownload(item)?.url === previewUrl && previewPathForDownload(item)?.mediaType === 'video'
 }
 
 export function rowModelTypeLabel(item: DownloadViewRowItem | null) {

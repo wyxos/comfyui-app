@@ -230,6 +230,7 @@ export function normalizePreviewImage(rawImage) {
     hash: safeTrim(image.hash),
     type: safeTrim(image.type),
     nsfw: image.nsfw,
+    nsfwLevel: safeTrim(image.nsfwLevel),
     meta: normalizePlainObject(image.meta),
     postId: image.postId ?? null,
     username: safeTrim(image.username),

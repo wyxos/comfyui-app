@@ -8,10 +8,12 @@ const props = withDefaults(
     items: T[]
     modelValue?: number
     ariaLabel?: string
+    itemClass?: string
   }>(),
   {
     modelValue: 0,
     ariaLabel: 'Carousel',
+    itemClass: 'basis-full h-full',
   },
 )
 
@@ -122,7 +124,8 @@ watch(
         <div
           v-for="(item, index) in items"
           :key="index"
-          class="min-w-0 shrink-0 grow-0 basis-full h-full"
+          data-test="carousel-item"
+          :class="['min-w-0 shrink-0 grow-0', props.itemClass]"
         >
           <slot name="item" :item="item" :index="index" />
         </div>

@@ -2,8 +2,12 @@
 import { ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-vue-next'
 import { computed } from 'vue'
 import UiPreviewCard from '../../components/ui/UiPreviewCard.vue'
-import type { AssetPickerOption, AssetPickerPreviewMedia } from './homeAssetPickerOptionHelpers'
-import { optionHasVideoPreview } from './homeAssetPickerOptionHelpers'
+import {
+  optionHasVideoPreview,
+  previewMediaHasNsfw,
+  type AssetPickerOption,
+  type AssetPickerPreviewMedia,
+} from './homeAssetPickerOptionHelpers'
 
 const props = defineProps<{
   option: AssetPickerOption
@@ -27,7 +31,8 @@ const titleLabel = computed(() =>
     ? `${props.option.label}\n${props.option.value}`
     : props.option.label,
 )
-const shouldBlurNsfwContent = computed(() => props.blurNsfwContent === true && props.hasNsfw)
+const shouldBlurNsfwPreview = computed(() => props.blurNsfwContent === true && previewMediaHasNsfw(props.previewMedia))
+const shouldBlurNsfwTitle = computed(() => props.blurNsfwContent === true && props.hasNsfw)
 </script>
 
 <template>
@@ -41,7 +46,7 @@ const shouldBlurNsfwContent = computed(() => props.blurNsfwContent === true && p
     :is-video-preview="isVideoPreview"
     :preview-label="`${option.label} preview`"
     :title="titleLabel"
-    :media-content-class="shouldBlurNsfwContent ? 'scale-110 blur-sm saturate-50' : ''"
+    :media-content-class="shouldBlurNsfwPreview ? 'scale-110 blur-sm saturate-50' : ''"
   >
     <template #placeholder>
       <ImageIcon
@@ -110,7 +115,7 @@ const shouldBlurNsfwContent = computed(() => props.blurNsfwContent === true && p
 
     <h3
       class="pointer-events-none relative z-20 truncate text-sm font-semibold leading-5 text-card-foreground transition group-hover:text-secondary"
-      :class="shouldBlurNsfwContent ? 'blur-sm select-none' : ''"
+      :class="shouldBlurNsfwTitle ? 'blur-sm select-none' : ''"
       data-asset-picker-title
       :title="option.label"
     >

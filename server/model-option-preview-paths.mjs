@@ -47,7 +47,19 @@ function serializeDownloadPreviewPath(download, source, index) {
       ? `/api/civitai/downloads/${encodeURIComponent(download.id)}/previews/${index}`
       : '')
 
-  return url ? { url, mediaType: mediaTypeForPreview(source) } : null
+  if (!url) {
+    return null
+  }
+
+  const preview = { url, mediaType: mediaTypeForPreview(source) }
+  if (source?.nsfw !== undefined && source?.nsfw !== null) {
+    preview.nsfw = source.nsfw
+  }
+  if (safeTrim(source?.nsfwLevel)) {
+    preview.nsfwLevel = safeTrim(source.nsfwLevel)
+  }
+
+  return preview
 }
 
 function serializeSidecarPreviewPath(source, index, type, modelName) {
@@ -55,7 +67,19 @@ function serializeSidecarPreviewPath(source, index, type, modelName) {
     ? modelArchiveMediaUrl(type, modelName, index)
     : safeTrim(source?.localUrl ?? source?.url)
 
-  return url ? { url, mediaType: mediaTypeForPreview(source) } : null
+  if (!url) {
+    return null
+  }
+
+  const preview = { url, mediaType: mediaTypeForPreview(source) }
+  if (source?.nsfw !== undefined && source?.nsfw !== null) {
+    preview.nsfw = source.nsfw
+  }
+  if (safeTrim(source?.nsfwLevel)) {
+    preview.nsfwLevel = safeTrim(source.nsfwLevel)
+  }
+
+  return preview
 }
 
 function addPreviewPath(results, seenKeys, seenUrls, source, preview) {

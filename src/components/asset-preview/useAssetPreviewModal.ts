@@ -5,13 +5,12 @@ import {
   formatMeta,
   imageDimensions,
   imagesForVersion,
-  isVideoPreview,
   modelVersionLabel,
   numberProp,
   normalizeImageMeta,
-  preloadImage,
   primaryFileForVersion,
   selectedVersionFor,
+  sortModelVersions,
   versionDownloadUnavailableLabel,
 } from './assetPreviewHelpers'
 import type {
@@ -22,10 +21,10 @@ import type {
   CivitaiModel,
   CivitaiModelsResponse,
   CivitaiModelVersion,
-  PreviewSlide,
 } from './assetPreviewTypes'
 import { useAssetPreviewArchiveFallback } from './useAssetPreviewArchiveFallback'
 import { useAssetPreviewImageSafety } from './useAssetPreviewImageSafety'
+import { useAssetPreviewMediaFeed } from './useAssetPreviewMediaFeed'
 import { useAssetPreviewNavigationEvents } from './useAssetPreviewNavigationEvents'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
@@ -44,7 +43,6 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
 
   let civitaiController: AbortController | null = null
   let imageDetailsController: AbortController | null = null
-  let mediaLoadToken = 0
   let imageDetailsToken = 0
   const normalizedModelId = computed(() => numberProp(props.modelId))
   const normalizedVersionId = computed(() => numberProp(props.versionId))
@@ -52,36 +50,25 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
   const { archiveModel, canLookupArchive, fetchLocalArchive, resetArchive } =
     useAssetPreviewArchiveFallback(props, setInitialVersion)
   const civitaiModel = computed(() => props.model ?? fetchedModel.value ?? archiveModel.value)
-  const modelVersions = computed(() => civitaiModel.value?.modelVersions ?? [])
+  const modelVersions = computed(() => sortModelVersions(civitaiModel.value?.modelVersions ?? []))
   const selectedVersion = computed(() => selectedVersionFor(modelVersions, activeVersionId))
-  const selectedVersionImages = computed(() => imagesForVersion(selectedVersion.value))
-  const previewSlides = computed<PreviewSlide[]>(() => {
-    if (!props.open) {
-      return []
-    }
-
-    const civitaiSlides = selectedVersionImages.value.map((image, index) => ({
-      key: `civitai:${image.id ?? index}:${image.url}`,
-      url: image.url ?? '',
-      image,
-      isVideo: isVideoPreview(image),
-      source: image.archiveSource === 'local' || image.remoteUrl ? 'archive' as const : 'civitai' as const,
-    }))
-
-    if (civitaiSlides.length) {
-      return civitaiSlides
-    }
-    return props.previewUrl
-      ? [{
-          key: `local:${props.previewUrl}`,
-          url: props.previewUrl,
-          image: null,
-          isVideo: props.isVideo === true,
-          source: 'local' as const,
-        }]
-      : []
+  const {
+    feedImages,
+    feedLoading,
+    feedError,
+    feedSlides,
+    previewSlides,
+    activeSlide,
+    selectPreviewImage,
+    selectFeedImage,
+  } = useAssetPreviewMediaFeed({
+    open: computed(() => props.open),
+    model: civitaiModel,
+    selectedVersion,
+    previewUrl: props.previewUrl,
+    isVideo: props.isVideo === true,
+    activeImageIndex,
   })
-  const activeSlide = computed(() => previewSlides.value[activeImageIndex.value] ?? null)
   const activeImage = computed(() => activeSlide.value?.image ?? null)
   const activeDetailedImage = computed(() => {
     const id = activeImage.value?.id
@@ -279,7 +266,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     }
   }
 
-  function handleModalVideoReady(url: string) {
+  function handleModalMediaReady(url: string) {
     if (displayedImageUrl.value === url) {
       mediaLoading.value = false
     }
@@ -391,10 +378,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
 
   watch(
     () => activeSlide.value?.url ?? '',
-    async (url) => {
-      const loadToken = mediaLoadToken + 1
-      mediaLoadToken = loadToken
-
+    (url) => {
       if (!url) {
         displayedImageUrl.value = ''
         mediaLoading.value = false
@@ -402,23 +386,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
       }
 
       mediaLoading.value = true
-      displayedImageUrl.value = ''
-
-      if (activeSlide.value?.isVideo) {
-        displayedImageUrl.value = url
-        return
-      }
-
-      try {
-        await preloadImage(url)
-      } catch {
-        // Let the native media element show its failure state.
-      } finally {
-        if (mediaLoadToken === loadToken) {
-          displayedImageUrl.value = url
-          mediaLoading.value = false
-        }
-      }
+      displayedImageUrl.value = url
     },
     { immediate: true },
   )
@@ -464,6 +432,10 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     mediaLoading,
     modelVersions,
     selectedVersion,
+    feedImages,
+    feedLoading,
+    feedError,
+    feedSlides,
     previewSlides,
     activeSlide,
     activeImage,
@@ -486,7 +458,9 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     selectVersion,
     showPreviousImage,
     showNextImage,
-    handleModalVideoReady,
+    selectPreviewImage,
+    selectFeedImage,
+    handleModalMediaReady,
     downloadForVersion,
     downloadStatusLabel,
     modelDownloadKey,

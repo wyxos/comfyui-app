@@ -19,7 +19,7 @@ describe('server model option enrichment', () => {
         fileName: 'waiIllustriousSDXL_v160.safetensors',
         targetPath: join(server.checkpointDir, 'waiIllustriousSDXL_v160.safetensors'),
         previewPaths: [
-          { path: firstPreviewPath, url: '/api/civitai/downloads/wai-illustrious/previews/0', mediaType: 'image' },
+          { path: firstPreviewPath, url: '/api/civitai/downloads/wai-illustrious/previews/0', mediaType: 'image', nsfw: 'Soft' },
           { path: secondPreviewPath, url: '/api/civitai/downloads/wai-illustrious/previews/1', mediaType: 'image' },
         ],
       }),
@@ -30,7 +30,7 @@ describe('server model option enrichment', () => {
     expect(checkpoints.payload.checkpoints[0]).toMatchObject({
       name: 'waiIllustriousSDXL_v160.safetensors',
       previewPaths: [
-        { url: '/api/civitai/downloads/wai-illustrious/previews/0', mediaType: 'image' },
+        { url: '/api/civitai/downloads/wai-illustrious/previews/0', mediaType: 'image', nsfw: 'Soft' },
         { url: '/api/civitai/downloads/wai-illustrious/previews/1', mediaType: 'image' },
       ],
     })

@@ -1,4 +1,5 @@
 import { civitaiImagesUrl } from './config.mjs'
+import { fetchCivitaiJsonWithCache } from './civitai-cache.mjs'
 import { buildCivitaiImagesQueryParams, parseInteger } from './civitai-query.mjs'
 import { sendError, sendJson } from './http.mjs'
 import { getStoredCivitaiApiKey } from './settings.mjs'
@@ -47,16 +48,16 @@ async function fetchCivitaiImagesPayload(sourceParams, apiKey, signal) {
   const upstreamUrl = new URL(civitaiImagesUrl.toString())
   upstreamUrl.search = buildCivitaiImagesQueryParams(sourceParams).toString()
 
-  const upstreamResponse = await fetch(upstreamUrl, {
+  const upstreamResponse = await fetchCivitaiJsonWithCache(upstreamUrl, {
+    authScope: apiKey ? 'auth' : 'public',
     headers: buildCivitaiHeaders(apiKey),
     signal,
   })
-  const text = await upstreamResponse.text()
 
   return {
     upstreamResponse,
-    payload: tryParseJson(text),
-    text,
+    payload: upstreamResponse.payload,
+    text: upstreamResponse.text,
   }
 }
 

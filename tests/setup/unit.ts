@@ -1,7 +1,8 @@
-import { enableAutoUnmount } from '@vue/test-utils'
+import { RouterLinkStub, config, enableAutoUnmount } from '@vue/test-utils'
 import { afterEach, vi } from 'vitest'
 
 enableAutoUnmount(afterEach)
+config.global.stubs.RouterLink = RouterLinkStub
 
 class MockResizeObserver {
   observe() {}

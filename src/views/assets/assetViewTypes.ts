@@ -108,7 +108,7 @@ export type CivitaiImage = {
   url?: string | null
   type?: string | null
   nsfw?: string | boolean | null
-  nsfwLevel?: string | null
+  nsfwLevel?: string | number | null
   width?: number
   height?: number
   hash?: string | null

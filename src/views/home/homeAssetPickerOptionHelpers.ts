@@ -1,12 +1,18 @@
+import { imageNsfwDetectedValue } from '../../components/asset-preview/assetPreviewHelpers'
+
 export type AssetPickerPreviewMedia = {
   url: string
   mediaType?: 'image' | 'video' | string | null
+  nsfw?: string | boolean | null
+  nsfwLevel?: string | number | null
 }
 
 export type AssetPickerPreviewSource = {
   url?: string | null
   mediaType?: 'image' | 'video' | string | null
   type?: 'image' | 'video' | string | null
+  nsfw?: string | boolean | null
+  nsfwLevel?: string | number | null
 }
 
 export type AssetPickerOption = {
@@ -127,6 +133,8 @@ function addPreviewMedia(
   media.push({
     url,
     mediaType: source?.mediaType ?? source?.type ?? null,
+    nsfw: source?.nsfw ?? null,
+    nsfwLevel: source?.nsfwLevel ?? null,
   })
 }
 
@@ -165,4 +173,8 @@ export function activePreviewMediaFor(option: AssetPickerOption, index: number) 
 export function optionHasVideoPreview(media: AssetPickerPreviewMedia | null | undefined) {
   const mediaType = String(media?.mediaType ?? '').toLowerCase()
   return mediaType.includes('video') || /\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(media?.url ?? '')
+}
+
+export function previewMediaHasNsfw(media: AssetPickerPreviewMedia | null | undefined) {
+  return imageNsfwDetectedValue(media) === true
 }

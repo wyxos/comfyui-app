@@ -38,7 +38,7 @@ describe('LibraryView filters', () => {
     installLocalStorageStub()
   })
 
-  it('paginates and filters local models by type, base model, and safety', async () => {
+  it('paginates local models without hiding NSFW items when the toggle is off', async () => {
     const now = Date.now()
     const downloads = ref(
       Array.from({ length: 46 }, (_, index) => {
@@ -101,7 +101,7 @@ describe('LibraryView filters', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('46 library items, 23 checkpoints, 23 LoRAs')
-    expect(wrapper.text()).toContain('1-40 of 45')
+    expect(wrapper.text()).toContain('1-40 of 46')
     expect(wrapper.text()).toContain('Library model 01')
     expect(wrapper.text()).not.toContain('library_model_01.safetensors')
     expect(wrapper.text()).not.toContain('Downloaded')
@@ -122,14 +122,11 @@ describe('LibraryView filters', () => {
     expect(wrapper.text()).toContain('1-15 of 15')
     await wrapper.get('[aria-label="Show All bases base models"]').trigger('click')
     await wrapper.get('[aria-label="Next library page"]').trigger('click')
-    expect(wrapper.text()).toContain('41-45 of 45')
-    expect(wrapper.text()).toContain('Library model 41')
-    await wrapper.get('[aria-label="Include NSFW library models"]').setValue(true)
-    expect(wrapper.text()).toContain('1-40 of 46')
-    await wrapper.get('[aria-label="Next library page"]').trigger('click')
     expect(wrapper.text()).toContain('41-46 of 46')
+    expect(wrapper.text()).toContain('Library model 41')
     expect(wrapper.text()).toContain('Library model 46')
     expect(wrapper.text()).toContain('NSFW')
+    expect((wrapper.get('[aria-label="Include NSFW library models"]').element as HTMLInputElement).checked).toBe(false)
   })
 
   it('shows watched Civitai models in the library and filters to watched items only', async () => {
@@ -306,7 +303,7 @@ describe('LibraryView filters', () => {
     expect(wrapper.text()).toContain('No hidden models match the current filters.')
   })
 
-  it('filters hidden Library models with the local NSFW toggle', async () => {
+  it('keeps hidden NSFW Library models visible when the local toggle is off', async () => {
     const hiddenModel = createMockModel({ id: 505, name: 'Hidden NSFW Library LoRA', nsfw: true })
     window.localStorage.setItem(BLACKLIST_STORAGE_KEY, JSON.stringify([505]))
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -356,8 +353,8 @@ describe('LibraryView filters', () => {
       },
     })
     await flushPromises()
-    expect(wrapper.text()).not.toContain('Hidden NSFW Library LoRA')
-    expect(wrapper.text()).toContain('No hidden models match the current filters.')
+    expect(wrapper.text()).toContain('Hidden NSFW Library LoRA')
+    expect(wrapper.text()).toContain('1-1 of 1')
     expect((wrapper.get('[aria-label="Include NSFW library models"]').element as HTMLInputElement).checked).toBe(false)
     await wrapper.get('[aria-label="Include NSFW library models"]').setValue(true)
     expect(wrapper.text()).toContain('Hidden NSFW Library LoRA')

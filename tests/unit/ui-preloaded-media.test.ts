@@ -43,4 +43,19 @@ describe('UiPreloadedMedia', () => {
     expect(wrapper.find('[data-test="media-loading"]').exists()).toBe(false)
     expect(wrapper.get('video').classes()).toContain('opacity-100')
   })
+
+  it('clears the loading state when image loading fails', async () => {
+    const wrapper = mount(UiPreloadedMedia, {
+      props: {
+        src: '/rate-limited-preview.png',
+        alt: 'Preview image',
+        label: 'Loading preview',
+      },
+    })
+
+    await wrapper.get('img').trigger('error')
+
+    expect(wrapper.find('[data-test="media-loading"]').exists()).toBe(false)
+    expect(wrapper.emitted('error')).toEqual([['/rate-limited-preview.png']])
+  })
 })

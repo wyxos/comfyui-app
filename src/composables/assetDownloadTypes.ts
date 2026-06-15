@@ -38,7 +38,12 @@ export type AssetDownloadItem = {
   totalBytes?: number | null
   progressPercent?: number | null
   previewUrl?: string | null
-  previewPaths?: Array<{ url?: string | null; mediaType?: 'image' | 'video' | string | null }>
+  previewPaths?: Array<{
+    url?: string | null
+    mediaType?: 'image' | 'video' | string | null
+    nsfw?: string | boolean | null
+    nsfwLevel?: string | number | null
+  }>
   dismissedAt?: number | null
   deletedAt?: number | null
   createdAt?: number | null

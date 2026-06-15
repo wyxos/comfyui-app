@@ -5,6 +5,8 @@ export type ModelPreviewPath = {
   url?: string | null
   mediaType?: 'image' | 'video' | string | null
   type?: 'image' | 'video' | string | null
+  nsfw?: string | boolean | null
+  nsfwLevel?: string | number | null
 }
 
 export type CheckpointOption = {

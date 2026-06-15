@@ -221,6 +221,10 @@ describe('AssetPreviewModal', () => {
     expect(document.body.textContent).toContain('sample-creator')
     expect(document.body.textContent).toContain('Illustrious')
     expect(document.body.textContent).toContain('blue armor')
+
+    await document.body.querySelector('button[aria-label="Show image and video details"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+
     expect(document.body.textContent).toContain('image-detail prompt')
     expect(document.body.textContent).toContain('Civitai API')
   })
@@ -457,8 +461,13 @@ describe('AssetPreviewModal', () => {
     await nextTick()
 
     expect(document.body.textContent).toContain('3 / 3')
+
+    await document.body.querySelector('button[aria-label="Show image and video details"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await nextTick()
+
     expect(document.body.textContent).toContain('3 of 3')
   })
+
 })
 
 describe('UiCarousel', () => {

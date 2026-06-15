@@ -3,6 +3,23 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('embla-carousel-vue', async () => {
+  const { ref } = await import('vue')
+  return {
+    default: () => [ref(null), ref({
+      canScrollPrev: () => false,
+      canScrollNext: () => true,
+      selectedScrollSnap: () => 0,
+      scrollPrev: vi.fn(),
+      scrollNext: vi.fn(),
+      scrollTo: vi.fn(),
+      reInit: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+    })],
+  }
+})
+
 function jsonResponse(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -85,6 +102,9 @@ describe('AssetPreviewModal offline archive fallback', () => {
           },
         })
       }
+      if (url.includes('/api/civitai/images?')) {
+        return jsonResponse({ items: [] })
+      }
 
       throw new Error(`Unexpected fetch ${url}`)
     })
@@ -116,9 +136,16 @@ describe('AssetPreviewModal offline archive fallback', () => {
       expect.stringContaining('/api/model-archive?'),
       expect.objectContaining({ headers: { Accept: 'application/json' } }),
     )
-    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/api/civitai/images?'), expect.anything())
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/civitai/images?'),
+      expect.objectContaining({ headers: { Accept: 'application/json' } }),
+    )
     expect(wrapper.text()).toContain('Archived Detail LoRA')
     expect(wrapper.text()).toContain('offline-creator')
+
+    await wrapper.get('button[aria-label="Show image and video details"]').trigger('click')
+    await flushPromises()
+
     expect(wrapper.text()).toContain('Offline archive')
     expect(wrapper.text()).toContain('offline archive prompt')
     expect(wrapper.text()).toContain('offline archive negative')

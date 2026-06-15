@@ -15,7 +15,7 @@ import {
   UserRound,
 } from 'lucide-vue-next'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
-import { imagesForVersion } from './assetModelHelpers'
+import { imageNsfwDetectedValue, imagesForVersion } from './assetModelHelpers'
 import { useProvidedAssetsView } from './assetsViewContext'
 import type { CivitaiModel } from './assetViewTypes'
 import { useAssetDownloadMenuPlacement } from './useAssetDownloadMenuPlacement'
@@ -148,8 +148,12 @@ function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
   event.stopPropagation()
   blacklistModel(model)
 }
-function shouldBlurNsfwContent(model: CivitaiModel) {
-  return blurNsfwContent?.value === true && modelHasNsfw(model)
+function shouldBlurNsfwPreview(model: CivitaiModel) {
+  return blurNsfwContent?.value === true && imageNsfwDetectedValue(activePreviewMediaFor(model)) === true
+}
+
+function shouldBlurNsfwTitle(model: CivitaiModel) {
+  return blurNsfwContent?.value === true && model.nsfw === true
 }
 </script>
 
@@ -183,7 +187,7 @@ function shouldBlurNsfwContent(model: CivitaiModel) {
             class="h-full w-auto max-w-none object-contain transition duration-300 group-hover:scale-[1.03]"
             :class="[
               isActivePreviewMediaReady(model) ? 'opacity-100' : 'opacity-0',
-              shouldBlurNsfwContent(model) ? 'scale-110 blur-sm saturate-50' : '',
+              shouldBlurNsfwPreview(model) ? 'scale-110 blur-sm saturate-50' : '',
             ]"
             :style="{ opacity: isActivePreviewMediaReady(model) ? 1 : 0 }"
             :src="activePreviewUrlFor(model) ?? undefined"
@@ -202,7 +206,7 @@ function shouldBlurNsfwContent(model: CivitaiModel) {
             class="h-full w-auto max-w-none object-contain transition duration-300 group-hover:scale-[1.03]"
             :class="[
               isActivePreviewMediaReady(model) ? 'opacity-100' : 'opacity-0',
-              shouldBlurNsfwContent(model) ? 'scale-110 blur-sm saturate-50' : '',
+              shouldBlurNsfwPreview(model) ? 'scale-110 blur-sm saturate-50' : '',
             ]"
             :style="{ opacity: isActivePreviewMediaReady(model) ? 1 : 0 }"
             :src="activePreviewUrlFor(model) ?? undefined"
@@ -310,7 +314,7 @@ function shouldBlurNsfwContent(model: CivitaiModel) {
         >
           <a
             class="block min-w-0 truncate text-base font-semibold leading-5 tracking-tight text-card-foreground transition hover:text-secondary"
-            :class="shouldBlurNsfwContent(model) ? 'blur-sm select-none' : ''"
+            :class="shouldBlurNsfwTitle(model) ? 'blur-sm select-none' : ''"
             data-asset-card-title-link
             :href="modelUrl(model)"
             target="_blank"

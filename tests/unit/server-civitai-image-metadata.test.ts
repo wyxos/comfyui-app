@@ -93,4 +93,58 @@ describe('Civitai image metadata proxy', () => {
     expect(server.calls.some((call) => call.url.pathname === '/api/v1/images')).toBe(true)
     expect(server.calls.some((call) => call.url.pathname === `/images/${imageId}`)).toBe(true)
   })
+
+  it('serves cached image metadata when Civitai rate limits a repeated lookup', async () => {
+    const imageId = 114266624
+    const server = await setupHarness({
+      upstream: {
+        civitaiImages: {
+          items: [
+            {
+              id: imageId,
+              url: 'https://image.test/cached-image.png',
+              width: 1024,
+              height: 768,
+              hash: 'CACHEDHASH',
+              meta: { prompt: 'cached metadata prompt' },
+            },
+          ],
+          metadata: { totalItems: 1, totalPages: 1 },
+        },
+      },
+    })
+
+    await expect(server.request(`/api/civitai/images?imageId=${imageId}&limit=1`)).resolves.toMatchObject({
+      response: expect.objectContaining({ status: 200 }),
+      payload: {
+        items: [
+          expect.objectContaining({
+            id: imageId,
+            meta: expect.objectContaining({ prompt: 'cached metadata prompt' }),
+          }),
+        ],
+      },
+    })
+
+    server.upstream.failures['GET https://civitai.com/api/v1/images'] = {
+      status: 429,
+      payload: {
+        code: 'too_many_requests',
+        message: 'Your account has made too many requests; try again later.',
+        status: 429,
+      },
+    }
+
+    await expect(server.request(`/api/civitai/images?imageId=${imageId}&limit=1`)).resolves.toMatchObject({
+      response: expect.objectContaining({ status: 200 }),
+      payload: {
+        items: [
+          expect.objectContaining({
+            id: imageId,
+            meta: expect.objectContaining({ prompt: 'cached metadata prompt' }),
+          }),
+        ],
+      },
+    })
+  })
 })

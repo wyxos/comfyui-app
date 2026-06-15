@@ -8,6 +8,8 @@ import type {
   NormalizedMetaRow,
 } from './assetPreviewTypes'
 
+type NsfwMediaSource = Pick<CivitaiImage, 'nsfw' | 'nsfwLevel'> | null | undefined
+
 export function modelVersionLabel(version: CivitaiModelVersion) {
   const name = version.name ?? `Version ${version.id}`
   return version.baseModel ? `${name} - ${version.baseModel}` : name
@@ -36,6 +38,46 @@ export function selectedVersionFor(versions: Ref<CivitaiModelVersion[]>, activeV
   return versions.value.find((version) => version.id === activeVersionId.value)
     ?? versions.value[0]
     ?? null
+}
+
+function versionReleaseTimestamp(version: CivitaiModelVersion | null | undefined) {
+  for (const value of [version?.publishedAt, version?.createdAt]) {
+    if (!value) {
+      continue
+    }
+
+    const timestamp = Date.parse(value)
+    if (Number.isFinite(timestamp)) {
+      return timestamp
+    }
+  }
+
+  return null
+}
+
+export function sortModelVersions(versions: CivitaiModelVersion[] | null | undefined) {
+  return (versions ?? [])
+    .map((version, index) => ({
+      version,
+      index,
+      timestamp: versionReleaseTimestamp(version),
+    }))
+    .sort((left, right) => {
+      if (left.timestamp !== null && right.timestamp !== null && left.timestamp !== right.timestamp) {
+        return right.timestamp - left.timestamp
+      }
+
+      if (left.timestamp !== null) {
+        return -1
+      }
+
+      if (right.timestamp !== null) {
+        return 1
+      }
+
+      return left.index - right.index
+    })
+    .map(({ version }) => version)
 }
 
 function normalizedAvailability(value: string | null | undefined) {
@@ -119,38 +161,66 @@ export function isVideoPreview(image: CivitaiImage | null | undefined) {
     isVideoUrl(image?.url)
 }
 
-export function isImageNsfw(model: CivitaiModel | null, image: CivitaiImage | null | undefined) {
-  if (model?.nsfw === true) {
-    return true
-  }
-
+export function isImageNsfw(_model: CivitaiModel | null, image: NsfwMediaSource) {
   return imageNsfwDetectedValue(image) === true
 }
 
-export function imageNsfwDetectedValue(image: CivitaiImage | null | undefined): boolean | null {
-  if (typeof image?.nsfw === 'boolean') {
-    return image.nsfw
+function nsfwFlagDetectedValue(value: unknown): boolean | null {
+  if (typeof value === 'boolean') {
+    return value
   }
 
-  if (typeof image?.nsfw === 'string') {
-    const normalized = image.nsfw.trim().toLowerCase()
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value > 0 : null
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
     if (!normalized) {
       return null
     }
 
-    return !['false', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized)
-  }
-
-  if (typeof image?.nsfwLevel === 'string') {
-    const normalized = image.nsfwLevel.trim().toLowerCase()
-    if (!normalized) {
-      return null
-    }
-
-    return !['false', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized)
+    return !['false', '0', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized)
   }
 
   return null
+}
+
+function nsfwLevelDetectedValue(value: unknown): boolean | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value > 1 : null
+  }
+
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) {
+    return null
+  }
+
+  const numericLevel = Number(normalized)
+  if (Number.isFinite(numericLevel)) {
+    return numericLevel > 1
+  }
+
+  return !['false', '0', '1', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized)
+}
+
+export function imageNsfwDetectedValue(image: NsfwMediaSource): boolean | null {
+  const levelDetected = nsfwLevelDetectedValue(image?.nsfwLevel)
+  const flagDetected = nsfwFlagDetectedValue(image?.nsfw)
+
+  if (levelDetected === true || flagDetected === true) {
+    return true
+  }
+
+  if (levelDetected !== null) {
+    return levelDetected
+  }
+
+  return flagDetected
 }
 
 export function modelHasNsfwContent(

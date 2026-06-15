@@ -1,4 +1,5 @@
 import {
+  imageNsfwDetectedValue,
   imagesForVersion,
   isVideoUrl,
   modelVersionLabel,
@@ -25,7 +26,12 @@ export type LibraryTypeFilter = (typeof typeFilters)[number]['value']
 export type LibraryItemKind = Exclude<LibraryTypeFilter, 'all'>
 export type LibrarySource = 'downloaded' | 'watched' | 'hidden' | 'controlnet'
 export type LibrarySourceFilter = (typeof sourceFilters)[number]['value']
-export type LibraryPreviewPath = { url?: string | null; mediaType?: 'image' | 'video' | string | null }
+export type LibraryPreviewPath = {
+  url?: string | null
+  mediaType?: 'image' | 'video' | string | null
+  nsfw?: string | boolean | null
+  nsfwLevel?: string | number | null
+}
 export type ControlNetLibraryItem = {
   id: string
   itemKind: 'controlnet'
@@ -178,6 +184,10 @@ export function isVideoPreview(item: LibraryModelItem) {
   return primaryPreviewPath(item)?.mediaType === 'video' || isVideoUrl(previewUrl)
 }
 
+export function previewHasNsfw(item: LibraryModelItem) {
+  return imageNsfwDetectedValue(primaryPreviewPath(item)) === true
+}
+
 export function normalizeSafetyValue(value: unknown): boolean | null {
   if (typeof value === 'boolean') {
     return value
@@ -265,8 +275,16 @@ function watchedPreviewPathFromImage(image: Record<string, unknown> | null | und
     : typeof image?.type === 'string'
       ? image.type
       : null
+  const nsfw = typeof image?.nsfw === 'boolean' || typeof image?.nsfw === 'string'
+    ? image.nsfw
+    : null
 
-  return { url, mediaType }
+  return {
+    url,
+    mediaType,
+    nsfw,
+    nsfwLevel: typeof image?.nsfwLevel === 'string' || typeof image?.nsfwLevel === 'number' ? image.nsfwLevel : null,
+  }
 }
 
 export function watchedPreviewPathsFor(item: WatchedAssetDownloadItem): LibraryPreviewPath[] {
@@ -303,6 +321,8 @@ export function hiddenLibraryItemForModel(model: CivitaiModel): HiddenLibraryIte
     ? imagesForVersion(version).map((image) => ({
         url: image.url,
         mediaType: image.mediaType ?? image.type ?? null,
+        nsfw: image.nsfw ?? null,
+        nsfwLevel: image.nsfwLevel ?? null,
       }))
     : []
 

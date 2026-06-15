@@ -201,6 +201,7 @@ export function serializeDownloadPreview(image) {
     hash: safeTrim(image.hash),
     type: safeTrim(image.type),
     nsfw: image.nsfw ?? null,
+    nsfwLevel: safeTrim(image.nsfwLevel),
     postId: image.postId ?? null,
     username: safeTrim(image.username),
     modelVersionIds: Array.isArray(image.modelVersionIds) ? image.modelVersionIds : [],

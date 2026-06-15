@@ -4,6 +4,7 @@ import { Readable } from 'node:stream'
 import { comfyUrl, defaultRuntimeAdapters, host, indexPath, port, refreshConfigFromEnv, runtimeAdapters } from './config.mjs'
 import { resolveAsset, sendError, sendJson, streamFile } from './http.mjs'
 import { comfySocketConnected, connectComfySocket, resetComfySocketRuntimeState } from './comfy-socket.mjs'
+import { resetCivitaiCacheRuntimeState } from './civitai-cache.mjs'
 import {
   handleCheckpointList,
   handleCivitaiImagesProxy,
@@ -326,6 +327,7 @@ export function configureCompanionServerForTests(adapters = {}) {
   resetWatchedDownloadsRuntimeState()
   resetComfySocketRuntimeState()
   resetModelMetadataRuntimeState()
+  resetCivitaiCacheRuntimeState()
   Object.assign(runtimeAdapters, adapters)
 
   return () => {

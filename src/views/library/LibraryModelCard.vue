@@ -8,6 +8,7 @@ import {
   isVideoPreview,
   modelHasNsfw,
   modelTypeLabel,
+  previewHasNsfw,
   previewFor,
   type LibraryModelItem,
 } from './libraryModelHelpers'
@@ -24,7 +25,11 @@ defineEmits<{
   restore: [item: LibraryModelItem]
 }>()
 
-function shouldBlurNsfwContent() {
+function shouldBlurNsfwPreview() {
+  return props.blurNsfwContent && previewHasNsfw(props.item)
+}
+
+function shouldBlurNsfwTitle() {
   return props.blurNsfwContent && modelHasNsfw(props.item)
 }
 </script>
@@ -39,7 +44,7 @@ function shouldBlurNsfwContent() {
     :title="item.modelName"
     min-height-class="min-h-[20rem]"
     media-class="h-64"
-    :media-content-class="shouldBlurNsfwContent() ? 'scale-110 blur-sm saturate-50' : ''"
+    :media-content-class="shouldBlurNsfwPreview() ? 'scale-110 blur-sm saturate-50' : ''"
     @click="item.librarySource === 'hidden' ? undefined : $emit('open', item)"
   >
     <template #placeholder>
@@ -78,7 +83,7 @@ function shouldBlurNsfwContent() {
     <div class="flex min-w-0 items-start justify-between gap-2">
       <h2
         class="min-w-0 truncate text-sm font-semibold leading-5 text-card-foreground"
-        :class="shouldBlurNsfwContent() ? 'blur-sm select-none' : ''"
+        :class="shouldBlurNsfwTitle() ? 'blur-sm select-none' : ''"
         data-library-card-title
         :title="item.modelName"
       >

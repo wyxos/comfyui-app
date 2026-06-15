@@ -13,11 +13,15 @@ import { Toaster as Sonner } from 'vue-sonner'
 import { computed } from 'vue'
 import { cn } from '@/lib/utils'
 
-const props = defineProps<ToasterProps>()
-const delegatedProps = computed(() => {
-  const { class: _class, toastOptions: _toastOptions, ...delegated } = props
+type DelegatedToasterProps = Omit<ToasterProps, 'class' | 'toastOptions'>
 
-  return delegated
+const props = defineProps<ToasterProps>()
+const delegatedProps = computed<DelegatedToasterProps>(() => {
+  const delegated = { ...props } as Partial<ToasterProps>
+  delete delegated.class
+  delete delegated.toastOptions
+
+  return delegated as DelegatedToasterProps
 })
 const toastOptions = computed(() => ({
   ...props.toastOptions,

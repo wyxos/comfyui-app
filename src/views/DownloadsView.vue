@@ -17,7 +17,6 @@ import {
   isCheckpointOrLora,
   isVideoPreviewDownload,
   isWatchedCheckpointOrLora,
-  itemHasNsfw,
   normalizedModelType,
   previewForDownload,
   rowModelTypeLabel,
@@ -87,16 +86,8 @@ const watchedModelDownloads = computed(() => {
     .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
 })
 
-const visibleModelDownloads = computed(() => {
-  return modelDownloads.value.filter((item) => includeNsfw.value || !itemHasNsfw(item))
-})
-
-const visibleWatchedModelDownloads = computed(() => {
-  return watchedModelDownloads.value.filter((item) => includeNsfw.value || !itemHasNsfw(item))
-})
-
 const filterSourceDownloads = computed(() => {
-  return statusFilter.value === 'watched' ? visibleWatchedModelDownloads.value : visibleModelDownloads.value
+  return statusFilter.value === 'watched' ? watchedModelDownloads.value : modelDownloads.value
 })
 
 const filteredDownloads = computed(() => {
@@ -144,15 +135,15 @@ const visibleRangeLabel = computed(() => {
 })
 
 const statusCounts = computed(() => ({
-  all: visibleModelDownloads.value.length,
-  downloaded: visibleModelDownloads.value.filter((item) => statusGroup(item) === 'downloaded').length,
-  active: visibleModelDownloads.value.filter((item) => statusGroup(item) === 'active').length,
-  watched: visibleWatchedModelDownloads.value.length,
-  attention: visibleModelDownloads.value.filter((item) => statusGroup(item) === 'attention').length,
-  deleted: visibleModelDownloads.value.filter((item) => statusGroup(item) === 'deleted').length,
+  all: modelDownloads.value.length,
+  downloaded: modelDownloads.value.filter((item) => statusGroup(item) === 'downloaded').length,
+  active: modelDownloads.value.filter((item) => statusGroup(item) === 'active').length,
+  watched: watchedModelDownloads.value.length,
+  attention: modelDownloads.value.filter((item) => statusGroup(item) === 'attention').length,
+  deleted: modelDownloads.value.filter((item) => statusGroup(item) === 'deleted').length,
 }))
 
-watch([query, typeFilter, statusFilter, includeNsfw], () => {
+watch([query, typeFilter, statusFilter], () => {
   currentPage.value = 1
 })
 
@@ -419,6 +410,8 @@ onMounted(() => {
       :version-id="selectedDownload?.versionId ?? null"
       :preview-url="previewForDownload(selectedDownload)"
       :is-video="isVideoPreviewDownload(selectedDownload)"
+      :include-nsfw="includeNsfw"
+      :blur-nsfw-content="blurNsfwContent"
       :title="selectedDownload?.modelName ?? 'Preview'"
       :subtitle="selectedDownload?.versionName ?? null"
       :kind-label="rowModelTypeLabel(selectedDownload)"

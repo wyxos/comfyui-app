@@ -12,6 +12,8 @@ provideAssetsView(view)
 const {
   activeImageModel,
   activeImageInitialIndex,
+  includeNsfw,
+  blurNsfwContent,
   queuingDownloadKey,
   downloadForVersion,
   downloadStatusLabel,
@@ -38,6 +40,8 @@ function assetPreviewDownloadStatusLabel(download: AssetPreviewDownload | null) 
     :open="Boolean(activeImageModel)"
     :model="activeImageModel"
     :initial-image-index="activeImageInitialIndex"
+    :include-nsfw="includeNsfw"
+    :blur-nsfw-content="blurNsfwContent"
     :queuing-download-key="queuingDownloadKey"
     :download-for-version="downloadForVersion"
     :download-status-label="assetPreviewDownloadStatusLabel"

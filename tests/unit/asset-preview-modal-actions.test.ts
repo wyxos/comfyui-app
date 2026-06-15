@@ -3,6 +3,23 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 
+vi.mock('embla-carousel-vue', async () => {
+  const { ref } = await import('vue')
+  return {
+    default: () => [ref(null), ref({
+      canScrollPrev: () => false,
+      canScrollNext: () => true,
+      selectedScrollSnap: () => 0,
+      scrollPrev: vi.fn(),
+      scrollNext: vi.fn(),
+      scrollTo: vi.fn(),
+      reInit: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+    })],
+  }
+})
+
 describe('AssetPreviewModal actions', () => {
   it('restores model safety to original metadata from the shadcn toggle group', async () => {
     const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
@@ -85,6 +102,7 @@ describe('AssetPreviewModal actions', () => {
       },
     })
 
+    await wrapper.get('button[aria-label="Show image and video details"]').trigger('click')
     expect(wrapper.text()).toContain('Image safety')
     await wrapper.get('button[aria-label="Mark image NSFW"]').trigger('click')
     await wrapper.get('button[aria-label="Save image safety override"]').trigger('click')

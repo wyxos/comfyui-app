@@ -4,6 +4,23 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { computed, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('embla-carousel-vue', async () => {
+  const { ref } = await import('vue')
+  return {
+    default: () => [ref(null), ref({
+      canScrollPrev: () => false,
+      canScrollNext: () => true,
+      selectedScrollSnap: () => 0,
+      scrollPrev: vi.fn(),
+      scrollNext: vi.fn(),
+      scrollTo: vi.fn(),
+      reInit: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+    })],
+  }
+})
+
 describe('DownloadsView watched filter', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -85,7 +102,7 @@ describe('DownloadsView watched filter', () => {
     expect(wrapper.find('[aria-label="Delete Watched early LoRA from disk"]').exists()).toBe(false)
   })
 
-  it('uses the NSFW toggle to filter downloaded and watched rows', async () => {
+  it('keeps downloaded and watched rows visible when the NSFW toggle is off', async () => {
     const downloads = ref([
       {
         id: 'safe-complete-download',
@@ -179,8 +196,8 @@ describe('DownloadsView watched filter', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Safe checkpoint')
-    expect(wrapper.text()).not.toContain('NSFW checkpoint')
-    expect(wrapper.text()).toContain('1 downloaded')
+    expect(wrapper.text()).toContain('NSFW checkpoint')
+    expect(wrapper.text()).toContain('2 downloaded')
     expect((wrapper.get('[aria-label="Include NSFW downloads"]').element as HTMLInputElement).checked).toBe(false)
 
     await wrapper.get('[aria-label="Include NSFW downloads"]').setValue(true)
@@ -197,8 +214,8 @@ describe('DownloadsView watched filter', () => {
     await wrapper.get('[aria-label="Include NSFW downloads"]').setValue(false)
 
     expect(wrapper.text()).toContain('Safe watched LoRA')
-    expect(wrapper.text()).not.toContain('NSFW watched LoRA')
-    expect(wrapper.text()).toContain('1 watched')
+    expect(wrapper.text()).toContain('NSFW watched LoRA')
+    expect(wrapper.text()).toContain('2 watched')
   })
 
   it('uses the saved NSFW default as the initial Downloads toggle state', async () => {
@@ -253,22 +270,23 @@ describe('DownloadsView watched filter', () => {
     expect((wrapper.get('[aria-label="Include NSFW downloads"]').element as HTMLInputElement).checked).toBe(true)
   })
 
-  it('blurs visible NSFW rows and opens the shared model modal from the title', async () => {
+  it('blurs a visible NSFW preview image without blurring the safe model title', async () => {
     const downloads = ref([
       {
         id: 'nsfw-complete-download',
         state: 'complete',
         modelId: 3,
-        modelName: 'NSFW checkpoint',
+        modelName: 'Safe checkpoint',
         modelType: 'Checkpoint',
-        modelNsfw: true,
-        modelMetadata: { nsfw: true },
+        modelNsfw: false,
+        modelMetadata: { nsfw: false },
         versionId: 4,
         versionName: 'v1',
         fileName: 'nsfw.safetensors',
         targetPath: 'C:\\models\\checkpoints\\nsfw.safetensors',
         progressPercent: 100,
         previewUrl: '/api/civitai/downloads/nsfw-complete-download/preview',
+        previewPaths: [{ url: '/api/civitai/downloads/nsfw-complete-download/preview', mediaType: 'image', nsfw: 'Soft' }],
         updatedAt: 20,
       },
     ])
@@ -278,10 +296,10 @@ describe('DownloadsView watched filter', () => {
         return new Response(JSON.stringify({
           items: [{
             id: 3,
-            name: 'NSFW checkpoint',
+            name: 'Safe checkpoint',
             type: 'Checkpoint',
-            nsfw: true,
-            modelVersions: [{ id: 4, name: 'v1', images: [] }],
+            nsfw: false,
+            modelVersions: [{ id: 4, name: 'v1', images: [{ url: 'https://example.test/nsfw-preview.png', nsfw: 'Soft' }] }],
           }],
         }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } })
       }
@@ -315,13 +333,13 @@ describe('DownloadsView watched filter', () => {
     const wrapper = mount(DownloadsView)
     await flushPromises()
 
-    expect(wrapper.get('img[alt="NSFW checkpoint preview"]').classes()).toContain('blur-sm')
-    expect(wrapper.get('[data-download-title-button]').classes()).toContain('blur-sm')
-    expect(wrapper.get('[data-download-title-civitai-link]').attributes('href')).toBe('https://civitai.red/models/3?modelVersionId=4')
+    expect(wrapper.get('img[alt="Safe checkpoint preview"]').classes()).toContain('blur-sm')
+    expect(wrapper.get('[data-download-title-button]').classes()).not.toContain('blur-sm')
+    expect(wrapper.get('[data-download-title-civitai-link]').attributes('href')).toBe('https://civitai.com/models/3?modelVersionId=4')
 
-    await wrapper.get('[aria-label="Open NSFW checkpoint preview"]').trigger('click')
+    await wrapper.get('[aria-label="Open Safe checkpoint preview"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.get('[role="dialog"]').text()).toContain('NSFW checkpoint')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Safe checkpoint')
   })
 })

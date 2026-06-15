@@ -51,13 +51,9 @@ let openLoadToken = 0
 let includeNsfwTouched = false
 
 const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase())
-const searchAndSafetyFilteredOptions = computed(() => {
+const searchFilteredOptions = computed(() => {
   const query = normalizedSearchQuery.value
   return props.options.filter((option) => {
-    if (!includeNsfw.value && optionHasNsfw(option)) {
-      return false
-    }
-
     if (!query) {
       return true
     }
@@ -68,7 +64,7 @@ const searchAndSafetyFilteredOptions = computed(() => {
 const baseModelFilterOptions = computed<BaseModelFilterOption[]>(() => {
   const filters = new Map<string, BaseModelFilterOption>()
 
-  for (const option of searchAndSafetyFilteredOptions.value) {
+  for (const option of searchFilteredOptions.value) {
     for (const label of optionBaseModelLabels(option)) {
       const key = normalizeBaseModelFilterKey(label)
       if (!key) {
@@ -90,10 +86,10 @@ const baseModelFilterOptions = computed<BaseModelFilterOption[]>(() => {
 const hasBaseModelFilters = computed(() => baseModelFilterOptions.value.length > 0)
 const filteredOptions = computed(() => {
   if (!selectedBaseModelFilter.value) {
-    return searchAndSafetyFilteredOptions.value
+    return searchFilteredOptions.value
   }
 
-  return searchAndSafetyFilteredOptions.value.filter((option) =>
+  return searchFilteredOptions.value.filter((option) =>
     optionBaseModelLabels(option).some((label) => normalizeBaseModelFilterKey(label) === selectedBaseModelFilter.value),
   )
 })
@@ -331,7 +327,7 @@ onBeforeUnmount(() => {
           @click="applyBaseModelFilter('')"
         >
           All
-          <span class="text-current/70">{{ searchAndSafetyFilteredOptions.length }}</span>
+          <span class="text-current/70">{{ searchFilteredOptions.length }}</span>
         </button>
         <button
           v-for="option in baseModelFilterOptions"

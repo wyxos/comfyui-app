@@ -1,5 +1,12 @@
-import { civitaiModelWebUrl, isVersionDownloadable } from '../../components/asset-preview/assetPreviewHelpers'
+import {
+  civitaiModelWebUrl,
+  imageNsfwDetectedValue,
+  isVersionDownloadable,
+  sortModelVersions,
+} from '../../components/asset-preview/assetPreviewHelpers'
 import type { CivitaiImage, CivitaiModel, CivitaiModelVersion } from './assetViewTypes'
+
+export { imageNsfwDetectedValue }
 
 export function formatNumber(value?: number) {
   if (!value) {
@@ -13,7 +20,7 @@ export function formatNumber(value?: number) {
 }
 
 export function firstVersion(model: CivitaiModel) {
-  return model.modelVersions?.[0] ?? null
+  return versionsForModel(model)[0] ?? null
 }
 
 export function imagesForVersion(version: CivitaiModelVersion): CivitaiImage[] {
@@ -80,29 +87,12 @@ export function favoriteCountFor(model: CivitaiModel) {
   return model.stats?.favoriteCount ?? model.stats?.thumbsUpCount
 }
 
-export function isImageNsfw(model: CivitaiModel, image?: CivitaiImage) {
-  if (model.nsfw === true) {
-    return true
-  }
-
-  if (!image) {
-    return false
-  }
-
-  if (typeof image.nsfw === 'boolean') {
-    return image.nsfw
-  }
-
-  if (typeof image.nsfw === 'string') {
-    const normalized = image.nsfw.trim().toLowerCase()
-    return Boolean(normalized && !['false', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized))
-  }
-
-  return false
+export function isImageNsfw(_model: CivitaiModel, image?: CivitaiImage) {
+  return imageNsfwDetectedValue(image) === true
 }
 
 export function modelHasNsfw(model: CivitaiModel) {
-  return model.nsfw === true || imagesForModel(model).some((image) => isImageNsfw(model, image))
+  return model.nsfw === true
 }
 
 export function formatFileSize(sizeKb: number | undefined) {
@@ -122,7 +112,7 @@ export function formatFileSize(sizeKb: number | undefined) {
 }
 
 export function versionsForModel(model: CivitaiModel) {
-  return model.modelVersions ?? []
+  return sortModelVersions(model.modelVersions)
 }
 
 export function primaryFileForVersion(version: CivitaiModelVersion | null | undefined) {

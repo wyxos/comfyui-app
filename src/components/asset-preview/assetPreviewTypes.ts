@@ -13,7 +13,7 @@ export type CivitaiImage = {
   url?: string | null
   type?: string | null
   nsfw?: string | boolean | null
-  nsfwLevel?: string | null
+  nsfwLevel?: string | number | null
   width?: number
   height?: number
   hash?: string | null
@@ -115,6 +115,8 @@ export type AssetPreviewModalProps = {
   previewUrl?: string | null
   initialImageIndex?: number
   isVideo?: boolean
+  includeNsfw?: boolean
+  blurNsfwContent?: boolean
   subtitle?: string | null
   kindLabel?: string
   modelId?: number | null

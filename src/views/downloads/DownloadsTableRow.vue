@@ -14,6 +14,7 @@ import {
 import { civitaiModelWebUrl } from '../../components/asset-preview/assetPreviewHelpers'
 import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import type { AssetDownloadItem, AssetDownloadState } from '../../composables/useAssetDownloads'
+import { previewHasNsfw } from './downloadsViewHelpers'
 
 type DownloadTableRowState = AssetDownloadState | 'watched'
 type DownloadTableRowItem = Omit<AssetDownloadItem, 'state'> & { state: DownloadTableRowState }
@@ -130,11 +131,11 @@ function itemHasNsfw(item: DownloadTableRowItem) {
 }
 
 function shouldBlurPreview(item: DownloadTableRowItem) {
-  return props.blurNsfwPreview && itemHasNsfw(item)
+  return props.blurNsfwPreview && previewHasNsfw(item)
 }
 
 function shouldBlurText(item: DownloadTableRowItem) {
-  return shouldBlurPreview(item)
+  return props.blurNsfwPreview && itemHasNsfw(item)
 }
 
 function formatFileSize(item: DownloadTableRowItem) {

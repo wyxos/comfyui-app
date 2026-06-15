@@ -16,7 +16,6 @@ import {
   hiddenLibraryItemForModel,
   isCheckpointOrLora,
   isVideoPreview,
-  modelHasNsfw,
   modelTypeLabel,
   normalizedModelType,
   parseLibrarySourceFilter,
@@ -142,10 +141,6 @@ const filteredModels = computed(() => {
       return false
     }
 
-    if (shouldHideForSafety(item)) {
-      return false
-    }
-
     if (typeFilter.value !== 'all' && item.itemKind !== typeFilter.value) {
       return false
     }
@@ -204,10 +199,6 @@ const baseModelOptions = computed(() => {
       continue
     }
 
-    if (shouldHideForSafety(item)) {
-      continue
-    }
-
     if (typeFilter.value !== 'all' && item.itemKind !== typeFilter.value) {
       continue
     }
@@ -224,7 +215,7 @@ const baseModelOptions = computed(() => {
       .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
   ]
 })
-watch([query, typeFilter, sourceFilter, baseModelFilter, includeNsfw], () => {
+watch([query, typeFilter, sourceFilter, baseModelFilter], () => {
   currentPage.value = 1
 })
 
@@ -271,10 +262,6 @@ function matchesSourceFilter(item: LibraryModelItem) {
   }
 
   return sourceFilter.value === 'all' || item.librarySource === sourceFilter.value
-}
-
-function shouldHideForSafety(item: LibraryModelItem) {
-  return !includeNsfw.value && modelHasNsfw(item)
 }
 
 function openModelPreview(item: LibraryModelItem) {
@@ -449,6 +436,8 @@ onMounted(() => {
       :version-id="selectedModel?.versionId ?? null"
       :preview-url="selectedModel ? previewFor(selectedModel) : null"
       :is-video="selectedModel ? isVideoPreview(selectedModel) : false"
+      :include-nsfw="includeNsfw"
+      :blur-nsfw-content="blurNsfwContent"
       :title="selectedModel?.modelName ?? 'Preview'"
       :subtitle="selectedModel?.versionName ?? null"
       :kind-label="selectedModel ? modelTypeLabel(selectedModel) : 'Preview'"
