@@ -6,6 +6,23 @@ import { workflowNodesFromBody } from './workflowTestUtils'
 
 const { setupHarness, downloadItem } = useServerHarness()
 
+async function waitForCivitaiVersionCalls(server: Awaited<ReturnType<typeof setupHarness>>, expectedCount: number) {
+  const deadline = Date.now() + 500
+
+  while (Date.now() < deadline) {
+    const count = server.calls.filter((call) => call.url.pathname === '/api/v1/model-versions/201').length
+    if (count >= expectedCount) {
+      return count
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10)
+    })
+  }
+
+  return server.calls.filter((call) => call.url.pathname === '/api/v1/model-versions/201').length
+}
+
 describe('companion server API routes', () => {
   it('covers input images, model previews, view proxy, and open parent folder routes', async () => {
       const server = await setupHarness()
@@ -391,5 +408,65 @@ describe('companion server API routes', () => {
           }),
         }),
       })
+    })
+
+  it('backs off automatic download metadata refreshes after Civitai fails', async () => {
+      const server = await setupHarness({
+        upstream: {
+          failures: {
+            'GET https://civitai.com/api/v1/model-versions/201': {
+              status: 502,
+              payload: { message: 'Bad gateway' },
+            },
+          },
+        },
+      })
+
+      await server.writeDownloads([
+        downloadItem('missing-metadata', 'complete', {
+          modelNsfw: null,
+          modelMetadata: null,
+        }),
+      ])
+
+      await expect(server.request('/api/civitai/downloads')).resolves.toMatchObject({
+        response: expect.objectContaining({ status: 200 }),
+      })
+      expect(await waitForCivitaiVersionCalls(server, 1)).toBe(1)
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, 10)
+      })
+      await expect(server.request('/api/civitai/downloads')).resolves.toMatchObject({
+        response: expect.objectContaining({ status: 200 }),
+      })
+      await new Promise((resolve) => {
+        setTimeout(resolve, 25)
+      })
+
+      expect(server.calls.filter((call) => call.url.pathname === '/api/v1/model-versions/201')).toHaveLength(1)
+    })
+
+  it('limits automatic download metadata refresh fan-out per downloads list request', async () => {
+      const server = await setupHarness()
+
+      await server.writeDownloads(
+        Array.from({ length: 5 }, (_, index) =>
+          downloadItem(`missing-metadata-${index + 1}`, 'complete', {
+            modelNsfw: null,
+            modelMetadata: null,
+            versionId: 201 + index,
+          }),
+        ),
+      )
+
+      await expect(server.request('/api/civitai/downloads')).resolves.toMatchObject({
+        response: expect.objectContaining({ status: 200 }),
+      })
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50)
+      })
+
+      expect(server.calls.filter((call) => call.url.pathname.startsWith('/api/v1/model-versions/'))).toHaveLength(3)
     })
 })

@@ -54,6 +54,7 @@ import {
 } from './handlers/jobs-files.mjs'
 import { resetDownloadsRuntimeState } from './downloads/state.mjs'
 import { resetDownloadQueueRuntimeState } from './downloads/queue.mjs'
+import { resetDownloadMetadataRuntimeState } from './downloads/metadata.mjs'
 import { resetWatchedDownloadsRuntimeState, startWatchedDownloadPoller, stopWatchedDownloadPoller } from './downloads/watched.mjs'
 import { resetComfyModelDirsFromEnv } from './model-paths.mjs'
 import { resetModelMetadataRuntimeState } from './model-metadata.mjs'
@@ -324,6 +325,7 @@ export function configureCompanionServerForTests(adapters = {}) {
   resetComfyModelDirsFromEnv()
   resetDownloadsRuntimeState()
   resetDownloadQueueRuntimeState()
+  resetDownloadMetadataRuntimeState()
   resetWatchedDownloadsRuntimeState()
   resetComfySocketRuntimeState()
   resetModelMetadataRuntimeState()

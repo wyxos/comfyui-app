@@ -12,6 +12,36 @@ import { fetchCivitaiVersionMetadata } from '../model-metadata.mjs'
 import { refreshCivitaiArchiveForDownload } from '../civitai-archive.mjs'
 
 const pendingModelMetadataRefreshes = new Set()
+const failedModelMetadataRefreshes = new Map()
+const modelMetadataRefreshFailureBackoffMs = 15 * 60 * 1000
+const maxAutomaticModelMetadataRefreshesPerPass = 3
+
+function modelMetadataRefreshKey(download) {
+  return safeTrim(download?.id)
+}
+
+function isModelMetadataRefreshBackedOff(key, now = Date.now()) {
+  const retryAt = failedModelMetadataRefreshes.get(key)
+  if (!retryAt) {
+    return false
+  }
+
+  if (retryAt > now) {
+    return true
+  }
+
+  failedModelMetadataRefreshes.delete(key)
+  return false
+}
+
+function markModelMetadataRefreshFailed(key) {
+  failedModelMetadataRefreshes.set(key, Date.now() + modelMetadataRefreshFailureBackoffMs)
+}
+
+export function resetDownloadMetadataRuntimeState() {
+  pendingModelMetadataRefreshes.clear()
+  failedModelMetadataRefreshes.clear()
+}
 
 export function normalizeDownloadFile(rawFile) {
   const file = normalizePlainObject(rawFile)
@@ -191,26 +221,44 @@ export async function refreshDownloadModelMetadata(download, { force = false } =
 }
 
 export function refreshMissingDownloadModelMetadataInBackground(downloads) {
+  let scheduledRefreshes = 0
+  const now = Date.now()
+
   for (const download of downloads) {
     if (!download?.id || download.state !== 'complete' || hasDownloadModelNsfwMetadata(download)) {
       continue
     }
 
-    if (pendingModelMetadataRefreshes.has(download.id)) {
+    const refreshKey = modelMetadataRefreshKey(download)
+    if (
+      !refreshKey ||
+      pendingModelMetadataRefreshes.has(refreshKey) ||
+      isModelMetadataRefreshBackedOff(refreshKey, now)
+    ) {
       continue
     }
 
-    pendingModelMetadataRefreshes.add(download.id)
+    if (scheduledRefreshes >= maxAutomaticModelMetadataRefreshesPerPass) {
+      break
+    }
+
+    scheduledRefreshes += 1
+    pendingModelMetadataRefreshes.add(refreshKey)
     void refreshDownloadModelMetadata(download)
       .then((changed) => {
         if (changed) {
+          failedModelMetadataRefreshes.delete(refreshKey)
           download.updatedAt = Date.now()
           scheduleDownloadsPersist(true)
+        } else {
+          markModelMetadataRefreshFailed(refreshKey)
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        markModelMetadataRefreshFailed(refreshKey)
+      })
       .finally(() => {
-        pendingModelMetadataRefreshes.delete(download.id)
+        pendingModelMetadataRefreshes.delete(refreshKey)
       })
   }
 }
