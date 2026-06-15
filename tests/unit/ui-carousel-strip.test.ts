@@ -74,4 +74,30 @@ describe('UiCarousel strip layout', () => {
     expect(wrapper.text()).not.toContain('Image')
     expect(wrapper.text()).not.toContain('1')
   })
+
+  it('keeps strip paging controls outside the thumbnail viewport and pages five at a time', async () => {
+    const { default: AssetPreviewMediaStrip } = await import('../../src/components/asset-preview/AssetPreviewMediaStrip.vue')
+    const wrapper = mount(AssetPreviewMediaStrip, {
+      props: {
+        activeIndex: 0,
+        slides: Array.from({ length: 8 }, (_, index) => ({
+          key: `preview-${index}`,
+          url: `https://example.test/preview-${index}.jpg`,
+          image: { url: `https://example.test/preview-${index}.jpg` },
+          isVideo: false,
+          source: 'civitai' as const,
+        })),
+      },
+    })
+
+    const viewport = wrapper.get('[data-test="asset-preview-strip-viewport"]')
+    const nextButton = wrapper.get('[data-test="asset-preview-strip-next"]')
+
+    expect(viewport.element.contains(nextButton.element)).toBe(false)
+
+    await nextButton.trigger('click')
+
+    expect(emblaApi.scrollTo).toHaveBeenCalledWith(5)
+    expect(emblaApi.scrollNext).not.toHaveBeenCalled()
+  })
 })

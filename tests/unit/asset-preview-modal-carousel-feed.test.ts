@@ -59,6 +59,7 @@ describe('AssetPreviewModal carousel and feed', () => {
           open: computed(() => props.open),
           model: computed(() => model),
           selectedVersion: computed(() => version),
+          includeNsfw: computed(() => false),
           previewUrl: null,
           isVideo: false,
           activeImageIndex,
@@ -338,8 +339,11 @@ describe('AssetPreviewModal carousel and feed', () => {
     await wrapper.get('button[aria-label="Show feed"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.findAll('[data-test="asset-preview-feed-version-badge"]')).toHaveLength(2)
+    expect(wrapper.find('[data-test="asset-preview-feed-version-select"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-test="asset-preview-feed-version-badge"]')).toHaveLength(0)
+    expect(wrapper.get('[data-test="asset-preview-feed-grid"]').classes()).toContain('grid-cols-3')
     expect(wrapper.findAll('[data-test="asset-preview-feed-item"]')).toHaveLength(20)
+    expect(wrapper.findAll('[data-test="asset-preview-feed-item"]')[0]?.text()).not.toContain('https://')
 
     await wrapper.findAll('[data-test="asset-preview-feed-item"]')[3]?.trigger('click')
     await flushPromises()
@@ -352,5 +356,93 @@ describe('AssetPreviewModal carousel and feed', () => {
 
     expect(wrapper.findAll('[data-test="asset-preview-strip-button"]')).toHaveLength(20)
     expect(wrapper.text()).toContain('5 / 20')
+
+    const versionSelect = wrapper.get('[data-test="asset-preview-feed-version-select"]')
+    await versionSelect.get('button[role="combobox"]').trigger('click')
+    const olderVersionButton = wrapper.findAll('[role="option"]').find((button) => button.text().includes('Older version'))
+    await olderVersionButton?.trigger('click')
+    await flushPromises()
+
+    const versionRequests = fetchMock.mock.calls
+      .map((call) => new URL(String(call[0]), 'http://127.0.0.1'))
+      .filter((url) => url.searchParams.has('modelVersionId'))
+    expect(versionRequests.at(-1)?.searchParams.get('modelVersionId')).toBe('202')
+  })
+
+  it('includes NSFW media in feed requests when the modal allows NSFW previews', async () => {
+    const fetchMock = vi.fn(async () => new Response(
+      JSON.stringify({ items: [] }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
+    mount(AssetPreviewModal, {
+      attachTo: document.body,
+      global: {
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
+      },
+      props: {
+        open: true,
+        includeNsfw: true,
+        model: {
+          id: 101,
+          name: 'NSFW feed model',
+          type: 'Checkpoint',
+          modelVersions: [
+            {
+              id: 201,
+              name: 'Latest version',
+              baseModel: 'Illustrious',
+              images: [{ url: 'https://example.test/fallback-1.jpg', type: 'image', nsfw: false }],
+            },
+          ],
+        },
+      },
+    })
+
+    await flushPromises()
+
+    const requestUrl = new URL(String(fetchMock.mock.calls[0]?.[0]), 'http://127.0.0.1')
+    expect(requestUrl.pathname).toBe('/api/civitai/images')
+    expect(requestUrl.searchParams.get('modelId')).toBe('101')
+    expect(requestUrl.searchParams.get('modelVersionId')).toBe('201')
+    expect(requestUrl.searchParams.get('nsfw')).toBe('true')
+  })
+
+  it('keeps the Civitai link as a compact icon beside the modal title', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ items: [] }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )))
+
+    const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
+    const wrapper = mount(AssetPreviewModal, {
+      attachTo: document.body,
+      global: {
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
+      },
+      props: {
+        open: true,
+        model: {
+          id: 101,
+          name: 'Linked model',
+          type: 'Checkpoint',
+          modelVersions: [{ id: 201, name: 'v1', images: [] }],
+        },
+      },
+    })
+
+    await flushPromises()
+
+    const link = wrapper.get('[data-test="asset-preview-civitai-link"]')
+    expect(link.attributes('href')).toBe('https://civitai.com/models/101')
+    expect(link.attributes('aria-label')).toBe('Open Linked model on Civitai')
+    expect(link.text()).toBe('')
+    expect(wrapper.text()).not.toContain('Open on Civitai')
   })
 })

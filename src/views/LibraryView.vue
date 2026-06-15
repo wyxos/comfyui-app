@@ -16,6 +16,7 @@ import {
   hiddenLibraryItemForModel,
   isCheckpointOrLora,
   isVideoPreview,
+  modelHasNsfw,
   modelTypeLabel,
   normalizedModelType,
   parseLibrarySourceFilter,
@@ -152,6 +153,10 @@ const filteredModels = computed(() => {
       return false
     }
 
+    if (!includeNsfw.value && item.librarySource !== 'hidden' && modelHasNsfw(item)) {
+      return false
+    }
+
     if (!search) {
       return true
     }
@@ -215,7 +220,7 @@ const baseModelOptions = computed(() => {
       .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
   ]
 })
-watch([query, typeFilter, sourceFilter, baseModelFilter], () => {
+watch([query, typeFilter, sourceFilter, baseModelFilter, includeNsfw], () => {
   currentPage.value = 1
 })
 

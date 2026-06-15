@@ -5,11 +5,10 @@ import { computed, ref, watch } from 'vue'
 import {
   formatNumber,
   imageDimensions as formatImageDimensions,
-  imageNsfwDetectedValue,
   mediaExtensionFromUrl,
-  modelVersionLabel,
 } from './assetPreviewHelpers'
 import AssetPreviewCompatibilityEditor from './AssetPreviewCompatibilityEditor.vue'
+import AssetPreviewFeedPanel from './AssetPreviewFeedPanel.vue'
 import AssetPreviewFileDetails from './AssetPreviewFileDetails.vue'
 import AssetPreviewImageMetadataSection from './AssetPreviewImageMetadataSection.vue'
 import AssetPreviewImageSafetyEditor from './AssetPreviewImageSafetyEditor.vue'
@@ -24,7 +23,7 @@ import type {
   NormalizedMetaRow,
   PreviewSlide,
 } from './assetPreviewTypes'
-import UiPreloadedMedia from '../ui/UiPreloadedMedia.vue'
+import UiTooltip from '../ui/UiTooltip.vue'
 
 type SidebarTab = 'model' | 'media' | 'feed'
 
@@ -32,6 +31,7 @@ const props = defineProps<{
   kindLabel: string
   modalTitle: string
   modalSubtitle: string
+  modelTypeLabel: string
   civitaiModel: CivitaiModel | null
   civitaiError: string
   civitaiModelUrl: string
@@ -95,6 +95,7 @@ const emit = defineEmits<{
   'delete-download': [version: CivitaiModelVersion]
   'select-preview': [index: number]
   'select-feed-preview': [index: number]
+  'request-image-metadata': []
   close: []
 }>()
 
@@ -102,11 +103,14 @@ const activeTab = ref<SidebarTab>('model')
 
 const creatorUsername = computed(() => props.civitaiModel?.creator?.username?.trim() ?? '')
 const creatorLabel = computed(() => creatorUsername.value || 'Unknown creator')
+const modelTypeValue = computed(() => props.modelTypeLabel.trim() || props.kindLabel || 'Unknown')
+const showModelTypeBadge = computed(() => !['model', 'preview'].includes(modelTypeValue.value.toLowerCase()))
 const creatorAssetsRoute = computed(() => {
   return creatorUsername.value
     ? { name: 'assets', query: { username: creatorUsername.value } }
     : null
 })
+const hasActiveImage = computed(() => Boolean(props.activeImage))
 
 watch(
   () => props.selectedVersion?.id ?? null,
@@ -115,6 +119,16 @@ watch(
       activeTab.value = 'model'
     }
   },
+)
+
+watch(
+  () => [activeTab.value, props.activeImage?.id ?? null] as const,
+  ([tab]) => {
+    if (tab === 'media') {
+      emit('request-image-metadata')
+    }
+  },
+  { flush: 'post' },
 )
 
 function tabClasses(tab: SidebarTab) {
@@ -134,44 +148,58 @@ function mediaKindLabel(slide: PreviewSlide) {
   return mediaExtensionFromUrl(slide.url) === 'gif' ? 'GIF' : 'Image'
 }
 
-function feedItemLabel(index: number) {
-  return `Open feed media ${index + 1}`
+function mediaSourceLabel(slide: PreviewSlide | null) {
+  if (slide?.source === 'archive') {
+    return 'Offline archive'
+  }
+
+  return slide?.source === 'civitai' ? 'Civitai API' : 'Local preview file'
 }
 
-function feedMediaClass(slide: PreviewSlide) {
-  return props.blurNsfwContent === true && imageNsfwDetectedValue(slide.image) === true
-    ? 'h-full w-full object-cover blur-sm saturate-50'
-    : 'h-full w-full object-cover'
-}
 </script>
 
 <template>
   <aside class="min-h-0 overflow-y-auto border-l border-border bg-card p-5">
     <div class="space-y-5">
       <section class="space-y-3">
-        <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">
-            {{ kindLabel }}
-          </p>
-          <h2 class="mt-2 text-lg font-semibold leading-6 text-card-foreground">
-            {{ modalTitle }}
-          </h2>
-          <p
-            v-if="modalSubtitle"
-            class="mt-1 break-words text-sm text-muted-foreground"
-          >
-            {{ modalSubtitle }}
-          </p>
-          <a
+        <div class="flex min-w-0 items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex min-w-0 flex-wrap items-center gap-2">
+              <h2 class="min-w-0 text-lg font-semibold leading-6 text-card-foreground">
+                {{ modalTitle }}
+              </h2>
+              <span
+                v-if="showModelTypeBadge"
+                class="inline-flex h-6 shrink-0 items-center rounded-sm border border-secondary/30 bg-secondary/10 px-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-secondary"
+                data-test="asset-preview-model-type-badge"
+              >
+                {{ modelTypeValue }}
+              </span>
+            </div>
+            <p
+              v-if="modalSubtitle"
+              class="mt-1 break-words text-sm text-muted-foreground"
+              data-test="asset-preview-modal-subtitle"
+            >
+              {{ modalSubtitle }}
+            </p>
+          </div>
+
+          <UiTooltip
             v-if="civitaiModelUrl"
-            :href="civitaiModelUrl"
-            target="_blank"
-            rel="noreferrer"
-            class="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-secondary transition hover:text-accent"
+            content="Open on Civitai"
           >
-            Open on Civitai
-            <ExternalLink class="h-3.5 w-3.5" />
-          </a>
+            <a
+              :href="civitaiModelUrl"
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-secondary transition hover:border-secondary hover:text-accent focus:outline-none focus:ring-2 focus:ring-ring/25"
+              :aria-label="`Open ${modalTitle} on Civitai`"
+              data-test="asset-preview-civitai-link"
+            >
+              <ExternalLink class="h-3.5 w-3.5" />
+            </a>
+          </UiTooltip>
         </div>
 
         <p
@@ -199,18 +227,27 @@ function feedMediaClass(slide: PreviewSlide) {
       </nav>
 
       <div v-if="activeTab === 'model'" class="space-y-6">
-        <dl class="grid gap-2 text-sm">
-          <div class="rounded-md border border-border bg-background p-3">
-            <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Type</dt>
-            <dd class="mt-1 font-semibold text-card-foreground">{{ civitaiModel?.type ?? kindLabel }}</dd>
+        <dl class="grid gap-2 text-xs text-card-foreground">
+          <div
+            class="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3"
+            data-test="asset-preview-model-detail-row"
+          >
+            <dt class="text-muted-foreground">Type</dt>
+            <dd class="min-w-0 truncate font-semibold">{{ modelTypeValue }}</dd>
           </div>
-          <div class="rounded-md border border-border bg-background p-3">
-            <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Base model</dt>
-            <dd class="mt-1 font-semibold text-card-foreground">{{ selectedVersion?.baseModel ?? 'Unknown' }}</dd>
+          <div
+            class="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3"
+            data-test="asset-preview-model-detail-row"
+          >
+            <dt class="text-muted-foreground">Base model</dt>
+            <dd class="min-w-0 truncate font-semibold">{{ selectedVersion?.baseModel ?? 'Unknown' }}</dd>
           </div>
-          <div class="rounded-md border border-border bg-background p-3">
-            <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Creator</dt>
-            <dd class="mt-1 font-semibold text-card-foreground">
+          <div
+            class="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3"
+            data-test="asset-preview-model-detail-row"
+          >
+            <dt class="text-muted-foreground">Creator</dt>
+            <dd class="min-w-0 truncate font-semibold">
               <RouterLink
                 v-if="creatorAssetsRoute"
                 :to="creatorAssetsRoute"
@@ -224,10 +261,11 @@ function feedMediaClass(slide: PreviewSlide) {
           </div>
           <div
             v-if="civitaiModel?.stats"
-            class="rounded-md border border-border bg-background p-3"
+            class="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3"
+            data-test="asset-preview-model-detail-row"
           >
-            <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Civitai stats</dt>
-            <dd class="mt-1 font-semibold text-card-foreground">
+            <dt class="text-muted-foreground">Stats</dt>
+            <dd class="min-w-0 truncate font-semibold">
               {{ formatNumber(civitaiModel.stats.downloadCount) }} downloads
             </dd>
           </div>
@@ -292,6 +330,16 @@ function feedMediaClass(slide: PreviewSlide) {
           :file="activePrimaryFile"
           :fallback-file-name="activePrimaryFile?.name ?? null"
         />
+
+        <AssetPreviewImageMetadataSection
+          :loading="imageMetaLoading"
+          :error="imageMetaError"
+          :metadata-text="activeImageMeta"
+          :rows="normalizedImageMetaRows"
+          :metadata-source="activeImageMetaSource"
+          :apply-generation-metadata="applyGenerationMetadata"
+          @applied="emit('close')"
+        />
       </div>
 
       <div v-else-if="activeTab === 'media'" class="space-y-6">
@@ -307,7 +355,7 @@ function feedMediaClass(slide: PreviewSlide) {
             <div class="rounded-md border border-border bg-background p-3">
               <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Source</dt>
               <dd class="mt-1 font-semibold text-card-foreground">
-                {{ activeSlide?.source === 'archive' ? 'Offline archive' : activeSlide?.source === 'civitai' ? 'Civitai API' : 'Local preview file' }}
+                {{ mediaSourceLabel(activeSlide) }}
               </dd>
             </div>
             <div class="rounded-md border border-border bg-background p-3">
@@ -357,109 +405,24 @@ function feedMediaClass(slide: PreviewSlide) {
           :metadata-text="activeImageMeta"
           :rows="normalizedImageMetaRows"
           :metadata-source="activeImageMetaSource"
+          :show-empty="hasActiveImage"
           :apply-generation-metadata="applyGenerationMetadata"
           @applied="emit('close')"
         />
       </div>
 
-      <div v-else class="space-y-4">
-        <div class="space-y-3">
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="version in modelVersions"
-              :key="version.id"
-              data-test="asset-preview-feed-version-badge"
-              type="button"
-              :aria-label="`Filter feed to version ${modelVersionLabel(version)}`"
-              :class="[
-                'rounded-sm border px-2.5 py-1 text-xs font-semibold transition',
-                version.id === selectedVersion?.id
-                  ? 'border-secondary bg-secondary text-secondary-foreground'
-                  : 'border-border bg-background text-muted-foreground hover:text-card-foreground',
-              ]"
-              @click="emit('select-version', version)"
-            >
-              {{ version.name ?? `Version ${version.id}` }}
-            </button>
-          </div>
-          <p class="text-xs text-muted-foreground">
-            Latest {{ feedSlides.length || 20 }} items for {{ selectedVersion ? modelVersionLabel(selectedVersion) : 'this model version' }}.
-          </p>
-        </div>
-
-        <p
-          v-if="feedError"
-          class="rounded-md border border-destructive/35 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive"
-        >
-          {{ feedError }}
-        </p>
-
-        <div
-          v-if="feedLoading"
-          class="rounded-md border border-border bg-background px-3 py-4 text-sm font-semibold text-muted-foreground"
-        >
-          Loading recent media…
-        </div>
-
-        <div
-          v-else-if="feedSlides.length"
-          class="space-y-3"
-        >
-          <button
-            v-for="(slide, index) in feedSlides"
-            :key="slide.key"
-            data-test="asset-preview-feed-item"
-            type="button"
-            :aria-label="feedItemLabel(index)"
-            :class="[
-              'grid w-full grid-cols-[6rem_minmax(0,1fr)] gap-3 rounded-md border bg-background p-3 text-left transition',
-              slide.key === activeSlide?.key
-                ? 'border-secondary shadow-[0_0_0_1px_rgba(240,200,8,0.35)]'
-                : 'border-border hover:border-accent/50',
-            ]"
-            @click="emit('select-feed-preview', index)"
-          >
-            <div class="h-24 overflow-hidden rounded-sm border border-border bg-card">
-              <UiPreloadedMedia
-                :src="slide.url"
-                :is-video="slide.isVideo"
-                :alt="`Feed preview ${index + 1}`"
-                label=""
-                :media-class="feedMediaClass(slide)"
-                loading-class="bg-background/35"
-                spinner-class="h-3 w-3"
-                :autoplay="slide.isVideo"
-                :loop="slide.isVideo"
-                :muted="slide.isVideo"
-                preload="metadata"
-              />
-            </div>
-            <div class="min-w-0 space-y-2">
-              <div class="flex items-center gap-2">
-                <span class="rounded-sm bg-primary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary-foreground">
-                  {{ mediaKindLabel(slide) }}
-                </span>
-                <span class="text-xs text-muted-foreground">
-                  {{ index + 1 }}
-                </span>
-              </div>
-              <p class="truncate text-sm font-semibold text-card-foreground">
-                {{ slide.url }}
-              </p>
-              <p class="text-xs text-muted-foreground">
-                {{ slide.source === 'archive' ? 'Offline archive' : 'Civitai API' }}
-              </p>
-            </div>
-          </button>
-        </div>
-
-        <div
-          v-else
-          class="rounded-md border border-border bg-background px-3 py-4 text-sm font-semibold text-muted-foreground"
-        >
-          No feed media available for this model version.
-        </div>
-      </div>
+      <AssetPreviewFeedPanel
+        v-else
+        :model-versions="modelVersions"
+        :selected-version="selectedVersion"
+        :feed-slides="feedSlides"
+        :active-slide="activeSlide"
+        :blur-nsfw-content="blurNsfwContent"
+        :feed-loading="feedLoading"
+        :feed-error="feedError"
+        @select-version="emit('select-version', $event)"
+        @select-feed-preview="emit('select-feed-preview', $event)"
+      />
     </div>
   </aside>
 </template>

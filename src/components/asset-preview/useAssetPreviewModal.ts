@@ -65,6 +65,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     open: computed(() => props.open),
     model: civitaiModel,
     selectedVersion,
+    includeNsfw: computed(() => props.includeNsfw === true),
     previewUrl: props.previewUrl,
     isVideo: props.isVideo === true,
     activeImageIndex,
@@ -236,9 +237,24 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     }
   }
 
+  function loadActiveImageDetails() {
+    const imageId = activeImage.value?.id
+    if (
+      imageId === undefined ||
+      imageId === null ||
+      imageDetails.value[String(imageId)] ||
+      activeSlide.value?.source === 'archive'
+    ) {
+      return
+    }
+
+    void fetchImageDetails(imageId)
+  }
+
   function setInitialVersion(model: CivitaiModel | null | undefined) {
-    const versionFromProps = model?.modelVersions?.find((version) => version.id === normalizedVersionId.value)
-    const initialVersion = versionFromProps ?? model?.modelVersions?.[0] ?? null
+    const sortedVersions = sortModelVersions(model?.modelVersions ?? [])
+    const versionFromProps = sortedVersions.find((version) => version.id === normalizedVersionId.value)
+    const initialVersion = versionFromProps ?? sortedVersions[0] ?? null
     const slideCount = imagesForVersion(initialVersion).length || (props.previewUrl ? 1 : 0)
     activeVersionId.value = initialVersion?.id ?? null
     activeImageIndex.value = slideCount > 0 ? Math.min(Math.max(0, numberProp(props.initialImageIndex) ?? 0), slideCount - 1) : 0
@@ -402,13 +418,10 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
       if (
         imageId === undefined ||
         imageId === null ||
-        imageDetails.value[String(imageId)] ||
         activeSlide.value?.source === 'archive'
       ) {
         return
       }
-
-      void fetchImageDetails(imageId)
     },
     { immediate: true },
   )
@@ -455,6 +468,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     shouldRenderModal,
     hasDownloadActions,
     close,
+    loadActiveImageDetails,
     selectVersion,
     showPreviousImage,
     showNextImage,

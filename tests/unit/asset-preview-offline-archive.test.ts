@@ -136,7 +136,7 @@ describe('AssetPreviewModal offline archive fallback', () => {
       expect.stringContaining('/api/model-archive?'),
       expect.objectContaining({ headers: { Accept: 'application/json' } }),
     )
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).not.toHaveBeenCalledWith(
       expect.stringContaining('/api/civitai/images?'),
       expect.objectContaining({ headers: { Accept: 'application/json' } }),
     )

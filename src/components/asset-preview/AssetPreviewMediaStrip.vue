@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { computed } from 'vue'
 
 import { imageNsfwDetectedValue } from './assetPreviewHelpers'
@@ -37,6 +38,9 @@ function mediaClassFor(slide: PreviewSlide) {
       <UiCarousel
         :items="slides"
         :model-value="scrollIndex"
+        :show-controls="false"
+        :scroll-step="5"
+        viewport-test-id="asset-preview-strip-viewport"
         aria-label="Preview media strip"
         item-class="basis-1/5 p-1 h-full"
       >
@@ -67,6 +71,35 @@ function mediaClassFor(slide: PreviewSlide) {
               preload="metadata"
             />
           </button>
+        </template>
+
+        <template #footer="{ canScrollPrev, canScrollNext, scrollPrev, scrollNext }">
+          <div
+            v-if="slides.length > 5"
+            class="pointer-events-none absolute -left-12 -right-12 top-1/2 flex -translate-y-1/2 items-center justify-between"
+          >
+            <button
+              data-test="asset-preview-strip-prev"
+              type="button"
+              class="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary-foreground/12 bg-primary/82 text-primary-foreground shadow-sm transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
+              :disabled="!canScrollPrev"
+              aria-label="Previous preview thumbnails"
+              @click="scrollPrev"
+            >
+              <ChevronLeft class="h-4 w-4" />
+            </button>
+
+            <button
+              data-test="asset-preview-strip-next"
+              type="button"
+              class="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary-foreground/12 bg-primary/82 text-primary-foreground shadow-sm transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
+              :disabled="!canScrollNext"
+              aria-label="Next preview thumbnails"
+              @click="scrollNext"
+            >
+              <ChevronRight class="h-4 w-4" />
+            </button>
+          </div>
         </template>
       </UiCarousel>
     </div>

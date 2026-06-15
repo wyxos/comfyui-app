@@ -9,11 +9,17 @@ const props = withDefaults(
     modelValue?: number
     ariaLabel?: string
     itemClass?: string
+    showControls?: boolean
+    scrollStep?: number
+    viewportTestId?: string
   }>(),
   {
     modelValue: 0,
     ariaLabel: 'Carousel',
     itemClass: 'basis-full h-full',
+    showControls: true,
+    scrollStep: 1,
+    viewportTestId: '',
   },
 )
 
@@ -52,11 +58,31 @@ function syncSelectedIndex() {
 }
 
 function scrollPrev() {
-  emblaApi.value?.scrollPrev()
+  const api = emblaApi.value
+  if (!api) {
+    return
+  }
+
+  if (props.scrollStep <= 1) {
+    api.scrollPrev()
+    return
+  }
+
+  api.scrollTo(api.selectedScrollSnap() - props.scrollStep)
 }
 
 function scrollNext() {
-  emblaApi.value?.scrollNext()
+  const api = emblaApi.value
+  if (!api) {
+    return
+  }
+
+  if (props.scrollStep <= 1) {
+    api.scrollNext()
+    return
+  }
+
+  api.scrollTo(api.selectedScrollSnap() + props.scrollStep)
 }
 
 watch(
@@ -119,7 +145,11 @@ watch(
 
 <template>
   <div class="relative h-full w-full" :aria-label="ariaLabel">
-    <div ref="viewportRef" class="h-full overflow-hidden">
+    <div
+      ref="viewportRef"
+      class="h-full overflow-hidden"
+      :data-test="viewportTestId || undefined"
+    >
       <div class="flex h-full">
         <div
           v-for="(item, index) in items"
@@ -133,7 +163,7 @@ watch(
     </div>
 
     <div
-      v-if="items.length > 1"
+      v-if="showControls && items.length > 1"
       class="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 items-center justify-between px-3"
     >
       <button

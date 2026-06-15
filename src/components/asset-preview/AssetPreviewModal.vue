@@ -94,10 +94,12 @@ const {
   activePrimaryFile,
   modalTitle,
   modalSubtitle,
+  modelTypeLabel,
   civitaiModelUrl,
   shouldRenderModal,
   hasDownloadActions,
   close,
+  loadActiveImageDetails,
   selectVersion,
   showPreviousImage,
   showNextImage,
@@ -223,6 +225,7 @@ const {
       :kind-label="props.kindLabel"
       :modal-title="modalTitle"
       :modal-subtitle="modalSubtitle"
+      :model-type-label="modelTypeLabel"
       :civitai-model="civitaiModel ?? null"
       :civitai-error="civitaiError"
       :civitai-model-url="civitaiModelUrl"
@@ -275,6 +278,7 @@ const {
       @delete-download="deleteVersionDownload"
       @select-preview="selectPreviewImage"
       @select-feed-preview="selectFeedImage"
+      @request-image-metadata="loadActiveImageDetails"
       @close="close"
     />
   </div>

@@ -38,7 +38,7 @@ describe('LibraryView filters', () => {
     installLocalStorageStub()
   })
 
-  it('paginates local models without hiding NSFW items when the toggle is off', async () => {
+  it('paginates local models with NSFW items hidden until the toggle is on', async () => {
     const now = Date.now()
     const downloads = ref(
       Array.from({ length: 46 }, (_, index) => {
@@ -101,7 +101,7 @@ describe('LibraryView filters', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('46 library items, 23 checkpoints, 23 LoRAs')
-    expect(wrapper.text()).toContain('1-40 of 46')
+    expect(wrapper.text()).toContain('1-40 of 45')
     expect(wrapper.text()).toContain('Library model 01')
     expect(wrapper.text()).not.toContain('library_model_01.safetensors')
     expect(wrapper.text()).not.toContain('Downloaded')
@@ -122,11 +122,16 @@ describe('LibraryView filters', () => {
     expect(wrapper.text()).toContain('1-15 of 15')
     await wrapper.get('[aria-label="Show All bases base models"]').trigger('click')
     await wrapper.get('[aria-label="Next library page"]').trigger('click')
-    expect(wrapper.text()).toContain('41-46 of 46')
+    expect(wrapper.text()).toContain('41-45 of 45')
     expect(wrapper.text()).toContain('Library model 41')
+    expect(wrapper.text()).not.toContain('Library model 46')
+    expect((wrapper.get('[aria-label="Include NSFW library models"]').element as HTMLInputElement).checked).toBe(false)
+    await wrapper.get('[aria-label="Include NSFW library models"]').setValue(true)
+    expect(wrapper.text()).toContain('1-40 of 46')
+    await wrapper.get('[aria-label="Next library page"]').trigger('click')
+    expect(wrapper.text()).toContain('41-46 of 46')
     expect(wrapper.text()).toContain('Library model 46')
     expect(wrapper.text()).toContain('NSFW')
-    expect((wrapper.get('[aria-label="Include NSFW library models"]').element as HTMLInputElement).checked).toBe(false)
   })
 
   it('shows watched Civitai models in the library and filters to watched items only', async () => {

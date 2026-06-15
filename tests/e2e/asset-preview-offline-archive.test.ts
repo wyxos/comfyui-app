@@ -99,11 +99,16 @@ describe('AssetPreviewModal offline archive browser flow', () => {
       expect(host.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe(
         'Archived Browser LoRA image preview',
       )
-      expect(host.textContent).toContain('Offline archive')
       expect(host.textContent).toContain('browser offline prompt')
       expect(host.textContent).toContain('browser offline negative')
     })
     expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/api/civitai/images?'), expect.anything())
+
+    const mediaButton = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Show image and video details')
+    mediaButton?.click()
+    await vi.waitFor(() => {
+      expect(host.textContent).toContain('Offline archive')
+    })
 
     const applyButton = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('Apply metadata'))
     expect(applyButton).toBeDefined()

@@ -15,6 +15,7 @@ type UseAssetPreviewMediaFeedOptions = {
   open: ComputedRef<boolean>
   model: ComputedRef<CivitaiModel | null | undefined>
   selectedVersion: ComputedRef<CivitaiModelVersion | null>
+  includeNsfw: ComputedRef<boolean>
   previewUrl: string | null | undefined
   isVideo: boolean
   activeImageIndex: Ref<number>
@@ -24,6 +25,10 @@ function normalizeFeedImages(items: CivitaiImage[] | null | undefined) {
   return (items ?? [])
     .filter((image) => Boolean(image?.url))
     .slice(0, MEDIA_FEED_LIMIT)
+}
+
+function versionUsesArchivedMedia(version: CivitaiModelVersion | null) {
+  return imagesForVersion(version).some((image) => image.archiveSource === 'local' || Boolean(image.remoteUrl))
 }
 
 export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOptions) {
@@ -125,6 +130,9 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
       modelVersionId: String(versionId),
       sort: 'Newest',
     })
+    if (options.includeNsfw.value) {
+      params.set('nsfw', 'true')
+    }
 
     try {
       const response = await fetch(`/api/civitai/images?${params.toString()}`, {
@@ -164,9 +172,15 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
       options.open.value,
       numberProp(options.model.value?.id),
       numberProp(options.selectedVersion.value?.id),
+      options.includeNsfw.value,
     ] as const,
     ([isOpen, modelId, versionId]) => {
       if (!isOpen || modelId === null || versionId === null) {
+        resetFeed()
+        return
+      }
+
+      if (versionUsesArchivedMedia(options.selectedVersion.value)) {
         resetFeed()
         return
       }

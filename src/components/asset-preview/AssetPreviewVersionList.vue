@@ -88,12 +88,6 @@ watch(
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0">
         <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">Model versions</p>
-        <p
-          v-if="hasDownloadActions && selectedVersion && downloadForVersion(selectedVersion)"
-          class="mt-1 text-xs text-muted-foreground"
-        >
-          {{ downloadStatusLabel(downloadForVersion(selectedVersion)) }}
-        </p>
       </div>
     </div>
 

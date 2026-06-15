@@ -13,11 +13,16 @@ defineProps<{
 
 <template>
   <section class="space-y-3 border-t border-border pt-5">
-    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">Selected version file</p>
+    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">Selected version</p>
     <dl class="grid gap-2 text-xs text-card-foreground">
       <div class="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3">
         <dt class="text-muted-foreground">File</dt>
-        <dd class="min-w-0 truncate font-semibold">{{ file.name ?? fallbackFileName ?? 'Unknown' }}</dd>
+        <dd
+          class="min-w-0 truncate font-semibold"
+          data-test="asset-preview-selected-version-file-name"
+        >
+          {{ file.name ?? fallbackFileName ?? 'Unknown' }}
+        </dd>
       </div>
       <div class="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3">
         <dt class="text-muted-foreground">Size</dt>

@@ -12,6 +12,8 @@ const props = withDefaults(
     rows?: NormalizedMetaRow[]
     metadataSource?: Record<string, unknown> | null
     applyGenerationMetadata?: (metadata: Record<string, unknown>) => void | Promise<void>
+    showEmpty?: boolean
+    emptyMessage?: string
   }>(),
   {
     loading: false,
@@ -20,6 +22,8 @@ const props = withDefaults(
     rows: () => [],
     metadataSource: null,
     applyGenerationMetadata: undefined,
+    showEmpty: false,
+    emptyMessage: 'No prompt metadata found for this image.',
   },
 )
 
@@ -65,12 +69,12 @@ async function handleMetadataAction() {
 
 <template>
   <section
-    v-if="loading || error || metadataText || rows.length"
+    v-if="loading || error || metadataText || rows.length || showEmpty"
     class="space-y-3 border-t border-border pt-5"
   >
     <div class="flex flex-wrap items-center justify-between gap-2">
       <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">
-        Image generation metadata
+        Metadata
       </p>
       <button
         v-if="metadataText"
@@ -110,6 +114,12 @@ async function handleMetadataAction() {
         class="text-xs font-semibold text-destructive"
       >
         {{ error }}
+      </p>
+      <p
+        v-else-if="!metadataText && !rows.length"
+        class="text-xs font-semibold text-muted-foreground"
+      >
+        {{ emptyMessage }}
       </p>
       <dl
         v-if="rows.length"
