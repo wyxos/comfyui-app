@@ -58,7 +58,7 @@ function mediaClassFor(slide: PreviewSlide) {
             @click="emit('select', index)"
           >
             <UiPreloadedMedia
-              :src="item.url"
+              :src="item.previewUrl ?? item.url"
               :is-video="item.isVideo"
               :alt="`Preview ${index + 1}`"
               label=""

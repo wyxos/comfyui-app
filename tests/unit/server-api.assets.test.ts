@@ -469,4 +469,5 @@ describe('companion server API routes', () => {
 
       expect(server.calls.filter((call) => call.url.pathname.startsWith('/api/v1/model-versions/'))).toHaveLength(3)
     })
+
 })

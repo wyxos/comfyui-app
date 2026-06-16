@@ -40,6 +40,13 @@ export {
 } from './model-trigger-words.mjs'
 export { mergeJobOutputs } from './job-state.mjs'
 export { ensureJobsLoaded, resetJobStoreRuntimeState } from './job-store.mjs'
+export {
+  installServerConsoleLogger,
+  logApiError,
+  serverLogPath,
+  uninstallServerConsoleLoggerForTests,
+  writeServerLog,
+} from './server-log.mjs'
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   const { startCompanionServer } = await import('./app.mjs')

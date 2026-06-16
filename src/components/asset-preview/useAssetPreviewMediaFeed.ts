@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 
-import { imagesForVersion, isVideoPreview, numberProp } from './assetPreviewHelpers'
+import { imagesForVersion, isVideoPreview, numberProp, previewSizedImageUrl } from './assetPreviewHelpers'
 import type {
   CivitaiImage,
   CivitaiImagesResponse,
@@ -27,14 +27,47 @@ function normalizeFeedImages(items: CivitaiImage[] | null | undefined) {
     .slice(0, MEDIA_FEED_LIMIT)
 }
 
+function feedImageKey(image: CivitaiImage) {
+  if (image.id !== undefined && image.id !== null && image.id !== '') {
+    return `id:${image.id}`
+  }
+
+  return `url:${image.url ?? ''}`
+}
+
+function mergeFeedImages(currentImages: CivitaiImage[], nextImages: CivitaiImage[]) {
+  const seen = new Set(currentImages.map(feedImageKey))
+  const merged = [...currentImages]
+  for (const image of nextImages) {
+    const key = feedImageKey(image)
+    if (!seen.has(key)) {
+      seen.add(key)
+      merged.push(image)
+    }
+  }
+
+  return merged
+}
+
+function normalizeNextCursor(payload: CivitaiImagesResponse) {
+  const cursor = payload.metadata?.nextCursor
+  return typeof cursor === 'string' && cursor.trim() ? cursor.trim() : ''
+}
+
 function versionUsesArchivedMedia(version: CivitaiModelVersion | null) {
   return imagesForVersion(version).some((image) => image.archiveSource === 'local' || Boolean(image.remoteUrl))
+}
+
+function previewUrlFor(url: string, isVideo: boolean) {
+  return isVideo ? url : previewSizedImageUrl(url)
 }
 
 export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOptions) {
   const feedImages = ref<CivitaiImage[]>([])
   const feedLoading = ref(false)
+  const feedLoadingMore = ref(false)
   const feedError = ref('')
+  const feedNextCursor = ref('')
   const activeMediaSource = ref<'version' | 'feed'>('version')
 
   let feedController: AbortController | null = null
@@ -45,13 +78,19 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
       return []
     }
 
-    const civitaiSlides = imagesForVersion(options.selectedVersion.value).map((image, index) => ({
-      key: `civitai:${image.id ?? index}:${image.url}`,
-      url: image.url ?? '',
-      image,
-      isVideo: isVideoPreview(image),
-      source: image.archiveSource === 'local' || image.remoteUrl ? 'archive' as const : 'civitai' as const,
-    }))
+    const civitaiSlides = imagesForVersion(options.selectedVersion.value).map((image, index) => {
+      const url = image.url ?? ''
+      const isVideo = isVideoPreview(image)
+
+      return {
+        key: `civitai:${image.id ?? index}:${image.url}`,
+        url,
+        previewUrl: previewUrlFor(url, isVideo),
+        image,
+        isVideo,
+        source: image.archiveSource === 'local' || image.remoteUrl ? 'archive' as const : 'civitai' as const,
+      }
+    })
 
     if (civitaiSlides.length) {
       return civitaiSlides
@@ -61,6 +100,7 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
       ? [{
           key: `local:${options.previewUrl}`,
           url: options.previewUrl,
+          previewUrl: previewUrlFor(options.previewUrl, options.isVideo),
           image: null,
           isVideo: options.isVideo,
           source: 'local' as const,
@@ -69,13 +109,19 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
   })
 
   const feedSlides = computed<PreviewSlide[]>(() =>
-    feedImages.value.map((image, index) => ({
-      key: `feed:${image.id ?? index}:${image.url}`,
-      url: image.url ?? '',
-      image,
-      isVideo: isVideoPreview(image),
-      source: image.archiveSource === 'local' || image.remoteUrl ? 'archive' as const : 'civitai' as const,
-    })),
+    feedImages.value.map((image, index) => {
+      const url = image.url ?? ''
+      const isVideo = isVideoPreview(image)
+
+      return {
+        key: `feed:${image.id ?? index}:${image.url}`,
+        url,
+        previewUrl: previewUrlFor(url, isVideo),
+        image,
+        isVideo,
+        source: image.archiveSource === 'local' || image.remoteUrl ? 'archive' as const : 'civitai' as const,
+      }
+    }),
   )
 
   const previewSlides = computed<PreviewSlide[]>(() => {
@@ -85,6 +131,7 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
   })
 
   const activeSlide = computed(() => previewSlides.value[options.activeImageIndex.value] ?? null)
+  const canLoadMoreFeed = computed(() => Boolean(feedNextCursor.value) && !feedLoading.value)
 
   function selectPreviewImage(index: number) {
     if (index < 0 || index >= previewSlides.value.length) {
@@ -109,19 +156,25 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
     feedToken += 1
     feedImages.value = []
     feedLoading.value = false
+    feedLoadingMore.value = false
     feedError.value = ''
+    feedNextCursor.value = ''
     activeMediaSource.value = 'version'
   }
 
-  async function fetchFeed(modelId: number, versionId: number) {
+  async function fetchFeed(modelId: number, versionId: number, cursor = '') {
     feedController?.abort()
 
     const controller = new AbortController()
     const requestToken = feedToken + 1
+    const isLoadingMore = Boolean(cursor)
     feedController = controller
     feedToken = requestToken
-    feedImages.value = []
-    feedLoading.value = true
+    if (!isLoadingMore) {
+      feedImages.value = []
+    }
+    feedLoading.value = !isLoadingMore
+    feedLoadingMore.value = isLoadingMore
     feedError.value = ''
 
     const params = new URLSearchParams({
@@ -132,6 +185,9 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
     })
     if (options.includeNsfw.value) {
       params.set('nsfw', 'true')
+    }
+    if (cursor) {
+      params.set('cursor', cursor)
     }
 
     try {
@@ -151,7 +207,11 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
         return
       }
 
-      feedImages.value = normalizeFeedImages(payload.items)
+      const nextImages = normalizeFeedImages(payload.items)
+      feedImages.value = isLoadingMore
+        ? mergeFeedImages(feedImages.value, nextImages)
+        : nextImages
+      feedNextCursor.value = normalizeNextCursor(payload)
     } catch (caughtError) {
       if (caughtError instanceof DOMException && caughtError.name === 'AbortError') {
         return
@@ -163,8 +223,19 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
     } finally {
       if (feedController === controller && feedToken === requestToken) {
         feedLoading.value = false
+        feedLoadingMore.value = false
       }
     }
+  }
+
+  function loadMoreFeed() {
+    const modelId = numberProp(options.model.value?.id)
+    const versionId = numberProp(options.selectedVersion.value?.id)
+    if (modelId === null || versionId === null || !feedNextCursor.value || feedLoading.value || feedLoadingMore.value) {
+      return
+    }
+
+    void fetchFeed(modelId, versionId, feedNextCursor.value)
   }
 
   watch(
@@ -213,11 +284,15 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
   return {
     feedImages,
     feedLoading,
+    feedLoadingMore,
     feedError,
+    feedNextCursor,
+    canLoadMoreFeed,
     feedSlides,
     previewSlides,
     activeSlide,
     selectPreviewImage,
     selectFeedImage,
+    loadMoreFeed,
   }
 }

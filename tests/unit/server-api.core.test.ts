@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { useServerHarness } from './serverApiTestUtils'
 
@@ -273,6 +273,13 @@ describe('companion server API routes', () => {
         response: expect.objectContaining({ status: 400 }),
         payload: expect.objectContaining({ error: 'invalid-include-nsfw' }),
       })
+
+      const logContents = await readFile(join(server.configDir, 'server.log'), 'utf8')
+      expect(logContents).toContain('"type":"api-error"')
+      expect(logContents).toContain('"code":"comfyui-rejected"')
+      expect(logContents).toContain('"code":"civitai-request-failed"')
+      expect(logContents).toContain('"code":"invalid-json"')
+      expect(logContents).toContain('"code":"invalid-include-nsfw"')
     })
 
   it('returns download summary counts without serializing the full history', async () => {

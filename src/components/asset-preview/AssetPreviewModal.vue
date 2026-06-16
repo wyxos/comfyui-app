@@ -75,7 +75,9 @@ const {
   displayedImageUrl,
   mediaLoading,
   feedLoading,
+  feedLoadingMore,
   feedError,
+  canLoadMoreFeed,
   feedSlides,
   modelVersions,
   selectedVersion,
@@ -105,6 +107,7 @@ const {
   showNextImage,
   selectPreviewImage,
   selectFeedImage,
+  loadMoreFeed,
   handleModalMediaReady,
   downloadForVersion,
   downloadStatusLabel,
@@ -260,7 +263,9 @@ const {
       :active-image-meta-source="activeImageMetaSource"
       :blur-nsfw-content="props.blurNsfwContent"
       :feed-loading="feedLoading"
+      :feed-loading-more="feedLoadingMore"
       :feed-error="feedError"
+      :can-load-more-feed="canLoadMoreFeed"
       :apply-generation-metadata="props.applyGenerationMetadata"
       :repair-download-previews="props.repairDownloadPreviews"
       :download-for-version="downloadForVersion"
@@ -278,6 +283,7 @@ const {
       @delete-download="deleteVersionDownload"
       @select-preview="selectPreviewImage"
       @select-feed-preview="selectFeedImage"
+      @load-more-feed="loadMoreFeed"
       @request-image-metadata="loadActiveImageDetails"
       @close="close"
     />

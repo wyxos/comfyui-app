@@ -80,6 +80,9 @@ export type CivitaiModelsResponse = {
 
 export type CivitaiImagesResponse = {
   items?: CivitaiImage[]
+  metadata?: {
+    nextCursor?: string | null
+  }
 }
 
 export type AssetPreviewDownload = {
@@ -97,6 +100,7 @@ export type ImageSafetyOverride = {
 export type PreviewSlide = {
   key: string
   url: string
+  previewUrl?: string
   image: CivitaiImage | null
   isVideo: boolean
   source: 'civitai' | 'archive' | 'local'

@@ -19,6 +19,10 @@ export function imagesForVersion(version: CivitaiModelVersion | null | undefined
   return (version?.images ?? []).filter((image) => Boolean(image.url))
 }
 
+export function previewSizedImageUrl(url: string) {
+  return url.replace('original=true', 'width=450')
+}
+
 export function primaryFileForVersion(version: CivitaiModelVersion | null | undefined) {
   return version?.files?.find((file) => file.primary === true && file.type === 'Model')
     ?? version?.files?.find((file) => file.type === 'Model')

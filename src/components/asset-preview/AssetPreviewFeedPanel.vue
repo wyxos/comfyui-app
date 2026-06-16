@@ -17,12 +17,15 @@ const props = defineProps<{
   activeSlide: PreviewSlide | null
   blurNsfwContent?: boolean
   feedLoading: boolean
+  feedLoadingMore: boolean
   feedError: string
+  canLoadMoreFeed: boolean
 }>()
 
 const emit = defineEmits<{
   'select-version': [version: CivitaiModelVersion]
   'select-feed-preview': [index: number]
+  'load-more': []
 }>()
 
 const selectedVersionId = computed(() => props.selectedVersion ? String(props.selectedVersion.id) : '')
@@ -32,6 +35,12 @@ const versionOptions = computed(() =>
     value: String(version.id),
   })),
 )
+const feedSummaryLabel = computed(() => {
+  const versionLabel = props.selectedVersion ? modelVersionLabel(props.selectedVersion) : 'this model version'
+  return props.feedSlides.length
+    ? `Showing ${props.feedSlides.length} newest items for ${versionLabel}.`
+    : `Newest media for ${versionLabel}.`
+})
 
 function mediaKindLabel(slide: PreviewSlide) {
   if (slide.isVideo) {
@@ -76,7 +85,7 @@ function selectVersion(versionId: string) {
         @update:model-value="selectVersion"
       />
       <p class="text-xs text-muted-foreground">
-        Latest {{ feedSlides.length || 20 }} items for {{ selectedVersion ? modelVersionLabel(selectedVersion) : 'this model version' }}.
+        {{ feedSummaryLabel }}
       </p>
     </div>
 
@@ -96,37 +105,52 @@ function selectVersion(versionId: string) {
 
     <div
       v-else-if="feedSlides.length"
-      data-test="asset-preview-feed-grid"
-      class="grid grid-cols-3 gap-2"
+      class="space-y-3"
     >
-      <button
-        v-for="(slide, index) in feedSlides"
-        :key="slide.key"
-        data-test="asset-preview-feed-item"
-        type="button"
-        :aria-label="feedItemLabel(index)"
-        :class="[
-          'group relative aspect-square overflow-hidden rounded-md border bg-background transition',
-          slide.key === activeSlide?.key
-            ? 'border-secondary shadow-[0_0_0_1px_rgba(240,200,8,0.35)]'
-            : 'border-border hover:border-accent/50',
-        ]"
-        @click="emit('select-feed-preview', index)"
+      <div
+        data-test="asset-preview-feed-grid"
+        class="grid grid-cols-3 gap-2"
       >
-        <UiPreloadedMedia
-          :src="slide.url"
-          :is-video="slide.isVideo"
-          :alt="`Feed preview ${index + 1}`"
-          label=""
-          :media-class="feedMediaClass(slide)"
-          loading-class="bg-background/35"
-          spinner-class="h-3 w-3"
-          :autoplay="slide.isVideo"
-          :loop="slide.isVideo"
-          :muted="slide.isVideo"
-          preload="metadata"
-        />
-        <span class="sr-only">{{ mediaKindLabel(slide) }} {{ index + 1 }}</span>
+        <button
+          v-for="(slide, index) in feedSlides"
+          :key="slide.key"
+          data-test="asset-preview-feed-item"
+          type="button"
+          :aria-label="feedItemLabel(index)"
+          :class="[
+            'group relative aspect-square overflow-hidden rounded-md border bg-background transition',
+            slide.key === activeSlide?.key
+              ? 'border-secondary shadow-[0_0_0_1px_rgba(240,200,8,0.35)]'
+              : 'border-border hover:border-accent/50',
+          ]"
+          @click="emit('select-feed-preview', index)"
+        >
+          <UiPreloadedMedia
+            :src="slide.previewUrl ?? slide.url"
+            :is-video="slide.isVideo"
+            :alt="`Feed preview ${index + 1}`"
+            label=""
+            :media-class="feedMediaClass(slide)"
+            loading-class="bg-background/35"
+            spinner-class="h-3 w-3"
+            :autoplay="slide.isVideo"
+            :loop="slide.isVideo"
+            :muted="slide.isVideo"
+            preload="metadata"
+          />
+          <span class="sr-only">{{ mediaKindLabel(slide) }} {{ index + 1 }}</span>
+        </button>
+      </div>
+
+      <button
+        v-if="canLoadMoreFeed"
+        data-test="asset-preview-feed-load-more"
+        type="button"
+        class="inline-flex h-9 w-full items-center justify-center rounded-md border border-border bg-background px-3 text-xs font-semibold text-card-foreground transition hover:border-secondary/60 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
+        :disabled="feedLoadingMore"
+        @click="emit('load-more')"
+      >
+        {{ feedLoadingMore ? 'Loading more...' : 'Load more' }}
       </button>
     </div>
 

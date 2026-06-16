@@ -276,8 +276,8 @@ describe('AssetPreviewModal carousel and feed', () => {
     expect(wrapper.text()).toContain('1 / 2')
   })
 
-  it('requests the latest 20 media items for the selected model version and renders them in the feed tab', async () => {
-    const feedItems = Array.from({ length: 21 }, (_, index) => ({
+  it('cursor-paginates the selected model version feed from the modal tab', async () => {
+    const firstFeedPage = Array.from({ length: 20 }, (_, index) => ({
       id: 900 + index,
       url: `https://example.test/feed-${index + 1}.jpg`,
       type: index % 3 === 2 ? 'video' : 'image',
@@ -285,11 +285,26 @@ describe('AssetPreviewModal carousel and feed', () => {
       width: 768,
       height: 1024,
     }))
+    const secondFeedPage = Array.from({ length: 2 }, (_, index) => ({
+      id: 950 + index,
+      url: `https://example.test/feed-page-2-${index + 1}.jpg`,
+      type: 'image',
+      nsfw: false,
+      width: 768,
+      height: 1024,
+    }))
 
-    const fetchMock = vi.fn(async () => new Response(
-      JSON.stringify({ items: feedItems }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } },
-    ))
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), 'http://127.0.0.1')
+      const hasCursor = url.searchParams.get('cursor') === 'next-feed-cursor'
+      return new Response(
+        JSON.stringify({
+          items: hasCursor ? secondFeedPage : firstFeedPage,
+          metadata: { nextCursor: hasCursor ? null : 'next-feed-cursor' },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    })
     vi.stubGlobal('fetch', fetchMock)
 
     const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
@@ -335,6 +350,7 @@ describe('AssetPreviewModal carousel and feed', () => {
     expect(requestUrl.searchParams.get('limit')).toBe('20')
     expect(requestUrl.searchParams.get('sort')).toBe('Newest')
     expect(requestUrl.searchParams.get('nsfw')).toBeNull()
+    expect(requestUrl.searchParams.get('cursor')).toBeNull()
 
     await wrapper.get('button[aria-label="Show feed"]').trigger('click')
     await flushPromises()
@@ -345,17 +361,26 @@ describe('AssetPreviewModal carousel and feed', () => {
     expect(wrapper.findAll('[data-test="asset-preview-feed-item"]')).toHaveLength(20)
     expect(wrapper.findAll('[data-test="asset-preview-feed-item"]')[0]?.text()).not.toContain('https://')
 
+    await wrapper.get('[data-test="asset-preview-feed-load-more"]').trigger('click')
+    await flushPromises()
+
+    const secondRequestUrl = new URL(String(fetchMock.mock.calls[1]?.[0]), 'http://127.0.0.1')
+    expect(secondRequestUrl.searchParams.get('cursor')).toBe('next-feed-cursor')
+    expect(secondRequestUrl.searchParams.get('modelVersionId')).toBe('201')
+    expect(wrapper.findAll('[data-test="asset-preview-feed-item"]')).toHaveLength(22)
+    expect(wrapper.find('[data-test="asset-preview-feed-load-more"]').exists()).toBe(false)
+
     await wrapper.findAll('[data-test="asset-preview-feed-item"]')[3]?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.findAll('[data-test="asset-preview-strip-button"]')).toHaveLength(20)
-    expect(wrapper.text()).toContain('4 / 20')
+    expect(wrapper.findAll('[data-test="asset-preview-strip-button"]')).toHaveLength(22)
+    expect(wrapper.text()).toContain('4 / 22')
 
     await wrapper.findAll('[data-test="asset-preview-strip-button"]')[4]?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.findAll('[data-test="asset-preview-strip-button"]')).toHaveLength(20)
-    expect(wrapper.text()).toContain('5 / 20')
+    expect(wrapper.findAll('[data-test="asset-preview-strip-button"]')).toHaveLength(22)
+    expect(wrapper.text()).toContain('5 / 22')
 
     const versionSelect = wrapper.get('[data-test="asset-preview-feed-version-select"]')
     await versionSelect.get('button[role="combobox"]').trigger('click')

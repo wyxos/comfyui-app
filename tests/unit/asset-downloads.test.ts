@@ -18,134 +18,25 @@ describe('useAssetDownloads', () => {
     vi.resetModules()
   })
 
-  it('loads downloads on first subscriber and posts queue actions', async () => {
-    vi.useFakeTimers()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse({
-          ok: true,
-          items: [
-            {
-              id: 'download-1',
-              state: 'queued',
-              modelId: 1,
-              modelName: 'Model',
-              modelType: 'Checkpoint',
-              versionId: 2,
-              versionName: 'v1',
-              fileName: 'model.safetensors',
-              updatedAt: 10,
-            },
-          ],
-        }),
-      )
-      .mockResolvedValueOnce(jsonResponse({ ok: true }))
-      .mockResolvedValueOnce(jsonResponse({ ok: true, items: [] }))
+  it('surfaces manual refresh failures', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: false, message: 'No downloads.' }, 500))
     vi.stubGlobal('fetch', fetchMock)
 
     const { useAssetDownloads } = await import('../../src/composables/useAssetDownloads')
     let exposedDownloads: ReturnType<typeof useAssetDownloads> | null = null
     const Consumer = defineComponent({
       setup() {
-        const downloads = useAssetDownloads()
+        const downloads = useAssetDownloads({ autoStart: false })
         exposedDownloads = downloads
-        return () => h('div', downloads.downloads.value.map((item) => item.modelName).join(','))
-      },
-    })
-
-    const wrapper = mount(Consumer)
-    await flushPromises()
-
-    expect(fetchMock).toHaveBeenCalledWith('/api/civitai/downloads', {
-      headers: {
-        Accept: 'application/json',
-      },
-    })
-    expect(wrapper.text()).toBe('Model')
-
-    await exposedDownloads?.queueDownload({
-      modelId: 1,
-      modelName: 'Model',
-      modelType: 'Checkpoint',
-      versionId: 2,
-      versionName: 'v1',
-      file: { id: 3, name: 'model.safetensors' },
-    })
-
-    expect(fetchMock).toHaveBeenCalledWith('/api/civitai/downloads', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json; charset=utf-8',
-      },
-      body: JSON.stringify({
-        modelId: 1,
-        modelName: 'Model',
-        modelType: 'Checkpoint',
-        versionId: 2,
-        versionName: 'v1',
-        file: { id: 3, name: 'model.safetensors' },
-      }),
-    })
-
-    wrapper.unmount()
-    vi.runOnlyPendingTimers()
-  })
-
-  it('surfaces refresh failures', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: false, message: 'No downloads.' }, 500))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const { useAssetDownloads } = await import('../../src/composables/useAssetDownloads')
-    const Consumer = defineComponent({
-      setup() {
-        const downloads = useAssetDownloads()
         return () => h('div', downloads.error.value)
       },
     })
 
     const wrapper = mount(Consumer)
+    await exposedDownloads?.refreshDownloads()
     await flushPromises()
 
     expect(wrapper.text()).toBe('No downloads.')
-  })
-
-  it('loads the lightweight downloads summary without fetching the full list', async () => {
-    vi.useFakeTimers()
-    const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse({
-        ok: true,
-        counts: {
-          active: 1,
-          attention: 0,
-          visibleComplete: 12,
-        },
-      }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
-
-    const { useAssetDownloadSummary } = await import('../../src/composables/useAssetDownloads')
-    const Consumer = defineComponent({
-      setup() {
-        const summary = useAssetDownloadSummary()
-        return () => h('div', String(summary.counts.value.active || summary.counts.value.visibleComplete))
-      },
-    })
-
-    const wrapper = mount(Consumer)
-    await flushPromises()
-
-    expect(fetchMock).toHaveBeenCalledWith('/api/civitai/downloads/summary', {
-      headers: {
-        Accept: 'application/json',
-      },
-    })
-    expect(fetchMock).not.toHaveBeenCalledWith('/api/civitai/downloads', expect.anything())
-    expect(wrapper.text()).toBe('1')
-
-    wrapper.unmount()
-    vi.runOnlyPendingTimers()
   })
 
   it('posts pause, resume, cancel, delete, redownload, and clear actions', async () => {

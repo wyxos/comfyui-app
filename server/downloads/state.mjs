@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { civitaiDownloads, configDir, downloadsPath, downloadsPersistRenameAttempts, downloadsPersistRenameDelayMs } from '../config.mjs'
 import { delay, safeTrim } from '../shared.mjs'
+import { queueDownloadsSnapshotBroadcast } from './events.mjs'
 import { safeUnlink } from './metadata.mjs'
 
 let downloadsPersistPromise = null
@@ -119,6 +120,8 @@ export function scheduleDownloadsPersist(immediate = false, delayMs = 750) {
   if (!downloadsLoaded) {
     return
   }
+
+  queueDownloadsSnapshotBroadcast({ immediate })
 
   if (immediate) {
     if (downloadsPersistTimer) {

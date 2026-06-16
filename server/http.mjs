@@ -2,6 +2,7 @@ import { createReadStream, existsSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
 import { contentTypes, distDir, host, indexPath, port } from './config.mjs'
+import { logApiError } from './server-log.mjs'
 
 export function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
@@ -12,6 +13,7 @@ export function sendJson(response, statusCode, payload) {
 }
 
 export function sendError(response, statusCode, code, message, details = null) {
+  logApiError({ statusCode, code, message, details })
   return sendJson(response, statusCode, {
     ok: false,
     error: code,

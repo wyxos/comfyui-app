@@ -13,16 +13,37 @@ function jsonResponse(payload: unknown, status = 200) {
   })
 }
 
+class FakeDownloadEventsSocket {
+  static CONNECTING = 0
+  static OPEN = 1
+  static instances: FakeDownloadEventsSocket[] = []
+  readyState = FakeDownloadEventsSocket.OPEN
+  url: string
+
+  constructor(url: string) {
+    this.url = url
+    FakeDownloadEventsSocket.instances.push(this)
+  }
+
+  addEventListener() {}
+  close() {}
+  static reset() {
+    FakeDownloadEventsSocket.instances = []
+  }
+}
+
 describe('useAssetPreviewDownloadActions', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.doUnmock('../../src/composables/useAssetDownloads')
+    FakeDownloadEventsSocket.reset()
   })
 
-  it('can defer full download polling until a preview opens', async () => {
+  it('can defer download event subscription until a preview opens', async () => {
     vi.useFakeTimers()
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true, items: [] }))
     vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('WebSocket', FakeDownloadEventsSocket)
 
     const { useAssetPreviewDownloadActions } = await import('../../src/components/asset-preview/useAssetPreviewDownloadActions')
     let actions: ReturnType<typeof useAssetPreviewDownloadActions> | null = null
@@ -37,15 +58,14 @@ describe('useAssetPreviewDownloadActions', () => {
     await flushPromises()
 
     expect(fetchMock).not.toHaveBeenCalled()
+    expect(FakeDownloadEventsSocket.instances).toHaveLength(0)
 
     actions?.startPolling()
     await flushPromises()
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/civitai/downloads', {
-      headers: {
-        Accept: 'application/json',
-      },
-    })
+    expect(FakeDownloadEventsSocket.instances).toHaveLength(1)
+    expect(FakeDownloadEventsSocket.instances[0].url).toContain('/api/civitai/downloads/events')
+    expect(fetchMock).not.toHaveBeenCalled()
 
     wrapper.unmount()
     vi.runOnlyPendingTimers()

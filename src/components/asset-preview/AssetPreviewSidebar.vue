@@ -74,7 +74,9 @@ const props = defineProps<{
   activeImageMetaSource: Record<string, unknown> | null
   blurNsfwContent?: boolean
   feedLoading: boolean
+  feedLoadingMore: boolean
   feedError: string
+  canLoadMoreFeed: boolean
   applyGenerationMetadata?: (metadata: Record<string, unknown>) => void | Promise<void>
   repairDownloadPreviews?: (download: AssetPreviewDownload) => void | Promise<void>
   downloadForVersion: (version: CivitaiModelVersion | null | undefined) => AssetPreviewDownload | null
@@ -95,6 +97,7 @@ const emit = defineEmits<{
   'delete-download': [version: CivitaiModelVersion]
   'select-preview': [index: number]
   'select-feed-preview': [index: number]
+  'load-more-feed': []
   'request-image-metadata': []
   close: []
 }>()
@@ -419,9 +422,12 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
         :active-slide="activeSlide"
         :blur-nsfw-content="blurNsfwContent"
         :feed-loading="feedLoading"
+        :feed-loading-more="feedLoadingMore"
         :feed-error="feedError"
+        :can-load-more-feed="canLoadMoreFeed"
         @select-version="emit('select-version', $event)"
         @select-feed-preview="emit('select-feed-preview', $event)"
+        @load-more="emit('load-more-feed')"
       />
     </div>
   </aside>

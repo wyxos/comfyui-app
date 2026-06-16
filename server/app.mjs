@@ -55,10 +55,12 @@ import {
 import { resetDownloadsRuntimeState } from './downloads/state.mjs'
 import { resetDownloadQueueRuntimeState } from './downloads/queue.mjs'
 import { resetDownloadMetadataRuntimeState } from './downloads/metadata.mjs'
+import { installDownloadsEventSocket } from './downloads/events.mjs'
 import { resetWatchedDownloadsRuntimeState, startWatchedDownloadPoller, stopWatchedDownloadPoller } from './downloads/watched.mjs'
 import { resetComfyModelDirsFromEnv } from './model-paths.mjs'
 import { resetModelMetadataRuntimeState } from './model-metadata.mjs'
 import { resetJobStoreRuntimeState } from './job-store.mjs'
+import { installProcessErrorLogger, installServerConsoleLogger } from './server-log.mjs'
 
 const proxyHeaderBlocklist = new Set(['connection', 'content-encoding', 'content-length', 'transfer-encoding'])
 
@@ -316,6 +318,8 @@ export function createCompanionServer({ connectWebSocket = true, devAssetOrigin 
     server.once('listening', connectComfySocket)
   }
 
+  installDownloadsEventSocket(server)
+
   return server
 }
 
@@ -338,6 +342,9 @@ export function configureCompanionServerForTests(adapters = {}) {
 }
 
 export function startCompanionServer(options = {}) {
+  installServerConsoleLogger()
+  installProcessErrorLogger()
+
   const server = createCompanionServer(options)
   server.listen(port, host, () => {
     console.log(`Comfy Companion listening on http://${host}:${port}`)

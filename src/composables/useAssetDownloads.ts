@@ -10,6 +10,7 @@ import type {
   WatchedDownloadsResponse,
 } from './assetDownloadTypes'
 import { emptyDownloadCounts, normalizeDownloadCounts } from './assetDownloadCounts'
+import { subscribeAssetDownloadEvents, type AssetDownloadSnapshot } from './assetDownloadEvents'
 import { useAssetDownloadSubscription } from './useAssetDownloadSubscription'
 
 export type {
@@ -31,12 +32,11 @@ const panelError = ref('')
 const summaryCounts = ref<DownloadCounts>(emptyDownloadCounts())
 const summaryLoading = ref(false)
 const summaryError = ref('')
-let pollTimer: number | undefined
-let panelPollTimer: number | undefined
-let summaryPollTimer: number | undefined
 let subscribers = 0
 let panelSubscribers = 0
 let summarySubscribers = 0
+let eventSubscribers = 0
+let unsubscribeDownloadEvents: (() => void) | null = null
 let refreshRequestId = 0
 let watchedRefreshRequestId = 0
 let panelRefreshRequestId = 0
@@ -48,9 +48,6 @@ const activeDownloads = computed(() => {
 const completedDownloads = computed(() => downloads.value.filter((item) => item.state === 'complete'))
 const panelActiveDownloads = computed(() => {
   return panelDownloads.value.filter((item) => ['queued', 'downloading', 'paused'].includes(item.state))
-})
-const panelRunningDownloads = computed(() => {
-  return panelDownloads.value.filter((item) => item.state === 'queued' || item.state === 'downloading')
 })
 const panelCompletedDownloads = computed(() => panelDownloads.value.filter((item) => item.state === 'complete'))
 const downloadById = computed(() => new Map(downloads.value.map((item) => [item.id, item])))
@@ -74,6 +71,57 @@ const downloadByVersionId = computed(() => {
 
   return map
 })
+
+function applyDownloadsResponse(payload: DownloadsResponse | undefined) {
+  if (!payload || payload.ok === false) {
+    return
+  }
+
+  downloads.value = Array.isArray(payload.items) ? payload.items : []
+  loading.value = false
+  error.value = ''
+}
+
+function applyPanelResponse(payload: DownloadsResponse | undefined) {
+  if (!payload || payload.ok === false) {
+    return
+  }
+
+  panelDownloads.value = Array.isArray(payload.items) ? payload.items : []
+  panelLoading.value = false
+  panelError.value = ''
+}
+
+function applySummaryResponse(payload: DownloadsSummaryResponse | undefined) {
+  if (!payload || payload.ok === false) {
+    return
+  }
+
+  summaryCounts.value = normalizeDownloadCounts(payload.counts)
+  summaryLoading.value = false
+  summaryError.value = ''
+}
+
+function applyDownloadSnapshot(snapshot: AssetDownloadSnapshot) {
+  applyDownloadsResponse(snapshot.downloads)
+  applyPanelResponse(snapshot.panel)
+  applySummaryResponse(snapshot.summary)
+}
+
+function subscribeDownloadEvents() {
+  eventSubscribers += 1
+  if (eventSubscribers === 1) {
+    unsubscribeDownloadEvents = subscribeAssetDownloadEvents(applyDownloadSnapshot)
+  }
+}
+
+function unsubscribeDownloadEventSubscription() {
+  eventSubscribers = Math.max(0, eventSubscribers - 1)
+  if (eventSubscribers === 0) {
+    unsubscribeDownloadEvents?.()
+    unsubscribeDownloadEvents = null
+  }
+}
 
 async function refreshWatchedDownloads() {
   const requestId = ++watchedRefreshRequestId
@@ -162,47 +210,6 @@ async function refreshDownloadPanel() {
   }
 }
 
-function startPolling() {
-  window.clearInterval(pollTimer)
-  void refreshDownloads()
-  pollTimer = window.setInterval(() => {
-    void refreshDownloads()
-  }, activeDownloads.value.length ? 1000 : 3500)
-}
-
-function stopPolling() {
-  window.clearInterval(pollTimer)
-  pollTimer = undefined
-  refreshRequestId += 1
-}
-
-function queueNextPanelPoll() {
-  window.clearTimeout(panelPollTimer)
-  panelPollTimer = window.setTimeout(() => {
-    void refreshDownloadPanel().finally(() => {
-      if (panelPollTimer !== undefined) {
-        queueNextPanelPoll()
-      }
-    })
-  }, panelRunningDownloads.value.length ? 1000 : 3500)
-}
-
-function startPanelPolling() {
-  window.clearTimeout(panelPollTimer)
-  panelPollTimer = undefined
-  void refreshDownloadPanel().finally(() => {
-    if (panelSubscribers > 0 && panelPollTimer === undefined) {
-      queueNextPanelPoll()
-    }
-  })
-}
-
-function stopPanelPolling() {
-  window.clearTimeout(panelPollTimer)
-  panelPollTimer = undefined
-  panelRefreshRequestId += 1
-}
-
 async function refreshDownloadSummary() {
   const requestId = ++summaryRefreshRequestId
   summaryLoading.value = true
@@ -234,50 +241,28 @@ async function refreshDownloadSummary() {
   }
 }
 
-function startSummaryPolling() {
-  window.clearInterval(summaryPollTimer)
-  void refreshDownloadSummary()
-  summaryPollTimer = window.setInterval(() => {
-    void refreshDownloadSummary()
-  }, 3500)
-}
-
-function stopSummaryPolling() {
-  window.clearInterval(summaryPollTimer)
-  summaryPollTimer = undefined
-  summaryRefreshRequestId += 1
-}
-
 function subscribeDownloads() {
   subscribers += 1
-  if (subscribers === 1) {
-    startPolling()
-  } else {
-    void refreshDownloads()
-  }
+  loading.value = true
+  subscribeDownloadEvents()
 }
 
 function unsubscribeDownloads() {
   subscribers = Math.max(0, subscribers - 1)
-  if (subscribers === 0) {
-    stopPolling()
-  }
+  refreshRequestId += 1
+  unsubscribeDownloadEventSubscription()
 }
 
 function subscribeDownloadPanel() {
   panelSubscribers += 1
-  if (panelSubscribers === 1) {
-    startPanelPolling()
-  } else {
-    void refreshDownloadPanel()
-  }
+  panelLoading.value = true
+  subscribeDownloadEvents()
 }
 
 function unsubscribeDownloadPanel() {
   panelSubscribers = Math.max(0, panelSubscribers - 1)
-  if (panelSubscribers === 0) {
-    stopPanelPolling()
-  }
+  panelRefreshRequestId += 1
+  unsubscribeDownloadEventSubscription()
 }
 
 async function postDownloadAction(path: string, init?: RequestInit) {
@@ -296,8 +281,6 @@ async function postDownloadAction(path: string, init?: RequestInit) {
     throw new Error(payload?.message ?? `Download request returned ${response.status}`)
   }
 
-  await refreshDownloads()
-  void refreshDownloadSummary()
   return payload
 }
 
@@ -321,8 +304,6 @@ async function postPanelDownloadAction(path: string, init?: RequestInit) {
     throw new Error(payload?.message ?? `Download request returned ${response.status}`)
   }
 
-  await refreshDownloadPanel()
-  void refreshDownloadSummary()
   return payload
 }
 
@@ -348,7 +329,6 @@ async function watchDownload(payload: WatchDownloadPayload) {
   }
 
   await refreshWatchedDownloads()
-  void refreshDownloads()
   return responsePayload
 }
 
@@ -479,16 +459,12 @@ export function useAssetDownloadPanel() {
 export function useAssetDownloadSummary() {
   useAssetDownloadSubscription(() => {
     summarySubscribers += 1
-    if (summarySubscribers === 1) {
-      startSummaryPolling()
-    } else {
-      void refreshDownloadSummary()
-    }
+    summaryLoading.value = true
+    subscribeDownloadEvents()
   }, () => {
     summarySubscribers = Math.max(0, summarySubscribers - 1)
-    if (summarySubscribers === 0) {
-      stopSummaryPolling()
-    }
+    summaryRefreshRequestId += 1
+    unsubscribeDownloadEventSubscription()
   })
 
   return {
