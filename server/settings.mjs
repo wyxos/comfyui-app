@@ -42,6 +42,42 @@ export function buildCivitaiKeyPreview(apiKey) {
   return `Saved, ending in ${trimmedKey.slice(-4).padStart(4, '*')}`
 }
 
+export function normalizeAtlasUrl(value) {
+  const trimmed = safeTrim(value)
+  if (!trimmed) {
+    return ''
+  }
+
+  const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+
+  try {
+    const url = new URL(candidate)
+    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) {
+      return ''
+    }
+
+    url.hash = ''
+    url.search = ''
+    url.pathname = url.pathname.replace(/\/+$/, '')
+    return url.toString().replace(/\/$/, '')
+  } catch {
+    return ''
+  }
+}
+
+export function serializeAtlasSettings(settings) {
+  const atlasSettings = normalizePlainObject(settings.atlas)
+  const atlasUrl = normalizeAtlasUrl(atlasSettings.baseUrl)
+  const apiKey = safeTrim(atlasSettings.apiKey)
+
+  return {
+    atlasUrl,
+    atlasConfigured: Boolean(atlasUrl),
+    atlasKeyConfigured: Boolean(apiKey),
+    atlasKeyPreview: buildCivitaiKeyPreview(apiKey),
+  }
+}
+
 export function serializeCivitaiSettings(apiKey) {
   const trimmedKey = safeTrim(apiKey)
 
@@ -95,6 +131,7 @@ export function serializeAppSettings(settings) {
     ok: true,
     includeNsfw: normalizeIncludeNsfw(preferences.includeNsfw),
     blurNsfwContent: normalizeBlurNsfwContent(preferences.blurNsfwContent),
+    ...serializeAtlasSettings(settings),
   }
 }
 
@@ -105,6 +142,7 @@ export async function getAppSettings() {
 export async function saveAppSettings(patch) {
   const settings = await readSettings()
   const preferences = normalizePlainObject(settings.preferences)
+  const atlasSettings = normalizePlainObject(settings.atlas)
   settings.preferences = {
     ...preferences,
     includeNsfw: patch?.includeNsfw === undefined
@@ -115,8 +153,43 @@ export async function saveAppSettings(patch) {
       : normalizeBlurNsfwContent(patch.blurNsfwContent),
   }
 
+  const nextAtlasUrl = patch?.atlasUrl === undefined
+    ? normalizeAtlasUrl(atlasSettings.baseUrl)
+    : normalizeAtlasUrl(patch.atlasUrl)
+  const nextAtlasKey = patch?.atlasApiKey === undefined
+    ? safeTrim(atlasSettings.apiKey)
+    : safeTrim(patch.atlasApiKey)
+
+  if (nextAtlasUrl || nextAtlasKey) {
+    settings.atlas = {
+      ...atlasSettings,
+      baseUrl: nextAtlasUrl,
+    }
+    if (patch?.atlasApiKey !== undefined) {
+      if (nextAtlasKey) {
+        settings.atlas.apiKey = nextAtlasKey
+      } else {
+        delete settings.atlas.apiKey
+      }
+    } else if (nextAtlasKey) {
+      settings.atlas.apiKey = nextAtlasKey
+    }
+  } else {
+    delete settings.atlas
+  }
+
   await writeSettings(settings)
   return serializeAppSettings(settings)
+}
+
+export async function getStoredAtlasSettings() {
+  const settings = await readSettings()
+  const atlasSettings = normalizePlainObject(settings.atlas)
+
+  return {
+    baseUrl: normalizeAtlasUrl(atlasSettings.baseUrl),
+    apiKey: safeTrim(atlasSettings.apiKey),
+  }
 }
 
 export async function getStoredCivitaiApiKey() {

@@ -101,10 +101,20 @@ export async function handlePutAppSettings(request, response) {
     return sendError(response, 400, 'invalid-blur-nsfw-content', 'blurNsfwContent must be a boolean.')
   }
 
+  if (body.atlasUrl !== undefined && typeof body.atlasUrl !== 'string') {
+    return sendError(response, 400, 'invalid-atlas-url', 'atlasUrl must be a string.')
+  }
+
+  if (body.atlasApiKey !== undefined && typeof body.atlasApiKey !== 'string') {
+    return sendError(response, 400, 'invalid-atlas-api-key', 'atlasApiKey must be a string.')
+  }
+
   try {
     return sendJson(response, 200, await saveAppSettings({
       includeNsfw: body.includeNsfw,
       blurNsfwContent: body.blurNsfwContent,
+      atlasUrl: body.atlasUrl,
+      atlasApiKey: body.atlasApiKey,
     }))
   } catch (error) {
     return sendError(

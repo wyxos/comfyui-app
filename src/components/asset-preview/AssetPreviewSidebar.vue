@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ExternalLink } from 'lucide-vue-next'
+import { Database, ExternalLink } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 
 import {
@@ -15,6 +15,7 @@ import AssetPreviewImageSafetyEditor from './AssetPreviewImageSafetyEditor.vue'
 import AssetPreviewPreviewRepairAction from './AssetPreviewPreviewRepairAction.vue'
 import AssetPreviewSafetyEditor from './AssetPreviewSafetyEditor.vue'
 import AssetPreviewVersionList from './AssetPreviewVersionList.vue'
+import type { AtlasReactionType } from './assetPreviewAtlasMedia'
 import type {
   AssetPreviewDownload,
   CivitaiModel,
@@ -35,6 +36,9 @@ const props = defineProps<{
   civitaiModel: CivitaiModel | null
   civitaiError: string
   civitaiModelUrl: string
+  atlasConfigured: boolean
+  atlasOpenError: string
+  atlasOpening: boolean
   selectedVersion: CivitaiModelVersion | null
   modelVersions: CivitaiModelVersion[]
   hasDownloadActions: boolean
@@ -76,6 +80,8 @@ const props = defineProps<{
   feedLoading: boolean
   feedLoadingMore: boolean
   feedError: string
+  atlasActionError: string
+  atlasReactionPendingKey: string
   canLoadMoreFeed: boolean
   applyGenerationMetadata?: (metadata: Record<string, unknown>) => void | Promise<void>
   repairDownloadPreviews?: (download: AssetPreviewDownload) => void | Promise<void>
@@ -98,6 +104,8 @@ const emit = defineEmits<{
   'select-preview': [index: number]
   'select-feed-preview': [index: number]
   'load-more-feed': []
+  'atlas-react-feed-preview': [index: number, type?: AtlasReactionType]
+  'open-atlas-model': []
   'request-image-metadata': []
   close: []
 }>()
@@ -203,6 +211,21 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
               <ExternalLink class="h-3.5 w-3.5" />
             </a>
           </UiTooltip>
+          <UiTooltip
+            v-if="atlasConfigured && civitaiModel"
+            content="Open in Atlas"
+          >
+            <button
+              type="button"
+              class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-secondary transition hover:border-secondary hover:text-accent focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
+              :disabled="atlasOpening"
+              :aria-label="`Open ${modalTitle} in Atlas`"
+              data-test="asset-preview-atlas-link"
+              @click="emit('open-atlas-model')"
+            >
+              <Database class="h-3.5 w-3.5" />
+            </button>
+          </UiTooltip>
         </div>
 
         <p
@@ -210,6 +233,13 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
           class="rounded-md border border-destructive/35 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive"
         >
           {{ civitaiError }}
+        </p>
+        <p
+          v-if="atlasOpenError"
+          class="rounded-md border border-destructive/35 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive"
+          data-test="asset-preview-atlas-open-error"
+        >
+          {{ atlasOpenError }}
         </p>
         <AssetPreviewPreviewRepairAction
           :download="downloadForVersion(selectedVersion)"
@@ -424,10 +454,14 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
         :feed-loading="feedLoading"
         :feed-loading-more="feedLoadingMore"
         :feed-error="feedError"
+        :atlas-action-error="atlasActionError"
+        :atlas-reaction-pending-key="atlasReactionPendingKey"
+        :atlas-configured="atlasConfigured"
         :can-load-more-feed="canLoadMoreFeed"
         @select-version="emit('select-version', $event)"
         @select-feed-preview="emit('select-feed-preview', $event)"
         @load-more="emit('load-more-feed')"
+        @atlas-react="(index, type) => emit('atlas-react-feed-preview', index, type)"
       />
     </div>
   </aside>

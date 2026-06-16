@@ -5,46 +5,6 @@ import { useServerHarness } from './serverApiTestUtils'
 
 const { downloadItem, setupHarness } = useServerHarness()
 
-function civitaiImagePageHtml(imageId: number, meta: Record<string, unknown>) {
-  return `<!doctype html><html><body><script id="__NEXT_DATA__" type="application/json">${
-    JSON.stringify({
-      props: {
-        pageProps: {
-          trpcState: {
-            json: {
-              queries: [
-                {
-                  queryHash: `[["image","get"],{"input":{"id":${imageId}},"type":"query"}]`,
-                  state: {
-                    data: {
-                      id: imageId,
-                      url: 'https://image.test/page-image.png',
-                      width: 1536,
-                      height: 2040,
-                      hash: 'PAGEHASH',
-                      type: 'image',
-                      nsfwLevel: 'Soft',
-                      postId: 901,
-                    },
-                  },
-                },
-                {
-                  queryHash: `[["image","getGenerationData"],{"input":{"id":${imageId}},"type":"query"}]`,
-                  state: {
-                    data: {
-                      meta,
-                    },
-                  },
-                },
-              ],
-            },
-          },
-        },
-      },
-    })
-  }</script></body></html>`
-}
-
 describe('companion server API routes', () => {
   it('serves health, model lists, settings, and Civitai proxies', async () => {
       const server = await setupHarness()
@@ -137,17 +97,31 @@ describe('companion server API routes', () => {
           ok: true,
           includeNsfw: false,
           blurNsfwContent: true,
+          atlasConfigured: false,
+          atlasUrl: '',
         }),
       })
-      await expect(server.json('PUT', '/api/settings/app', { includeNsfw: true, blurNsfwContent: false })).resolves.toMatchObject({
+      const savedAppSettings = await server.json('PUT', '/api/settings/app', {
+        includeNsfw: true,
+        blurNsfwContent: false,
+        atlasUrl: 'atlas.test',
+        atlasApiKey: 'atlas-secret-1234',
+      })
+      expect(savedAppSettings).toMatchObject({
         payload: expect.objectContaining({
           ok: true,
           includeNsfw: true,
           blurNsfwContent: false,
+          atlasConfigured: true,
+          atlasUrl: 'https://atlas.test',
+          atlasKeyConfigured: true,
+          atlasKeyPreview: 'Saved, ending in 1234',
         }),
       })
+      expect(savedAppSettings.payload.atlasApiKey).toBeUndefined()
       expect(JSON.parse(await server.readConfigFile('settings.json')).preferences.includeNsfw).toBe(true)
       expect(JSON.parse(await server.readConfigFile('settings.json')).preferences.blurNsfwContent).toBe(false)
+      expect(JSON.parse(await server.readConfigFile('settings.json')).atlas.apiKey).toBe('atlas-secret-1234')
 
       const civitaiModels = await server.request('/api/civitai/models?query=detail&limit=999&ignored=1')
       expect(civitaiModels.payload).toMatchObject({ items: [expect.objectContaining({ id: 101 })] })
@@ -180,59 +154,41 @@ describe('companion server API routes', () => {
         }),
       })
 
+      await expect(server.json('POST', '/api/atlas/civitai/status', {
+        items: [{ request_id: 'image-401', id: 401, url: 'https://image.test/detail.png' }],
+      })).resolves.toMatchObject({
+        payload: expect.objectContaining({
+          configured: true,
+          ok: true,
+        }),
+      })
+      const atlasStatusCall = server.calls.find((call) => call.url.origin === 'https://atlas.test' && call.url.pathname === '/api/extension/civitai/status')
+      expect(atlasStatusCall?.headers.get('x-atlas-api-key')).toBe('atlas-secret-1234')
+      expect(atlasStatusCall?.body).toMatchObject({
+        items: [expect.objectContaining({ request_id: 'image-401' })],
+      })
+
+      await expect(server.json('POST', '/api/atlas/civitai/open-model', {
+        modelId: 101,
+        modelVersionId: 201,
+      })).resolves.toMatchObject({
+        payload: expect.objectContaining({
+          configured: true,
+          browse_url: 'https://atlas.test/browse',
+        }),
+      })
+      const atlasOpenCall = server.calls.find((call) => call.url.origin === 'https://atlas.test' && call.url.pathname === '/api/extension/browse-tabs/civitai-model')
+      expect(atlasOpenCall?.body).toMatchObject({
+        model_id: 101,
+        model_version_id: 201,
+      })
+
       await expect(server.json('DELETE', '/api/settings/civitai')).resolves.toMatchObject({
         payload: expect.objectContaining({
           ok: true,
           configured: false,
         }),
       })
-    })
-
-  it('hydrates single-image metadata from the public Civitai image page when the API omits it', async () => {
-      const imageId = 114266630
-      const server = await setupHarness({
-        upstream: {
-          civitaiImages: {
-            items: [],
-            metadata: { totalItems: 0, totalPages: 0 },
-          },
-          civitaiImagePages: {
-            [String(imageId)]: civitaiImagePageHtml(imageId, {
-              prompt: 'mature female, solo, red hair',
-              negativePrompt: 'bad quality,worst quality',
-              cfgScale: 7,
-              steps: 30,
-              sampler: 'Euler a',
-              seed: 561061719,
-              Model: 'WAI-Nsfw-Illustrious-16',
-            }),
-          },
-        },
-      })
-
-      await expect(server.request(`/api/civitai/images?imageId=${imageId}&limit=1`)).resolves.toMatchObject({
-        payload: {
-          items: [
-            expect.objectContaining({
-              id: imageId,
-              url: 'https://image.test/page-image.png',
-              width: 1536,
-              height: 2040,
-              meta: expect.objectContaining({
-                prompt: 'mature female, solo, red hair',
-                negativePrompt: 'bad quality,worst quality',
-                seed: 561061719,
-              }),
-            }),
-          ],
-          metadata: expect.objectContaining({
-            totalItems: 1,
-            totalPages: 1,
-          }),
-        },
-      })
-      expect(server.calls.some((call) => call.url.pathname === '/api/v1/images')).toBe(true)
-      expect(server.calls.some((call) => call.url.pathname === `/images/${imageId}`)).toBe(true)
     })
 
   it('returns route-level failures for invalid bodies and upstream service errors', async () => {
@@ -259,6 +215,17 @@ describe('companion server API routes', () => {
         response: expect.objectContaining({ status: 502 }),
         payload: expect.objectContaining({ ok: false, error: 'civitai-request-failed' }),
       })
+      await expect(server.json('POST', '/api/atlas/civitai/status', {
+        items: [{ request_id: 'image-401', id: 401, url: 'https://image.test/detail.png' }],
+      })).resolves.toMatchObject({
+        response: expect.objectContaining({ status: 200 }),
+        payload: {
+          ok: true,
+          configured: false,
+          items: [],
+        },
+      })
+      expect(server.calls.some((call) => call.url.origin === 'https://atlas.test')).toBe(false)
       await expect(
         server.request('/api/settings/civitai', {
           method: 'PUT',

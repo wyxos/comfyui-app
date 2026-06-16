@@ -40,6 +40,11 @@ import {
   handlePutAppSettings,
   handlePutCivitaiSettings,
 } from './handlers/settings.mjs'
+import {
+  handleAtlasCivitaiOpenModel,
+  handleAtlasCivitaiReaction,
+  handleAtlasCivitaiStatus,
+} from './handlers/atlas.mjs'
 import { handleGenerate } from './handlers/generate.mjs'
 import { handleControlNetPreview, handleModelPreview } from './handlers/previews-prompts.mjs'
 import {
@@ -155,6 +160,18 @@ export function createCompanionServer({ connectWebSocket = true, devAssetOrigin 
 
   if (url.pathname === '/api/civitai/images' && request.method === 'GET') {
     return handleCivitaiImagesProxy(url, response, request)
+  }
+
+  if (url.pathname === '/api/atlas/civitai/status' && request.method === 'POST') {
+    return handleAtlasCivitaiStatus(request, response)
+  }
+
+  if (url.pathname === '/api/atlas/civitai/reactions' && request.method === 'POST') {
+    return handleAtlasCivitaiReaction(request, response)
+  }
+
+  if (url.pathname === '/api/atlas/civitai/open-model' && request.method === 'POST') {
+    return handleAtlasCivitaiOpenModel(request, response)
   }
 
   if (url.pathname === '/api/model-archive' && request.method === 'GET') {

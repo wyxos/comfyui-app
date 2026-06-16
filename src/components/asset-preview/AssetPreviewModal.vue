@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight, LoaderCircle, X } from 'lucide-vue-next'
 
+import AssetPreviewAtlasReactionWidget from './AssetPreviewAtlasReactionWidget.vue'
 import AssetPreviewMediaStrip from './AssetPreviewMediaStrip.vue'
 import AssetPreviewSidebar from './AssetPreviewSidebar.vue'
 import type { AssetPreviewModalProps } from './assetPreviewTypes'
+import { atlasMediaKey, type AtlasReactionType } from './assetPreviewAtlasMedia'
 import { useAssetPreviewModal } from './useAssetPreviewModal'
 import UiPreloadedMedia from '../ui/UiPreloadedMedia.vue'
 
@@ -77,6 +79,11 @@ const {
   feedLoading,
   feedLoadingMore,
   feedError,
+  atlasActionError,
+  atlasReactionPendingKey,
+  atlasConfigured,
+  atlasOpenError,
+  atlasOpening,
   canLoadMoreFeed,
   feedSlides,
   modelVersions,
@@ -102,12 +109,15 @@ const {
   hasDownloadActions,
   close,
   loadActiveImageDetails,
+  openAtlasModelTab,
   selectVersion,
   showPreviousImage,
   showNextImage,
   selectPreviewImage,
   selectFeedImage,
   loadMoreFeed,
+  reactToFeedImage,
+  reactToActiveImage,
   handleModalMediaReady,
   downloadForVersion,
   downloadStatusLabel,
@@ -119,6 +129,66 @@ const {
   deleteVersionDownload,
   imageDimensions,
 } = useAssetPreviewModal(props, () => emit('close'))
+
+function canReactToActiveAtlasImage() {
+  const image = activeSlide.value?.image
+  return atlasConfigured.value && Boolean(image?.url && image.id)
+}
+
+function activeAtlasStatus() {
+  return activeSlide.value?.image?.atlasStatus ?? null
+}
+
+function activeAtlasPending() {
+  const image = activeSlide.value?.image
+  return image ? atlasReactionPendingKey.value === atlasMediaKey(image) : false
+}
+
+function handleActiveAtlasReaction(type: AtlasReactionType) {
+  if (canReactToActiveAtlasImage()) {
+    void reactToActiveImage(type)
+  }
+}
+
+function handleMainMediaClick(event: MouseEvent) {
+  if (!event.altKey || event.button !== 0 || !canReactToActiveAtlasImage()) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  void reactToActiveImage('love')
+}
+
+function handleMainMediaMouseDown(event: MouseEvent) {
+  if (!event.altKey || event.button !== 1 || !canReactToActiveAtlasImage()) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  void reactToActiveImage('like')
+}
+
+function handleMainMediaContextMenu(event: MouseEvent) {
+  if (!event.altKey || !canReactToActiveAtlasImage()) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  void reactToActiveImage('blacklist')
+}
+
+function handleMainMediaAuxClick(event: MouseEvent) {
+  if (event.button !== 1 || event.altKey || !activeSlide.value?.url) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  window.open(activeSlide.value.url, '_blank', 'noopener,noreferrer')
+}
 </script>
 
 <template>
@@ -182,22 +252,40 @@ const {
           Loading preview...
         </div>
 
-        <UiPreloadedMedia
+        <div
           v-if="displayedImageUrl"
-          :src="displayedImageUrl"
-          :is-video="Boolean(activeSlide?.isVideo)"
-          :alt="`${modalTitle} preview image`"
-          label=""
-          :media-class="props.blurNsfwContent && activeImageIsNsfw ? 'max-h-full max-w-full scale-105 object-contain blur-2xl' : 'max-h-full max-w-full object-contain'"
-          loading-class="hidden"
-          controls
-          autoplay
-          loop
-          playsinline
-          preload="auto"
-          @ready="handleModalMediaReady"
-          @error="handleModalMediaReady"
-        />
+          data-test="asset-preview-main-media-shortcut-target"
+          class="flex h-full min-h-0 w-full flex-col items-center justify-center gap-3"
+          @click="handleMainMediaClick"
+          @mousedown="handleMainMediaMouseDown"
+          @contextmenu="handleMainMediaContextMenu"
+          @auxclick="handleMainMediaAuxClick"
+        >
+          <div class="min-h-0 w-full flex-1">
+            <UiPreloadedMedia
+              :src="displayedImageUrl"
+              :is-video="Boolean(activeSlide?.isVideo)"
+              :alt="`${modalTitle} preview image`"
+              label=""
+              :media-class="props.blurNsfwContent && activeImageIsNsfw ? 'max-h-full max-w-full scale-105 object-contain blur-2xl' : 'max-h-full max-w-full object-contain'"
+              loading-class="hidden"
+              controls
+              autoplay
+              loop
+              playsinline
+              preload="auto"
+              @ready="handleModalMediaReady"
+              @error="handleModalMediaReady"
+            />
+          </div>
+          <AssetPreviewAtlasReactionWidget
+            v-if="canReactToActiveAtlasImage()"
+            data-test="asset-preview-main-atlas-reactions"
+            :status="activeAtlasStatus()"
+            :pending="activeAtlasPending()"
+            @react="handleActiveAtlasReaction"
+          />
+        </div>
         <div
           v-else-if="!civitaiLoading"
           class="rounded-md border border-primary-foreground/12 bg-primary/72 px-5 py-4 text-sm font-semibold text-primary-foreground/72"
@@ -232,6 +320,9 @@ const {
       :civitai-model="civitaiModel ?? null"
       :civitai-error="civitaiError"
       :civitai-model-url="civitaiModelUrl"
+      :atlas-configured="atlasConfigured"
+      :atlas-open-error="atlasOpenError"
+      :atlas-opening="atlasOpening"
       :selected-version="selectedVersion"
       :model-versions="modelVersions"
       :has-download-actions="hasDownloadActions"
@@ -265,6 +356,8 @@ const {
       :feed-loading="feedLoading"
       :feed-loading-more="feedLoadingMore"
       :feed-error="feedError"
+      :atlas-action-error="atlasActionError"
+      :atlas-reaction-pending-key="atlasReactionPendingKey"
       :can-load-more-feed="canLoadMoreFeed"
       :apply-generation-metadata="props.applyGenerationMetadata"
       :repair-download-previews="props.repairDownloadPreviews"
@@ -284,6 +377,8 @@ const {
       @select-preview="selectPreviewImage"
       @select-feed-preview="selectFeedImage"
       @load-more-feed="loadMoreFeed"
+      @atlas-react-feed-preview="reactToFeedImage"
+      @open-atlas-model="openAtlasModelTab"
       @request-image-metadata="loadActiveImageDetails"
       @close="close"
     />

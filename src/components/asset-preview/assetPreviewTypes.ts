@@ -25,6 +25,34 @@ export type CivitaiImage = {
   mediaType?: string | null
   archiveSource?: string | null
   mediaStatus?: string | null
+  atlasStatus?: AtlasMediaStatus | null
+}
+
+export type AtlasMediaStatus = {
+  request_id?: string
+  exists?: boolean
+  file_id?: number | null
+  downloaded?: boolean
+  downloaded_at?: string | null
+  blacklisted?: boolean
+  blacklisted_at?: string | null
+  auto_blacklisted?: boolean
+  reaction?: string | null
+  reacted_at?: string | null
+  filtered?: boolean
+  ignored?: boolean
+  filter_reasons?: Array<{
+    type?: string
+    name?: string | null
+    reason?: string | null
+  }>
+  download?: {
+    requested?: boolean
+    transfer_id?: number | null
+    status?: string | null
+    progress_percent?: number | null
+    downloaded_at?: string | null
+  } | null
 }
 
 export type CivitaiModelFile = {

@@ -8,6 +8,12 @@ import type {
   CivitaiModelVersion,
   PreviewSlide,
 } from './assetPreviewTypes'
+import {
+  atlasMediaKey,
+  atlasRequestId,
+  type AtlasReactionType,
+} from './assetPreviewAtlasMedia'
+import { useAssetPreviewAtlasMediaActions } from './useAssetPreviewAtlasMediaActions'
 
 const MEDIA_FEED_LIMIT = 20
 
@@ -27,19 +33,11 @@ function normalizeFeedImages(items: CivitaiImage[] | null | undefined) {
     .slice(0, MEDIA_FEED_LIMIT)
 }
 
-function feedImageKey(image: CivitaiImage) {
-  if (image.id !== undefined && image.id !== null && image.id !== '') {
-    return `id:${image.id}`
-  }
-
-  return `url:${image.url ?? ''}`
-}
-
 function mergeFeedImages(currentImages: CivitaiImage[], nextImages: CivitaiImage[]) {
-  const seen = new Set(currentImages.map(feedImageKey))
+  const seen = new Set(currentImages.map(atlasMediaKey))
   const merged = [...currentImages]
   for (const image of nextImages) {
-    const key = feedImageKey(image)
+    const key = atlasMediaKey(image)
     if (!seen.has(key)) {
       seen.add(key)
       merged.push(image)
@@ -64,13 +62,25 @@ function previewUrlFor(url: string, isVideo: boolean) {
 
 export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOptions) {
   const feedImages = ref<CivitaiImage[]>([])
+  const versionAtlasStatuses = ref<Record<string, CivitaiImage['atlasStatus']>>({})
   const feedLoading = ref(false)
   const feedLoadingMore = ref(false)
   const feedError = ref('')
   const feedNextCursor = ref('')
   const activeMediaSource = ref<'version' | 'feed'>('version')
+  const {
+    atlasActionError,
+    atlasConfigured,
+    atlasReactionPendingKey,
+    fetchAtlasStatuses,
+    reactToAtlasImage,
+  } = useAssetPreviewAtlasMediaActions({
+    model: options.model,
+    selectedVersion: options.selectedVersion,
+  })
 
   let feedController: AbortController | null = null
+  let versionStatusController: AbortController | null = null
   let feedToken = 0
 
   const versionSlides = computed<PreviewSlide[]>(() => {
@@ -81,12 +91,16 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
     const civitaiSlides = imagesForVersion(options.selectedVersion.value).map((image, index) => {
       const url = image.url ?? ''
       const isVideo = isVideoPreview(image)
+      const requestId = atlasRequestId(image)
+      const atlasStatus = requestId in versionAtlasStatuses.value
+        ? versionAtlasStatuses.value[requestId] ?? null
+        : image.atlasStatus ?? null
 
       return {
         key: `civitai:${image.id ?? index}:${image.url}`,
         url,
         previewUrl: previewUrlFor(url, isVideo),
-        image,
+        image: { ...image, atlasStatus },
         isVideo,
         source: image.archiveSource === 'local' || image.remoteUrl ? 'archive' as const : 'civitai' as const,
       }
@@ -159,7 +173,22 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
     feedLoadingMore.value = false
     feedError.value = ''
     feedNextCursor.value = ''
+    atlasActionError.value = ''
+    atlasReactionPendingKey.value = ''
+    atlasConfigured.value = false
     activeMediaSource.value = 'version'
+  }
+
+  function resetVersionAtlasStatuses() {
+    versionStatusController?.abort()
+    versionStatusController = null
+    versionAtlasStatuses.value = {}
+  }
+
+  function storeVersionAtlasStatuses(images: CivitaiImage[]) {
+    versionAtlasStatuses.value = Object.fromEntries(
+      images.map((image) => [atlasRequestId(image), image.atlasStatus ?? null]),
+    )
   }
 
   async function fetchFeed(modelId: number, versionId: number, cursor = '') {
@@ -207,7 +236,11 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
         return
       }
 
-      const nextImages = normalizeFeedImages(payload.items)
+      const nextImages = await fetchAtlasStatuses(normalizeFeedImages(payload.items), controller.signal, true)
+      if (feedController !== controller || feedToken !== requestToken) {
+        return
+      }
+
       feedImages.value = isLoadingMore
         ? mergeFeedImages(feedImages.value, nextImages)
         : nextImages
@@ -238,6 +271,74 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
     void fetchFeed(modelId, versionId, feedNextCursor.value)
   }
 
+  function updateFeedImageStatus(key: string, status: CivitaiImage['atlasStatus']) {
+    feedImages.value = feedImages.value.map((candidate) => (
+      atlasMediaKey(candidate) === key
+        ? { ...candidate, atlasStatus: status }
+        : candidate
+    ))
+  }
+
+  async function reactToFeedImage(index: number, type: AtlasReactionType = 'love') {
+    const image = feedSlides.value[index]?.image
+    if (!image) {
+      return
+    }
+
+    const result = await reactToAtlasImage(image, type)
+    if (result) {
+      updateFeedImageStatus(result.key, result.status)
+    }
+  }
+
+  async function reactToActiveImage(type: AtlasReactionType = 'love') {
+    const image = activeSlide.value?.image
+    if (!image) {
+      return
+    }
+
+    const result = await reactToAtlasImage(image, type)
+    if (!result) {
+      return
+    }
+
+    if (activeMediaSource.value === 'feed') {
+      updateFeedImageStatus(result.key, result.status)
+      return
+    }
+
+    versionAtlasStatuses.value = {
+      ...versionAtlasStatuses.value,
+      [atlasRequestId(image)]: result.status,
+    }
+  }
+
+  async function fetchVersionAtlasStatuses() {
+    versionStatusController?.abort()
+    const images = imagesForVersion(options.selectedVersion.value)
+    if (!options.open.value || images.length === 0) {
+      versionAtlasStatuses.value = {}
+      return
+    }
+
+    const controller = new AbortController()
+    versionStatusController = controller
+    try {
+      const imagesWithStatuses = await fetchAtlasStatuses(images, controller.signal, false)
+      if (versionStatusController === controller) {
+        storeVersionAtlasStatuses(imagesWithStatuses)
+      }
+    } catch (caughtError) {
+      if (caughtError instanceof DOMException && caughtError.name === 'AbortError') {
+        return
+      }
+
+      if (versionStatusController === controller) {
+        storeVersionAtlasStatuses(images)
+      }
+    }
+  }
+
   watch(
     () => [
       options.open.value,
@@ -248,8 +349,11 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
     ([isOpen, modelId, versionId]) => {
       if (!isOpen || modelId === null || versionId === null) {
         resetFeed()
+        resetVersionAtlasStatuses()
         return
       }
+
+      void fetchVersionAtlasStatuses()
 
       if (versionUsesArchivedMedia(options.selectedVersion.value)) {
         resetFeed()
@@ -277,7 +381,9 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
 
   onBeforeUnmount(() => {
     feedController?.abort()
+    versionStatusController?.abort()
     feedController = null
+    versionStatusController = null
     feedToken += 1
   })
 
@@ -286,6 +392,9 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
     feedLoading,
     feedLoadingMore,
     feedError,
+    atlasActionError,
+    atlasReactionPendingKey,
+    atlasConfigured,
     feedNextCursor,
     canLoadMoreFeed,
     feedSlides,
@@ -294,5 +403,7 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
     selectPreviewImage,
     selectFeedImage,
     loadMoreFeed,
+    reactToFeedImage,
+    reactToActiveImage,
   }
 }

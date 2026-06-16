@@ -18,7 +18,7 @@ describe('companion app e2e flows', () => {
     await expect.element(screen.getByRole('heading', { name: 'Downloads' })).toBeVisible()
 
     await screen.getByRole('link', { name: 'Library' }).click()
-    await expect.element(screen.getByRole('heading', { name: 'Library' })).toBeVisible()
+    await expect.element(screen.getByRole('heading', { name: 'Library', exact: true })).toBeVisible()
 
     await screen.getByRole('link', { name: 'Jobs' }).click()
     await expect.element(screen.getByRole('heading', { name: 'Generation jobs' })).toBeVisible()
@@ -37,12 +37,12 @@ describe('companion app e2e flows', () => {
     await expect.element(screen.getByText('No Civitai API key saved yet.')).toBeVisible()
 
     await screen.getByLabelText('Civitai API key').fill('abcdef1234')
-    await screen.getByRole('button', { name: 'Save' }).click()
+    await screen.getByRole('button', { name: 'Save', exact: true }).click()
 
     await expect.element(screen.getByText('Civitai API key saved to this machine.')).toBeVisible()
     await expect.element(screen.getByText('Saved, ending in 1234')).toBeVisible()
 
-    await screen.getByRole('button', { name: 'Clear' }).click()
+    await screen.getByRole('button', { name: 'Clear', exact: true }).click()
 
     await expect.element(screen.getByText('Civitai API key cleared from this machine.')).toBeVisible()
   })
@@ -241,7 +241,7 @@ describe('companion app e2e flows', () => {
 
     const { screen } = await renderCompanionApp('/library', { downloads })
 
-    await expect.element(screen.getByRole('heading', { name: 'Library' })).toBeVisible()
+    await expect.element(screen.getByRole('heading', { name: 'Library', exact: true })).toBeVisible()
 
     await vi.waitFor(() => {
       expect(document.querySelector<HTMLButtonElement>('[aria-label="Next library page"]')?.disabled).toBe(false)

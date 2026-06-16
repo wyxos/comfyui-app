@@ -18,12 +18,21 @@ const includeNsfwDefault = ref(false)
 const blurNsfwContentDefault = ref(true)
 const savedIncludeNsfwDefault = ref(false)
 const savedBlurNsfwContentDefault = ref(true)
+const atlasUrl = ref('')
+const atlasApiKey = ref('')
+const savedAtlasUrl = ref('')
+const atlasKeyConfigured = ref(false)
+const atlasKeyPreview = ref<string | null>(null)
 const appSettingsLoading = ref(false)
 const appSettingsStatusText = ref('Loading app settings...')
+const atlasStatusText = ref('Loading Atlas settings...')
 
 const hasSavedKey = computed(() => savedKeyConfigured.value)
 const keyPreviewLabel = computed(() =>
   hasSavedKey.value ? savedKeyPreview.value ?? 'Configured' : 'Not configured',
+)
+const atlasKeyPreviewLabel = computed(() =>
+  atlasKeyConfigured.value ? atlasKeyPreview.value ?? 'Configured' : 'Not configured',
 )
 
 function applyCivitaiSettings(settings: CivitaiSettingsResponse) {
@@ -124,10 +133,17 @@ async function loadAppSettings() {
     blurNsfwContentDefault.value = settings.blurNsfwContent !== false
     savedIncludeNsfwDefault.value = includeNsfwDefault.value
     savedBlurNsfwContentDefault.value = blurNsfwContentDefault.value
+    atlasUrl.value = settings.atlasUrl
+    savedAtlasUrl.value = settings.atlasUrl
+    atlasKeyConfigured.value = settings.atlasKeyConfigured
+    atlasKeyPreview.value = settings.atlasKeyPreview
     appSettingsStatusText.value = appSettingsStatus(settings)
+    atlasStatusText.value = atlasSettingsStatus(settings)
   } catch (error) {
     appSettingsStatusText.value =
       error instanceof Error ? error.message : 'Could not load app settings.'
+    atlasStatusText.value =
+      error instanceof Error ? error.message : 'Could not load Atlas settings.'
   } finally {
     appSettingsLoading.value = false
   }
@@ -138,6 +154,16 @@ function appSettingsStatus(settings: { includeNsfw: boolean, blurNsfwContent: bo
     settings.includeNsfw ? 'NSFW toggles default to on.' : 'NSFW toggles default to off.',
     settings.blurNsfwContent ? 'NSFW content blur is on.' : 'NSFW content blur is off.',
   ].join(' ')
+}
+
+function atlasSettingsStatus(settings: { atlasUrl: string, atlasKeyConfigured: boolean }) {
+  if (!settings.atlasUrl) {
+    return 'Atlas integration is off.'
+  }
+
+  return settings.atlasKeyConfigured
+    ? 'Atlas integration is on.'
+    : 'Atlas URL saved. Atlas API key is not configured.'
 }
 
 async function saveContentDefaults() {
@@ -159,6 +185,46 @@ async function saveContentDefaults() {
     blurNsfwContentDefault.value = savedBlurNsfwContentDefault.value
     appSettingsStatusText.value =
       error instanceof Error ? error.message : 'Could not save app settings.'
+  } finally {
+    appSettingsLoading.value = false
+  }
+}
+
+async function saveAtlasSettings(options: { clearKey?: boolean } = {}) {
+  appSettingsLoading.value = true
+  atlasStatusText.value = 'Saving Atlas settings...'
+
+  const nextUrl = atlasUrl.value.trim()
+  const nextKey = atlasApiKey.value.trim()
+  const payload: {
+    includeNsfw: boolean
+    blurNsfwContent: boolean
+    atlasUrl: string
+    atlasApiKey?: string
+  } = {
+    includeNsfw: includeNsfwDefault.value,
+    blurNsfwContent: blurNsfwContentDefault.value,
+    atlasUrl: nextUrl,
+  }
+
+  if (options.clearKey) {
+    payload.atlasApiKey = ''
+  } else if (nextKey) {
+    payload.atlasApiKey = nextKey
+  }
+
+  try {
+    const settings = await saveAppSettings(payload)
+    atlasUrl.value = settings.atlasUrl
+    savedAtlasUrl.value = settings.atlasUrl
+    atlasApiKey.value = ''
+    atlasKeyConfigured.value = settings.atlasKeyConfigured
+    atlasKeyPreview.value = settings.atlasKeyPreview
+    atlasStatusText.value = atlasSettingsStatus(settings)
+  } catch (error) {
+    atlasUrl.value = savedAtlasUrl.value
+    atlasStatusText.value =
+      error instanceof Error ? error.message : 'Could not save Atlas settings.'
   } finally {
     appSettingsLoading.value = false
   }
@@ -281,14 +347,84 @@ onMounted(() => {
         </div>
       </section>
 
+      <section class="rounded-md border border-border bg-card p-4 shadow-sm">
+        <form class="grid gap-4" @submit.prevent="saveAtlasSettings()">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0">
+              <h2 class="text-base font-semibold text-card-foreground">
+                Atlas integration
+              </h2>
+              <p class="mt-1 text-sm text-muted-foreground" role="status" aria-live="polite">
+                {{ atlasStatusText }}
+              </p>
+            </div>
+
+            <div
+              class="rounded-md border px-3 py-2 text-sm"
+              :class="
+                atlasKeyConfigured
+                  ? 'border-secondary/50 bg-secondary/10 text-secondary'
+                  : 'border-border bg-muted text-muted-foreground'
+              "
+            >
+              {{ atlasKeyPreviewLabel }}
+            </div>
+          </div>
+
+          <label class="grid gap-2 text-sm">
+            <span class="font-medium text-card-foreground">Atlas URL</span>
+            <input
+              v-model="atlasUrl"
+              type="text"
+              autocomplete="url"
+              spellcheck="false"
+              :disabled="appSettingsLoading"
+              class="h-10 rounded-md border border-input bg-background px-3 text-sm text-card-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-ring/25"
+              placeholder="https://atlas.example.test"
+            />
+          </label>
+
+          <label class="grid gap-2 text-sm">
+            <span class="font-medium text-card-foreground">Atlas API key</span>
+            <input
+              v-model="atlasApiKey"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              :disabled="appSettingsLoading"
+              class="h-10 rounded-md border border-input bg-background px-3 text-sm text-card-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent focus:ring-2 focus:ring-ring/25"
+              placeholder="Paste API key to save or replace"
+            />
+          </label>
+
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+            <button
+              type="button"
+              class="inline-flex h-9 items-center rounded-md border border-border bg-background px-3 text-sm font-semibold text-card-foreground transition hover:border-destructive/50 hover:text-destructive focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="appSettingsLoading || !atlasKeyConfigured"
+              @click="saveAtlasSettings({ clearKey: true })"
+            >
+              Clear key
+            </button>
+            <button
+              type="submit"
+              class="inline-flex h-9 items-center rounded-md border border-secondary bg-secondary px-3 text-sm font-semibold text-secondary-foreground shadow-[0_0_0_1px_rgba(255,198,0,0.22)] transition hover:bg-secondary/90 focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="appSettingsLoading"
+            >
+              {{ appSettingsLoading ? 'Working...' : 'Save Atlas' }}
+            </button>
+          </div>
+        </form>
+      </section>
+
       <aside class="rounded-md border border-secondary/30 bg-secondary/10 px-4 py-3 text-sm leading-6">
         <p class="font-medium text-secondary">Privacy boundary</p>
         <p class="mt-1 text-muted-foreground">
-          The saved value lives in the local server's user config directory, or the directory set
+          Saved keys live in the local server's user config directory, or the directory set
           by <code class="rounded-sm bg-background px-1 py-0 text-xs text-card-foreground">
             COMFY_COMPANION_CONFIG_DIR
-          </code>. The settings API returns only whether a key is configured plus a masked preview;
-          the Civitai models proxy attaches the key server-side when present.
+          </code>. The settings API returns only whether each key is configured plus a masked preview;
+          the Civitai and Atlas proxies attach keys server-side when present.
         </p>
       </aside>
     </div>

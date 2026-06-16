@@ -11,10 +11,8 @@ import {
   primaryFileForVersion,
   selectedVersionFor,
   sortModelVersions,
-  versionDownloadUnavailableLabel,
 } from './assetPreviewHelpers'
 import type {
-  AssetPreviewDownload,
   AssetPreviewModalProps,
   CivitaiImage,
   CivitaiImagesResponse,
@@ -23,8 +21,10 @@ import type {
   CivitaiModelVersion,
 } from './assetPreviewTypes'
 import { useAssetPreviewArchiveFallback } from './useAssetPreviewArchiveFallback'
+import { useAssetPreviewAtlas } from './useAssetPreviewAtlas'
 import { useAssetPreviewImageSafety } from './useAssetPreviewImageSafety'
 import { useAssetPreviewMediaFeed } from './useAssetPreviewMediaFeed'
+import { useAssetPreviewModalDownloadActions } from './useAssetPreviewModalDownloadActions'
 import { useAssetPreviewNavigationEvents } from './useAssetPreviewNavigationEvents'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
@@ -53,10 +53,23 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
   const modelVersions = computed(() => sortModelVersions(civitaiModel.value?.modelVersions ?? []))
   const selectedVersion = computed(() => selectedVersionFor(modelVersions, activeVersionId))
   const {
+    atlasConfigured,
+    atlasOpenError,
+    atlasOpening,
+    openAtlasModelTab,
+  } = useAssetPreviewAtlas({
+    open: computed(() => props.open),
+    model: civitaiModel,
+    selectedVersion,
+    includeNsfw: computed(() => props.includeNsfw === true),
+  })
+  const {
     feedImages,
     feedLoading,
     feedLoadingMore,
     feedError,
+    atlasActionError,
+    atlasReactionPendingKey,
     canLoadMoreFeed,
     feedSlides,
     previewSlides,
@@ -64,6 +77,8 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     selectPreviewImage,
     selectFeedImage,
     loadMoreFeed,
+    reactToFeedImage,
+    reactToActiveImage,
   } = useAssetPreviewMediaFeed({
     open: computed(() => props.open),
     model: civitaiModel,
@@ -119,6 +134,20 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     return props.open && (props.previewUrl || canLookupCivitai.value || canLookupArchive.value || Boolean(civitaiModel.value))
   })
   const hasDownloadActions = computed(() => props.showDownloadActions === true && Boolean(civitaiModel.value))
+  const {
+    downloadForVersion,
+    downloadStatusLabel,
+    modelDownloadKey,
+    canQueueVersion,
+    canDeleteVersionDownload,
+    versionDownloadButtonLabel,
+    queueVersionDownload,
+    deleteVersionDownload,
+  } = useAssetPreviewModalDownloadActions({
+    props,
+    civitaiModel,
+    confirm,
+  })
 
   async function fetchCivitaiModel() {
     civitaiController?.abort()
@@ -291,70 +320,6 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     }
   }
 
-  function downloadForVersion(version: CivitaiModelVersion | null | undefined) {
-    return props.downloadForVersion?.(version) ?? null
-  }
-
-  function downloadStatusLabel(download: AssetPreviewDownload | null) {
-    return props.downloadStatusLabel?.(download) ?? ''
-  }
-
-  function modelDownloadKey(model: CivitaiModel, version: CivitaiModelVersion) {
-    return props.modelDownloadKey?.(model, version) ?? `${model.id}:${version.id}`
-  }
-
-  function canQueueVersion(version: CivitaiModelVersion) {
-    if (props.canQueueVersion) {
-      return props.canQueueVersion(version)
-    }
-
-    const file = primaryFileForVersion(version)
-    return Boolean(props.queueAssetDownload && file?.downloadUrl && file.name && !versionDownloadUnavailableLabel(version))
-  }
-
-  function canDeleteVersionDownload(version: CivitaiModelVersion) {
-    const download = downloadForVersion(version)
-    return Boolean(props.deleteAssetDownload && download?.id && download.state === 'complete')
-  }
-
-  function versionDownloadButtonLabel(version: CivitaiModelVersion) {
-    if (props.versionDownloadButtonLabel) {
-      return props.versionDownloadButtonLabel(version)
-    }
-
-    const unavailableLabel = versionDownloadUnavailableLabel(version)
-    if (unavailableLabel) {
-      return unavailableLabel
-    }
-
-    return downloadForVersion(version)?.state === 'complete'
-      ? 'Re-download'
-      : downloadStatusLabel(downloadForVersion(version)) || 'Download'
-  }
-
-  function queueVersionDownload(version: CivitaiModelVersion) {
-    if (!civitaiModel.value || !props.queueAssetDownload) {
-      return
-    }
-
-    void props.queueAssetDownload(civitaiModel.value, version)
-  }
-
-  async function deleteVersionDownload(version: CivitaiModelVersion) {
-    const download = downloadForVersion(version)
-    if (!download || !props.deleteAssetDownload) {
-      return
-    }
-
-    const fileName = download.fileName || primaryFileForVersion(version)?.name || modelVersionLabel(version)
-    const confirmed = await confirm({ title: 'Delete downloaded file?', description: `Delete ${fileName} from disk? The download record will remain for redownload.`, confirmLabel: 'Delete file', destructive: true })
-    if (!confirmed) {
-      return
-    }
-
-    void props.deleteAssetDownload(download, version)
-  }
-
   watch(
     () => [props.open, props.model?.id ?? null, normalizedModelId.value, normalizedVersionId.value, props.initialImageIndex, props.modelType, props.fileName],
     () => {
@@ -452,6 +417,11 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     feedLoading,
     feedLoadingMore,
     feedError,
+    atlasActionError,
+    atlasReactionPendingKey,
+    atlasConfigured,
+    atlasOpenError,
+    atlasOpening,
     canLoadMoreFeed,
     feedSlides,
     previewSlides,
@@ -474,12 +444,15 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     hasDownloadActions,
     close,
     loadActiveImageDetails,
+    openAtlasModelTab,
     selectVersion,
     showPreviousImage,
     showNextImage,
     selectPreviewImage,
     selectFeedImage,
     loadMoreFeed,
+    reactToFeedImage,
+    reactToActiveImage,
     handleModalMediaReady,
     downloadForVersion,
     downloadStatusLabel,

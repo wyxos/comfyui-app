@@ -6,6 +6,8 @@ import {
   mediaExtensionFromUrl,
   modelVersionLabel,
 } from './assetPreviewHelpers'
+import AssetPreviewAtlasReactionWidget from './AssetPreviewAtlasReactionWidget.vue'
+import { atlasMediaKey, type AtlasReactionType } from './assetPreviewAtlasMedia'
 import type { CivitaiModelVersion, PreviewSlide } from './assetPreviewTypes'
 import UiPreloadedMedia from '../ui/UiPreloadedMedia.vue'
 import UiSelect from '../ui/UiSelect.vue'
@@ -19,6 +21,9 @@ const props = defineProps<{
   feedLoading: boolean
   feedLoadingMore: boolean
   feedError: string
+  atlasActionError: string
+  atlasReactionPendingKey: string
+  atlasConfigured: boolean
   canLoadMoreFeed: boolean
 }>()
 
@@ -26,6 +31,7 @@ const emit = defineEmits<{
   'select-version': [version: CivitaiModelVersion]
   'select-feed-preview': [index: number]
   'load-more': []
+  'atlas-react': [index: number, type: AtlasReactionType]
 }>()
 
 const selectedVersionId = computed(() => props.selectedVersion ? String(props.selectedVersion.id) : '')
@@ -54,6 +60,31 @@ function feedItemLabel(index: number) {
   return `Open feed media ${index + 1}`
 }
 
+function atlasBadgeLabel(slide: PreviewSlide) {
+  const status = slide.image?.atlasStatus
+  if (!status) {
+    return ''
+  }
+
+  if (status.downloaded) {
+    return 'Downloaded'
+  }
+
+  if (status.reaction) {
+    return 'Reacted'
+  }
+
+  return status.exists ? 'In Atlas' : ''
+}
+
+function canReactInAtlas(slide: PreviewSlide) {
+  return props.atlasConfigured && Boolean(slide.image?.url && slide.image.id)
+}
+
+function isAtlasPending(slide: PreviewSlide) {
+  return slide.image ? props.atlasReactionPendingKey === atlasMediaKey(slide.image) : false
+}
+
 function feedMediaClass(slide: PreviewSlide) {
   return props.blurNsfwContent === true && imageNsfwDetectedValue(slide.image) === true
     ? 'h-full w-full object-cover blur-sm saturate-50'
@@ -65,6 +96,54 @@ function selectVersion(versionId: string) {
   if (version) {
     emit('select-version', version)
   }
+}
+
+function reactToSlide(index: number, type: AtlasReactionType) {
+  const slide = props.feedSlides[index]
+  if (slide && canReactInAtlas(slide)) {
+    emit('atlas-react', index, type)
+  }
+}
+
+function handleFeedClick(event: MouseEvent, index: number) {
+  if (event.altKey && event.button === 0) {
+    event.preventDefault()
+    event.stopPropagation()
+    reactToSlide(index, 'love')
+    return
+  }
+
+  emit('select-feed-preview', index)
+}
+
+function handleFeedMouseDown(event: MouseEvent, index: number) {
+  if (!event.altKey || event.button !== 1) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  reactToSlide(index, 'like')
+}
+
+function handleFeedContextMenu(event: MouseEvent, index: number) {
+  if (!event.altKey) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  reactToSlide(index, 'blacklist')
+}
+
+function handleFeedAuxClick(event: MouseEvent, slide: PreviewSlide) {
+  if (event.button !== 1 || event.altKey || !slide.url) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  window.open(slide.url, '_blank', 'noopener,noreferrer')
 }
 </script>
 
@@ -95,6 +174,13 @@ function selectVersion(versionId: string) {
     >
       {{ feedError }}
     </p>
+    <p
+      v-if="atlasActionError"
+      class="rounded-md border border-destructive/35 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive"
+      data-test="asset-preview-feed-atlas-error"
+    >
+      {{ atlasActionError }}
+    </p>
 
     <div
       v-if="feedLoading"
@@ -111,35 +197,63 @@ function selectVersion(versionId: string) {
         data-test="asset-preview-feed-grid"
         class="grid grid-cols-3 gap-2"
       >
-        <button
+        <div
           v-for="(slide, index) in feedSlides"
           :key="slide.key"
-          data-test="asset-preview-feed-item"
-          type="button"
-          :aria-label="feedItemLabel(index)"
-          :class="[
-            'group relative aspect-square overflow-hidden rounded-md border bg-background transition',
-            slide.key === activeSlide?.key
-              ? 'border-secondary shadow-[0_0_0_1px_rgba(240,200,8,0.35)]'
-              : 'border-border hover:border-accent/50',
-          ]"
-          @click="emit('select-feed-preview', index)"
+          class="space-y-1.5"
         >
-          <UiPreloadedMedia
-            :src="slide.previewUrl ?? slide.url"
-            :is-video="slide.isVideo"
-            :alt="`Feed preview ${index + 1}`"
-            label=""
-            :media-class="feedMediaClass(slide)"
-            loading-class="bg-background/35"
-            spinner-class="h-3 w-3"
-            :autoplay="slide.isVideo"
-            :loop="slide.isVideo"
-            :muted="slide.isVideo"
-            preload="metadata"
+          <div
+            data-test="asset-preview-feed-item"
+            :class="[
+              'group relative aspect-square overflow-hidden rounded-md border bg-background transition',
+              slide.key === activeSlide?.key
+                ? 'border-secondary shadow-[0_0_0_1px_rgba(240,200,8,0.35)]'
+                : 'border-border hover:border-accent/50',
+            ]"
+            @click="handleFeedClick($event, index)"
+            @mousedown="handleFeedMouseDown($event, index)"
+            @contextmenu="handleFeedContextMenu($event, index)"
+            @auxclick="handleFeedAuxClick($event, slide)"
+          >
+            <button
+              type="button"
+              data-test="asset-preview-feed-shortcut-target"
+              class="absolute inset-0 h-full w-full"
+              :aria-label="feedItemLabel(index)"
+            >
+              <UiPreloadedMedia
+                :src="slide.previewUrl ?? slide.url"
+                :is-video="slide.isVideo"
+                :alt="`Feed preview ${index + 1}`"
+                label=""
+                :media-class="feedMediaClass(slide)"
+                loading-class="bg-background/35"
+                spinner-class="h-3 w-3"
+                :autoplay="slide.isVideo"
+                :loop="slide.isVideo"
+                :muted="slide.isVideo"
+                preload="metadata"
+              />
+              <span class="sr-only">{{ mediaKindLabel(slide) }} {{ index + 1 }}</span>
+            </button>
+            <span
+              v-if="atlasBadgeLabel(slide)"
+              data-test="asset-preview-feed-atlas-badge"
+              class="absolute left-1.5 top-1.5 rounded-sm border border-black/20 bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-secondary-foreground shadow-sm"
+            >
+              {{ atlasBadgeLabel(slide) }}
+            </span>
+          </div>
+          <AssetPreviewAtlasReactionWidget
+            v-if="canReactInAtlas(slide)"
+            data-test="asset-preview-feed-atlas-reactions"
+            class="w-full"
+            :status="slide.image?.atlasStatus ?? null"
+            :pending="isAtlasPending(slide)"
+            compact
+            @react="(type) => reactToSlide(index, type)"
           />
-          <span class="sr-only">{{ mediaKindLabel(slide) }} {{ index + 1 }}</span>
-        </button>
+        </div>
       </div>
 
       <button

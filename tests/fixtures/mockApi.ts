@@ -13,7 +13,9 @@ import {
   parseRequestBody,
 } from './mockApiData'
 import type { FetchCall, MockApiOptions, MockDownload, MockJob, MockModel } from './mockApiData'
+import { createMockSettingsApiState, handleMockSettingsApi } from './mockSettingsApi'
 import { handleMockWatchedDownloads } from './mockWatchedDownloads'
+import { installMockDownloadEventsSocket } from './mockDownloadEventsSocket'
 
 export { createMockDownload, createMockJob, createMockModel } from './mockApiData'
 
@@ -42,9 +44,7 @@ function modelImages(models: MockModel[]) {
 }
 
 export function installMockApi(options: MockApiOptions = {}) {
-  let civitaiConfigured = options.civitaiConfigured ?? false
-  let includeNsfwDefault = options.includeNsfwDefault ?? false
-  let blurNsfwContentDefault = options.blurNsfwContentDefault ?? true
+  const settingsState = createMockSettingsApiState(options)
   let jobs: MockJob[] = [...(options.jobs ?? [])]
   let downloads: MockDownload[] = [...(options.downloads ?? [])]
   let watchedDownloads: MockDownload[] = [...(options.watchedDownloads ?? [])]
@@ -70,6 +70,45 @@ export function installMockApi(options: MockApiOptions = {}) {
       visibleComplete: downloads.filter((download) => download.state === 'complete' && !download.dismissedAt).length,
     }
   }
+
+  function panelDownloadItems() {
+    return downloads.map((download) => ({
+      id: download.id,
+      state: download.state,
+      modelId: download.modelId,
+      modelName: download.modelName,
+      modelType: download.modelType,
+      versionId: download.versionId,
+      versionName: download.versionName,
+      baseModel: download.baseModel,
+      fileName: download.fileName,
+      fileSizeKb: download.fileSizeKb,
+      bytesDownloaded: download.bytesDownloaded,
+      totalBytes: download.totalBytes,
+      progressPercent: download.progressPercent,
+      dismissedAt: download.dismissedAt,
+      deletedAt: download.deletedAt,
+      createdAt: download.createdAt,
+      startedAt: download.startedAt,
+      finishedAt: download.finishedAt,
+      error: download.error,
+      updatedAt: download.updatedAt,
+    }))
+  }
+
+  const downloadEvents = installMockDownloadEventsSocket(() => {
+    const counts = downloadCounts()
+    return {
+      downloads: { ok: true, items: downloads, counts },
+      panel: { ok: true, items: panelDownloadItems(), counts },
+      summary: { ok: true, counts },
+    }
+  })
+
+  function broadcastDownloadSnapshot() {
+    downloadEvents.broadcast()
+  }
+
   const watchedDownloadsStore = { get: () => watchedDownloads, set: (nextDownloads: MockDownload[]) => { watchedDownloads = nextDownloads } }
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -280,40 +319,9 @@ export function installMockApi(options: MockApiOptions = {}) {
       return jsonResponse({ ok: true, parentDirectory: 'C:\\mock' })
     }
 
-    if (url.pathname === '/api/settings/civitai' && method === 'GET') {
-      return jsonResponse({
-        ok: true,
-        configured: civitaiConfigured,
-        keyPreview: civitaiConfigured ? 'Saved, ending in 1234' : null,
-      })
-    }
-
-    if (url.pathname === '/api/settings/civitai' && method === 'PUT') {
-      civitaiConfigured = true
-      return jsonResponse({
-        ok: true,
-        configured: true,
-        keyPreview: 'Saved, ending in 1234',
-      })
-    }
-
-    if (url.pathname === '/api/settings/civitai' && method === 'DELETE') {
-      civitaiConfigured = false
-      return jsonResponse({
-        ok: true,
-        configured: false,
-        keyPreview: null,
-      })
-    }
-
-    if (url.pathname === '/api/settings/app' && method === 'GET') {
-      return jsonResponse({ ok: true, includeNsfw: includeNsfwDefault, blurNsfwContent: blurNsfwContentDefault })
-    }
-
-    if (url.pathname === '/api/settings/app' && method === 'PUT') {
-      includeNsfwDefault = Boolean((body as Record<string, unknown> | null)?.includeNsfw)
-      blurNsfwContentDefault = (body as Record<string, unknown> | null)?.blurNsfwContent !== false
-      return jsonResponse({ ok: true, includeNsfw: includeNsfwDefault, blurNsfwContent: blurNsfwContentDefault })
+    const settingsResponse = handleMockSettingsApi(settingsState, url.pathname, method, body)
+    if (settingsResponse) {
+      return settingsResponse
     }
 
     if (url.pathname === '/api/civitai/models' && method === 'GET') {
@@ -383,28 +391,7 @@ export function installMockApi(options: MockApiOptions = {}) {
     if (url.pathname === '/api/civitai/downloads/panel' && method === 'GET') {
       return jsonResponse({
         ok: true,
-        items: downloads.map((download) => ({
-          id: download.id,
-          state: download.state,
-          modelId: download.modelId,
-          modelName: download.modelName,
-          modelType: download.modelType,
-          versionId: download.versionId,
-          versionName: download.versionName,
-          baseModel: download.baseModel,
-          fileName: download.fileName,
-          fileSizeKb: download.fileSizeKb,
-          bytesDownloaded: download.bytesDownloaded,
-          totalBytes: download.totalBytes,
-          progressPercent: download.progressPercent,
-          dismissedAt: download.dismissedAt,
-          deletedAt: download.deletedAt,
-          createdAt: download.createdAt,
-          startedAt: download.startedAt,
-          finishedAt: download.finishedAt,
-          error: download.error,
-          updatedAt: download.updatedAt,
-        })),
+        items: panelDownloadItems(),
         counts: downloadCounts(),
       })
     }
@@ -420,6 +407,7 @@ export function installMockApi(options: MockApiOptions = {}) {
     if (url.pathname === '/api/civitai/downloads' && method === 'POST') {
       const download = createMockDownload()
       downloads = [download]
+      broadcastDownloadSnapshot()
       return jsonResponse({ ok: true, item: download })
     }
 
@@ -442,6 +430,7 @@ export function installMockApi(options: MockApiOptions = {}) {
             }
           : download,
       )
+      broadcastDownloadSnapshot()
       return jsonResponse({ ok: true, item: downloads.find((download) => download.id === decodeURIComponent(downloadId)) })
     }
 
@@ -450,6 +439,7 @@ export function installMockApi(options: MockApiOptions = {}) {
         ...download,
         dismissedAt: Date.now(),
       }))
+      broadcastDownloadSnapshot()
       return jsonResponse({ ok: true, items: downloads })
     }
 

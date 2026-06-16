@@ -19,6 +19,9 @@ type SettingsFetchOptions = {
   keyPreview?: string | null
   includeNsfw?: boolean
   blurNsfwContent?: boolean
+  atlasUrl?: string
+  atlasKeyConfigured?: boolean
+  atlasKeyPreview?: string | null
   getFailureMessage?: string
   saveFailureMessage?: string
 }
@@ -28,6 +31,9 @@ function installSettingsFetch(options: SettingsFetchOptions = {}) {
   let keyPreview = options.keyPreview ?? null
   let includeNsfw = options.includeNsfw ?? false
   let blurNsfwContent = options.blurNsfwContent ?? true
+  let atlasUrl = options.atlasUrl ?? ''
+  let atlasKeyConfigured = options.atlasKeyConfigured ?? false
+  let atlasKeyPreview = options.atlasKeyPreview ?? null
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input)
@@ -38,14 +44,42 @@ function installSettingsFetch(options: SettingsFetchOptions = {}) {
     }
 
     if (path === '/api/settings/app' && method === 'GET') {
-      return jsonResponse({ ok: true, includeNsfw, blurNsfwContent })
+      return jsonResponse({
+        ok: true,
+        includeNsfw,
+        blurNsfwContent,
+        atlasUrl,
+        atlasConfigured: Boolean(atlasUrl),
+        atlasKeyConfigured,
+        atlasKeyPreview,
+      })
     }
 
     if (path === '/api/settings/app' && method === 'PUT') {
-      const body = JSON.parse(String(init?.body ?? '{}')) as { includeNsfw?: boolean, blurNsfwContent?: boolean }
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        includeNsfw?: boolean
+        blurNsfwContent?: boolean
+        atlasUrl?: string
+        atlasApiKey?: string
+      }
       includeNsfw = body.includeNsfw === true
       blurNsfwContent = body.blurNsfwContent === true
-      return jsonResponse({ ok: true, includeNsfw, blurNsfwContent })
+      if (body.atlasUrl !== undefined) {
+        atlasUrl = body.atlasUrl === 'atlas.test' ? 'https://atlas.test' : body.atlasUrl
+      }
+      if (body.atlasApiKey !== undefined) {
+        atlasKeyConfigured = Boolean(body.atlasApiKey)
+        atlasKeyPreview = body.atlasApiKey ? 'Saved, ending in 1234' : null
+      }
+      return jsonResponse({
+        ok: true,
+        includeNsfw,
+        blurNsfwContent,
+        atlasUrl,
+        atlasConfigured: Boolean(atlasUrl),
+        atlasKeyConfigured,
+        atlasKeyPreview,
+      })
     }
 
     if (path === '/api/settings/civitai' && method === 'GET') {
@@ -185,5 +219,39 @@ describe('SettingsView', () => {
       body: JSON.stringify({ includeNsfw: true, blurNsfwContent: false }),
     })
     expect(wrapper.text()).toContain('NSFW content blur is off.')
+  })
+
+  it('saves Atlas URL and API key through app settings', async () => {
+    const fetchMock = installSettingsFetch()
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Atlas integration is off.')
+    expect(wrapper.text()).toContain('Not configured')
+
+    const keyInputs = wrapper.findAll('input[placeholder="Paste API key to save or replace"]')
+    expect(keyInputs).toHaveLength(2)
+    const atlasKeyInput = keyInputs[1]!
+    await wrapper.get('input[placeholder="https://atlas.example.test"]').setValue('atlas.test')
+    await atlasKeyInput.setValue('atlas-secret-1234')
+    await wrapper.findAll('form')[1]?.trigger('submit')
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/settings/app', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({
+        includeNsfw: false,
+        blurNsfwContent: true,
+        atlasUrl: 'atlas.test',
+        atlasApiKey: 'atlas-secret-1234',
+      }),
+    })
+    expect(wrapper.text()).toContain('Atlas integration is on.')
+    expect(wrapper.text()).toContain('Saved, ending in 1234')
+    expect((atlasKeyInput.element as HTMLInputElement).value).toBe('')
   })
 })
