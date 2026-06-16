@@ -281,7 +281,7 @@ describe('DownloadsView', () => {
       }),
     }))
     vi.doMock('../../src/composables/useAppSettings', () => ({
-      fetchAppSettings: vi.fn().mockResolvedValue({ includeNsfw: true, blurNsfwContent: false }),
+      fetchAppSettings: vi.fn().mockResolvedValue({ includeNsfw: true, blurNsfwModels: false, blurNsfwMediaLevel: null }),
     }))
     const confirm = vi.fn().mockResolvedValue(true)
     vi.doMock('../../src/composables/useConfirmDialog', () => ({

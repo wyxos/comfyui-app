@@ -220,7 +220,8 @@ describe('AssetPreviewModal feed and Atlas integration', () => {
         return new Response(JSON.stringify({
           ok: true,
           includeNsfw: false,
-          blurNsfwContent: true,
+          blurNsfwModels: true,
+          blurNsfwMediaLevel: 4,
           atlasConfigured: true,
           atlasUrl: 'https://atlas.test',
           atlasKeyConfigured: true,

@@ -1,5 +1,6 @@
 import { nextTick, watch } from 'vue'
 import { fetchAppSettings } from '../../composables/useAppSettings'
+import { modelHasNsfwContent } from '../../components/asset-preview/assetPreviewHelpers'
 import {
   firstQueryValue,
   makeSearchKey,
@@ -66,10 +67,12 @@ export function createAssetSearchController(state: AssetSearchState) {
     try {
       const settings = await fetchAppSettings()
       defaultIncludeNsfw = settings.includeNsfw
-      state.blurNsfwContent.value = settings.blurNsfwContent !== false
+      state.blurNsfwModels.value = settings.blurNsfwModels !== false
+      state.blurNsfwMediaLevel.value = settings.blurNsfwMediaLevel
     } catch {
       defaultIncludeNsfw = false
-      state.blurNsfwContent.value = true
+      state.blurNsfwModels.value = true
+      state.blurNsfwMediaLevel.value = 4
     }
   }
 
@@ -181,7 +184,7 @@ export function createAssetSearchController(state: AssetSearchState) {
       const payload = (await response.json()) as CivitaiModelsResponse
       const nextItems = (Array.isArray(payload.items) ? payload.items : []).filter(
         (model) => !state.blacklistedModelIdSet.value.has(model.id),
-      )
+      ).filter((model) => nsfw || !modelHasNsfwContent(model))
 
       if (activeController !== controller) {
         return

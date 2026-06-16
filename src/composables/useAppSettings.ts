@@ -1,6 +1,9 @@
+export type NsfwMediaBlurLevel = 4 | 8 | 16 | 32 | null
+
 export type AppSettings = {
   includeNsfw: boolean
-  blurNsfwContent: boolean
+  blurNsfwModels: boolean
+  blurNsfwMediaLevel: NsfwMediaBlurLevel
   atlasUrl: string
   atlasConfigured: boolean
   atlasKeyConfigured: boolean
@@ -11,7 +14,8 @@ export type AppSettings = {
 type AppSettingsResponse = {
   ok?: boolean
   includeNsfw?: boolean
-  blurNsfwContent?: boolean
+  blurNsfwModels?: boolean
+  blurNsfwMediaLevel?: number | null
   atlasUrl?: string | null
   atlasConfigured?: boolean
   atlasKeyConfigured?: boolean
@@ -21,9 +25,14 @@ type AppSettingsResponse = {
 
 type SaveAppSettingsPayload = {
   includeNsfw: boolean
-  blurNsfwContent: boolean
+  blurNsfwModels: boolean
+  blurNsfwMediaLevel: NsfwMediaBlurLevel
   atlasUrl?: string
   atlasApiKey?: string
+}
+
+function parseNsfwMediaBlurLevel(value: unknown): NsfwMediaBlurLevel {
+  return value === 4 || value === 8 || value === 16 || value === 32 ? value : null
 }
 
 async function parseAppSettingsResponse(response: Response): Promise<AppSettings> {
@@ -35,7 +44,8 @@ async function parseAppSettingsResponse(response: Response): Promise<AppSettings
 
   return {
     includeNsfw: payload.includeNsfw === true,
-    blurNsfwContent: payload.blurNsfwContent !== false,
+    blurNsfwModels: payload.blurNsfwModels !== false,
+    blurNsfwMediaLevel: parseNsfwMediaBlurLevel(payload.blurNsfwMediaLevel),
     atlasUrl: typeof payload.atlasUrl === 'string' ? payload.atlasUrl : '',
     atlasConfigured: payload.atlasConfigured === true || Boolean(payload.atlasUrl),
     atlasKeyConfigured: payload.atlasKeyConfigured === true,
@@ -62,7 +72,8 @@ export async function saveAppSettings(settings: SaveAppSettingsPayload): Promise
       },
       body: JSON.stringify({
         includeNsfw: settings.includeNsfw,
-        blurNsfwContent: settings.blurNsfwContent,
+        blurNsfwModels: settings.blurNsfwModels,
+        blurNsfwMediaLevel: settings.blurNsfwMediaLevel,
         ...(settings.atlasUrl !== undefined ? { atlasUrl: settings.atlasUrl } : {}),
         ...(settings.atlasApiKey !== undefined ? { atlasApiKey: settings.atlasApiKey } : {}),
       }),

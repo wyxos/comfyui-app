@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { fetchAppSettings, saveAppSettings } from '../composables/useAppSettings'
+import { fetchAppSettings, saveAppSettings, type NsfwMediaBlurLevel } from '../composables/useAppSettings'
 
 type CivitaiSettingsResponse = {
   ok?: boolean
@@ -15,9 +15,11 @@ const savedKeyPreview = ref<string | null>(null)
 const statusText = ref('Loading Civitai API key settings...')
 const loading = ref(false)
 const includeNsfwDefault = ref(false)
-const blurNsfwContentDefault = ref(true)
+const blurNsfwModelsDefault = ref(true)
+const blurNsfwMediaLevelDefault = ref<NsfwMediaBlurLevel>(4)
 const savedIncludeNsfwDefault = ref(false)
-const savedBlurNsfwContentDefault = ref(true)
+const savedBlurNsfwModelsDefault = ref(true)
+const savedBlurNsfwMediaLevelDefault = ref<NsfwMediaBlurLevel>(4)
 const atlasUrl = ref('')
 const atlasApiKey = ref('')
 const savedAtlasUrl = ref('')
@@ -34,6 +36,19 @@ const keyPreviewLabel = computed(() =>
 const atlasKeyPreviewLabel = computed(() =>
   atlasKeyConfigured.value ? atlasKeyPreview.value ?? 'Configured' : 'Not configured',
 )
+const mediaBlurOptions: Array<{ label: string; value: string }> = [
+  { label: 'Off', value: '0' },
+  { label: 'R and above', value: '4' },
+  { label: 'X and above', value: '8' },
+  { label: 'XXX and above', value: '16' },
+  { label: 'Blocked only', value: '32' },
+]
+const mediaBlurSelectValue = computed({
+  get: () => blurNsfwMediaLevelDefault.value === null ? '0' : String(blurNsfwMediaLevelDefault.value),
+  set: (value: string) => {
+    blurNsfwMediaLevelDefault.value = parseNsfwMediaLevel(value)
+  },
+})
 
 function applyCivitaiSettings(settings: CivitaiSettingsResponse) {
   savedKeyConfigured.value = Boolean(settings.configured)
@@ -130,9 +145,11 @@ async function loadAppSettings() {
   try {
     const settings = await fetchAppSettings()
     includeNsfwDefault.value = settings.includeNsfw
-    blurNsfwContentDefault.value = settings.blurNsfwContent !== false
+    blurNsfwModelsDefault.value = settings.blurNsfwModels !== false
+    blurNsfwMediaLevelDefault.value = settings.blurNsfwMediaLevel
     savedIncludeNsfwDefault.value = includeNsfwDefault.value
-    savedBlurNsfwContentDefault.value = blurNsfwContentDefault.value
+    savedBlurNsfwModelsDefault.value = blurNsfwModelsDefault.value
+    savedBlurNsfwMediaLevelDefault.value = blurNsfwMediaLevelDefault.value
     atlasUrl.value = settings.atlasUrl
     savedAtlasUrl.value = settings.atlasUrl
     atlasKeyConfigured.value = settings.atlasKeyConfigured
@@ -149,10 +166,25 @@ async function loadAppSettings() {
   }
 }
 
-function appSettingsStatus(settings: { includeNsfw: boolean, blurNsfwContent: boolean }) {
+function nsfwMediaLevelStatus(level: NsfwMediaBlurLevel) {
+  if (level === null) {
+    return 'Image/video blur is off.'
+  }
+
+  const label = mediaBlurOptions.find((option) => option.value === String(level))?.label.split(' ')[0] ?? String(level)
+  return `Image/video blur starts at ${label}.`
+}
+
+function parseNsfwMediaLevel(value: string): NsfwMediaBlurLevel {
+  const parsed = Number(value)
+  return parsed === 4 || parsed === 8 || parsed === 16 || parsed === 32 ? parsed : null
+}
+
+function appSettingsStatus(settings: { includeNsfw: boolean, blurNsfwModels: boolean, blurNsfwMediaLevel: NsfwMediaBlurLevel }) {
   return [
     settings.includeNsfw ? 'NSFW toggles default to on.' : 'NSFW toggles default to off.',
-    settings.blurNsfwContent ? 'NSFW content blur is on.' : 'NSFW content blur is off.',
+    settings.blurNsfwModels ? 'NSFW model name blur is on.' : 'NSFW model name blur is off.',
+    nsfwMediaLevelStatus(settings.blurNsfwMediaLevel),
   ].join(' ')
 }
 
@@ -173,16 +205,20 @@ async function saveContentDefaults() {
   try {
     const settings = await saveAppSettings({
       includeNsfw: includeNsfwDefault.value,
-      blurNsfwContent: blurNsfwContentDefault.value,
+      blurNsfwModels: blurNsfwModelsDefault.value,
+      blurNsfwMediaLevel: blurNsfwMediaLevelDefault.value,
     })
     includeNsfwDefault.value = settings.includeNsfw
-    blurNsfwContentDefault.value = settings.blurNsfwContent !== false
+    blurNsfwModelsDefault.value = settings.blurNsfwModels !== false
+    blurNsfwMediaLevelDefault.value = settings.blurNsfwMediaLevel
     savedIncludeNsfwDefault.value = includeNsfwDefault.value
-    savedBlurNsfwContentDefault.value = blurNsfwContentDefault.value
+    savedBlurNsfwModelsDefault.value = blurNsfwModelsDefault.value
+    savedBlurNsfwMediaLevelDefault.value = blurNsfwMediaLevelDefault.value
     appSettingsStatusText.value = appSettingsStatus(settings)
   } catch (error) {
     includeNsfwDefault.value = savedIncludeNsfwDefault.value
-    blurNsfwContentDefault.value = savedBlurNsfwContentDefault.value
+    blurNsfwModelsDefault.value = savedBlurNsfwModelsDefault.value
+    blurNsfwMediaLevelDefault.value = savedBlurNsfwMediaLevelDefault.value
     appSettingsStatusText.value =
       error instanceof Error ? error.message : 'Could not save app settings.'
   } finally {
@@ -198,12 +234,14 @@ async function saveAtlasSettings(options: { clearKey?: boolean } = {}) {
   const nextKey = atlasApiKey.value.trim()
   const payload: {
     includeNsfw: boolean
-    blurNsfwContent: boolean
+    blurNsfwModels: boolean
+    blurNsfwMediaLevel: NsfwMediaBlurLevel
     atlasUrl: string
     atlasApiKey?: string
   } = {
     includeNsfw: includeNsfwDefault.value,
-    blurNsfwContent: blurNsfwContentDefault.value,
+    blurNsfwModels: blurNsfwModelsDefault.value,
+    blurNsfwMediaLevel: blurNsfwMediaLevelDefault.value,
     atlasUrl: nextUrl,
   }
 
@@ -335,14 +373,33 @@ onMounted(() => {
 
           <label class="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground transition hover:border-secondary/55 hover:text-foreground">
             <input
-              v-model="blurNsfwContentDefault"
+              v-model="blurNsfwModelsDefault"
               class="h-4 w-4 accent-secondary"
               type="checkbox"
               :disabled="appSettingsLoading"
-              aria-label="Blur visible NSFW content"
+              aria-label="Blur NSFW model names"
               @change="saveContentDefaults"
             />
-            Blur NSFW
+            Blur names
+          </label>
+
+          <label class="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground transition hover:border-secondary/55 hover:text-foreground">
+            <span>Blur media</span>
+            <select
+              v-model="mediaBlurSelectValue"
+              class="h-7 rounded-sm border border-input bg-card px-2 text-xs text-card-foreground outline-none focus:border-accent focus:ring-2 focus:ring-ring/25"
+              :disabled="appSettingsLoading"
+              aria-label="Blur image and video previews at or above"
+              @change="saveContentDefaults"
+            >
+              <option
+                v-for="option in mediaBlurOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </option>
+            </select>
           </label>
         </div>
       </section>

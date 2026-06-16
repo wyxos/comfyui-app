@@ -14,7 +14,7 @@ import {
 import { civitaiModelWebUrl } from '../../components/asset-preview/assetPreviewHelpers'
 import UiPreloadedMedia from '../../components/ui/UiPreloadedMedia.vue'
 import type { AssetDownloadItem, AssetDownloadState } from '../../composables/useAssetDownloads'
-import { previewHasNsfw } from './downloadsViewHelpers'
+import { itemHasNsfw, previewMatchesNsfwBlurLevel } from './downloadsViewHelpers'
 
 type DownloadTableRowState = AssetDownloadState | 'watched'
 type DownloadTableRowItem = Omit<AssetDownloadItem, 'state'> & { state: DownloadTableRowState }
@@ -22,9 +22,11 @@ type DownloadTableRowItem = Omit<AssetDownloadItem, 'state'> & { state: Download
 const props = withDefaults(defineProps<{
   item: DownloadTableRowItem
   actionKey: string
-  blurNsfwPreview?: boolean
+  blurNsfwModels?: boolean
+  blurNsfwMediaLevel?: 4 | 8 | 16 | 32 | null
 }>(), {
-  blurNsfwPreview: false,
+  blurNsfwModels: false,
+  blurNsfwMediaLevel: null,
 })
 
 const emit = defineEmits<{
@@ -115,12 +117,11 @@ function isVideoPreview(item: DownloadTableRowItem) {
 }
 
 function shouldBlurPreview(item: DownloadTableRowItem) {
-  return props.blurNsfwPreview && previewHasNsfw(item)
+  return previewMatchesNsfwBlurLevel(item, props.blurNsfwMediaLevel)
 }
 
 function shouldBlurText(item: DownloadTableRowItem) {
-  return props.blurNsfwPreview &&
-    (item.modelNsfwOverride === true || item.modelMetadata?.modelNsfwOverride === true)
+  return props.blurNsfwModels && itemHasNsfw(item)
 }
 
 function formatFileSize(item: DownloadTableRowItem) {

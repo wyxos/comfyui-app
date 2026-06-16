@@ -323,7 +323,7 @@ describe('DownloadsView watched filter', () => {
       }),
     }))
     vi.doMock('../../src/composables/useAppSettings', () => ({
-      fetchAppSettings: vi.fn().mockResolvedValue({ includeNsfw: true, blurNsfwContent: true }),
+      fetchAppSettings: vi.fn().mockResolvedValue({ includeNsfw: true, blurNsfwModels: true, blurNsfwMediaLevel: 4 }),
     }))
     vi.doMock('../../src/composables/useConfirmDialog', () => ({
       useConfirmDialog: () => vi.fn(),

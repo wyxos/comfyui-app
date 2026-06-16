@@ -8,7 +8,8 @@ describe('companion server Atlas feed proxy', () => {
     const server = await setupHarness()
     await server.json('PUT', '/api/settings/app', {
       includeNsfw: true,
-      blurNsfwContent: false,
+      blurNsfwModels: false,
+      blurNsfwMediaLevel: null,
       atlasUrl: 'atlas.test',
       atlasApiKey: 'atlas-secret-1234',
     })

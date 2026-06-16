@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import UiPreviewCard from '../../components/ui/UiPreviewCard.vue'
 import {
   optionHasVideoPreview,
-  previewMediaHasNsfw,
+  previewMediaMatchesNsfwBlurLevel,
   type AssetPickerOption,
   type AssetPickerPreviewMedia,
 } from './homeAssetPickerOptionHelpers'
@@ -16,7 +16,8 @@ const props = defineProps<{
   previewCount: number
   baseModelLabel: string
   hasNsfw: boolean
-  blurNsfwContent?: boolean
+  blurNsfwModels?: boolean
+  blurNsfwMediaLevel?: 4 | 8 | 16 | 32 | null
 }>()
 
 const emit = defineEmits<{
@@ -31,8 +32,8 @@ const titleLabel = computed(() =>
     ? `${props.option.label}\n${props.option.value}`
     : props.option.label,
 )
-const shouldBlurNsfwPreview = computed(() => props.blurNsfwContent === true && previewMediaHasNsfw(props.previewMedia))
-const shouldBlurNsfwTitle = computed(() => props.blurNsfwContent === true && props.hasNsfw)
+const shouldBlurNsfwPreview = computed(() => previewMediaMatchesNsfwBlurLevel(props.previewMedia, props.blurNsfwMediaLevel))
+const shouldBlurNsfwTitle = computed(() => props.blurNsfwModels === true && props.hasNsfw)
 </script>
 
 <template>

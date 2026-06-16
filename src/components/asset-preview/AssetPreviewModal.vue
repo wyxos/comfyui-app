@@ -6,6 +6,7 @@ import AssetPreviewMediaStrip from './AssetPreviewMediaStrip.vue'
 import AssetPreviewSidebar from './AssetPreviewSidebar.vue'
 import type { AssetPreviewModalProps } from './assetPreviewTypes'
 import { atlasFileUrlForStatus, atlasMediaKey, type AtlasReactionType } from './assetPreviewAtlasMedia'
+import { imageMatchesNsfwBlurLevel } from './assetPreviewHelpers'
 import { useAssetPreviewModal } from './useAssetPreviewModal'
 import UiPreloadedMedia from '../ui/UiPreloadedMedia.vue'
 
@@ -17,7 +18,8 @@ const props = withDefaults(
     previewUrl: null,
     isVideo: false,
     includeNsfw: false,
-    blurNsfwContent: false,
+    blurNsfwModels: true,
+    blurNsfwMediaLevel: null,
     subtitle: null,
     kindLabel: 'Preview',
     modelId: null,
@@ -88,6 +90,7 @@ const {
   atlasOpenError,
   atlasOpening,
   canLoadMoreFeed,
+  versionAtlasStatusesLoading,
   feedSlides,
   modelVersions,
   selectedVersion,
@@ -141,7 +144,14 @@ const {
 
 function canReactToActiveAtlasImage() {
   const image = activeSlide.value?.image
-  return atlasConfigured.value && Boolean(image?.url && image.id)
+  return atlasConfigured.value && Boolean(image?.url && image.id) && !isActiveAtlasStatusLoading()
+}
+
+function isActiveAtlasStatusLoading() {
+  const image = activeSlide.value?.image
+  return atlasConfigured.value &&
+    Boolean(image?.url && image.id) &&
+    versionAtlasStatusesLoading.value
 }
 
 function activeAtlasStatus() {
@@ -212,6 +222,11 @@ function handleMainMediaAuxClick(event: MouseEvent) {
   event.preventDefault()
   event.stopPropagation()
   window.open(activeSlide.value.url, '_blank', 'noopener,noreferrer')
+}
+
+function shouldBlurActiveMedia() {
+  return imageMatchesNsfwBlurLevel(activeImage.value, props.blurNsfwMediaLevel) ||
+    (props.blurNsfwMediaLevel !== null && activeImageNsfwOverride.value === true)
 }
 </script>
 
@@ -291,7 +306,7 @@ function handleMainMediaAuxClick(event: MouseEvent) {
               :is-video="Boolean(activeSlide?.isVideo)"
               :alt="`${modalTitle} preview image`"
               label=""
-              :media-class="props.blurNsfwContent && activeImageIsNsfw ? 'max-h-full max-w-full scale-105 object-contain blur-2xl' : 'max-h-full max-w-full object-contain'"
+              :media-class="shouldBlurActiveMedia() ? 'max-h-full max-w-full scale-105 object-contain blur-2xl' : 'max-h-full max-w-full object-contain'"
               loading-class="hidden"
               controls
               autoplay
@@ -313,6 +328,15 @@ function handleMainMediaAuxClick(event: MouseEvent) {
             @react="handleActiveAtlasReaction"
             @delete="handleActiveAtlasDelete"
           />
+          <div
+            v-else-if="isActiveAtlasStatusLoading()"
+            data-test="asset-preview-main-atlas-loading"
+            class="relative z-30 inline-flex items-center rounded-md border border-border bg-card/95 px-3 py-2 text-xs font-semibold text-muted-foreground shadow-sm"
+            aria-live="polite"
+          >
+            <LoaderCircle class="mr-2 h-4 w-4 animate-spin text-secondary" />
+            Checking Atlas...
+          </div>
         </div>
         <div
           v-else-if="!civitaiLoading"
@@ -335,7 +359,7 @@ function handleMainMediaAuxClick(event: MouseEvent) {
       <AssetPreviewMediaStrip
         :slides="previewSlides"
         :active-index="activeImageIndex"
-        :blur-nsfw-content="props.blurNsfwContent"
+        :blur-nsfw-media-level="props.blurNsfwMediaLevel"
         @select="selectPreviewImage"
       />
     </section>
@@ -383,7 +407,7 @@ function handleMainMediaAuxClick(event: MouseEvent) {
       :active-image-meta="activeImageMeta"
       :normalized-image-meta-rows="normalizedImageMetaRows"
       :active-image-meta-source="activeImageMetaSource"
-      :blur-nsfw-content="props.blurNsfwContent"
+      :blur-nsfw-media-level="props.blurNsfwMediaLevel"
       :feed-loading="feedLoading"
       :feed-loading-more="feedLoadingMore"
       :feed-error="feedError"

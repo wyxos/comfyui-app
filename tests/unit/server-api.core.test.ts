@@ -96,14 +96,16 @@ describe('companion server API routes', () => {
         payload: expect.objectContaining({
           ok: true,
           includeNsfw: false,
-          blurNsfwContent: true,
+          blurNsfwModels: true,
+          blurNsfwMediaLevel: 4,
           atlasConfigured: false,
           atlasUrl: '',
         }),
       })
       const savedAppSettings = await server.json('PUT', '/api/settings/app', {
         includeNsfw: true,
-        blurNsfwContent: false,
+        blurNsfwModels: false,
+        blurNsfwMediaLevel: 8,
         atlasUrl: 'atlas.test',
         atlasApiKey: 'atlas-secret-1234',
       })
@@ -111,7 +113,8 @@ describe('companion server API routes', () => {
         payload: expect.objectContaining({
           ok: true,
           includeNsfw: true,
-          blurNsfwContent: false,
+          blurNsfwModels: false,
+          blurNsfwMediaLevel: 8,
           atlasConfigured: true,
           atlasUrl: 'https://atlas.test',
           atlasKeyConfigured: true,
@@ -120,7 +123,9 @@ describe('companion server API routes', () => {
       })
       expect(savedAppSettings.payload.atlasApiKey).toBeUndefined()
       expect(JSON.parse(await server.readConfigFile('settings.json')).preferences.includeNsfw).toBe(true)
-      expect(JSON.parse(await server.readConfigFile('settings.json')).preferences.blurNsfwContent).toBe(false)
+      expect(JSON.parse(await server.readConfigFile('settings.json')).preferences.blurNsfwModels).toBe(false)
+      expect(JSON.parse(await server.readConfigFile('settings.json')).preferences.blurNsfwMediaLevel).toBe(8)
+      expect(JSON.parse(await server.readConfigFile('settings.json')).preferences.blurNsfwContent).toBeUndefined()
       expect(JSON.parse(await server.readConfigFile('settings.json')).atlas.apiKey).toBe('atlas-secret-1234')
 
       const civitaiModels = await server.request('/api/civitai/models?query=detail&limit=999&ignored=1')
@@ -257,6 +262,10 @@ describe('companion server API routes', () => {
         response: expect.objectContaining({ status: 400 }),
         payload: expect.objectContaining({ error: 'invalid-include-nsfw' }),
       })
+      await expect(server.json('PUT', '/api/settings/app', { includeNsfw: false, blurNsfwMediaLevel: 7 })).resolves.toMatchObject({
+        response: expect.objectContaining({ status: 400 }),
+        payload: expect.objectContaining({ error: 'invalid-blur-nsfw-media-level' }),
+      })
 
       const logContents = await readFile(join(server.configDir, 'server.log'), 'utf8')
       expect(logContents).toContain('"type":"api-error"')
@@ -264,6 +273,7 @@ describe('companion server API routes', () => {
       expect(logContents).toContain('"code":"civitai-request-failed"')
       expect(logContents).toContain('"code":"invalid-json"')
       expect(logContents).toContain('"code":"invalid-include-nsfw"')
+      expect(logContents).toContain('"code":"invalid-blur-nsfw-media-level"')
     })
 
   it('returns download summary counts without serializing the full history', async () => {

@@ -62,7 +62,8 @@ describe('AssetPreviewModal Atlas feed', () => {
         return jsonResponse({
           ok: true,
           includeNsfw: false,
-          blurNsfwContent: true,
+          blurNsfwModels: true,
+          blurNsfwMediaLevel: 4,
           atlasConfigured: true,
           atlasUrl: 'https://atlas.test',
           atlasKeyConfigured: true,
@@ -159,7 +160,8 @@ describe('AssetPreviewModal Atlas feed', () => {
         return jsonResponse({
           ok: true,
           includeNsfw: false,
-          blurNsfwContent: true,
+          blurNsfwModels: true,
+          blurNsfwMediaLevel: 4,
           atlasConfigured: true,
           atlasUrl: 'https://atlas.test',
           atlasKeyConfigured: true,

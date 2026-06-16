@@ -15,7 +15,8 @@ import {
   UserRound,
 } from 'lucide-vue-next'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
-import { imageNsfwDetectedValue, imagesForVersion } from './assetModelHelpers'
+import { imageMatchesNsfwBlurLevel } from '../../components/asset-preview/assetPreviewHelpers'
+import { imagesForVersion } from './assetModelHelpers'
 import { useProvidedAssetsView } from './assetsViewContext'
 import type { CivitaiModel } from './assetViewTypes'
 import { useAssetDownloadMenuPlacement } from './useAssetDownloadMenuPlacement'
@@ -53,7 +54,8 @@ const {
   queueableMissingVersionsForModel,
   handleDownloadClick,
   modelUrl,
-  blurNsfwContent,
+  blurNsfwModels,
+  blurNsfwMediaLevel,
   blacklistModel,
   creatorFilterHref,
   openImageModal,
@@ -149,11 +151,11 @@ function handleCardAltContextMenu(model: CivitaiModel, event: MouseEvent) {
   blacklistModel(model)
 }
 function shouldBlurNsfwPreview(model: CivitaiModel) {
-  return blurNsfwContent?.value === true && imageNsfwDetectedValue(activePreviewMediaFor(model)) === true
+  return imageMatchesNsfwBlurLevel(activePreviewMediaFor(model), blurNsfwMediaLevel?.value)
 }
 
 function shouldBlurNsfwTitle(model: CivitaiModel) {
-  return blurNsfwContent?.value === true && modelHasNsfw(model)
+  return blurNsfwModels?.value === true && modelHasNsfw(model)
 }
 </script>
 

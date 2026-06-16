@@ -2,7 +2,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { computed } from 'vue'
 
-import { imageNsfwDetectedValue } from './assetPreviewHelpers'
+import { imageMatchesNsfwBlurLevel } from './assetPreviewHelpers'
 import type { PreviewSlide } from './assetPreviewTypes'
 import UiCarousel from '../ui/UiCarousel.vue'
 import UiPreloadedMedia from '../ui/UiPreloadedMedia.vue'
@@ -10,7 +10,7 @@ import UiPreloadedMedia from '../ui/UiPreloadedMedia.vue'
 const props = defineProps<{
   slides: PreviewSlide[]
   activeIndex: number
-  blurNsfwContent?: boolean
+  blurNsfwMediaLevel?: 4 | 8 | 16 | 32 | null
 }>()
 
 const emit = defineEmits<{
@@ -23,7 +23,7 @@ const scrollIndex = computed(() => {
 })
 
 function mediaClassFor(slide: PreviewSlide) {
-  return props.blurNsfwContent === true && imageNsfwDetectedValue(slide.image) === true
+  return imageMatchesNsfwBlurLevel(slide.image, props.blurNsfwMediaLevel)
     ? 'h-full w-full object-contain blur-sm saturate-50'
     : 'h-full w-full object-contain'
 }

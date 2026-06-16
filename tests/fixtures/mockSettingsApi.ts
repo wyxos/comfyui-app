@@ -3,7 +3,8 @@ import { jsonResponse, type MockApiOptions } from './mockApiData'
 export type MockSettingsApiState = {
   civitaiConfigured: boolean
   includeNsfwDefault: boolean
-  blurNsfwContentDefault: boolean
+  blurNsfwModelsDefault: boolean
+  blurNsfwMediaLevelDefault: number | null
   atlasUrl: string
   atlasKeyConfigured: boolean
 }
@@ -16,7 +17,8 @@ export function createMockSettingsApiState(options: MockApiOptions): MockSetting
   return {
     civitaiConfigured: options.civitaiConfigured ?? false,
     includeNsfwDefault: options.includeNsfwDefault ?? false,
-    blurNsfwContentDefault: options.blurNsfwContentDefault ?? true,
+    blurNsfwModelsDefault: options.blurNsfwModelsDefault ?? true,
+    blurNsfwMediaLevelDefault: options.blurNsfwMediaLevelDefault ?? 4,
     atlasUrl: '',
     atlasKeyConfigured: false,
   }
@@ -61,7 +63,10 @@ export function handleMockSettingsApi(
   if (pathname === '/api/settings/app' && method === 'PUT') {
     const payload = body as Record<string, unknown> | null
     state.includeNsfwDefault = Boolean(payload?.includeNsfw)
-    state.blurNsfwContentDefault = payload?.blurNsfwContent !== false
+    state.blurNsfwModelsDefault = payload?.blurNsfwModels !== false
+    state.blurNsfwMediaLevelDefault = typeof payload?.blurNsfwMediaLevel === 'number'
+      ? payload.blurNsfwMediaLevel
+      : null
     if (typeof payload?.atlasUrl === 'string') {
       state.atlasUrl = payload.atlasUrl
     }
@@ -79,7 +84,8 @@ function appSettingsPayload(state: MockSettingsApiState) {
   return {
     ok: true,
     includeNsfw: state.includeNsfwDefault,
-    blurNsfwContent: state.blurNsfwContentDefault,
+    blurNsfwModels: state.blurNsfwModelsDefault,
+    blurNsfwMediaLevel: state.blurNsfwMediaLevelDefault,
     atlasUrl: state.atlasUrl,
     atlasConfigured: Boolean(state.atlasUrl),
     atlasKeyConfigured: state.atlasKeyConfigured,

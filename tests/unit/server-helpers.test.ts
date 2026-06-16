@@ -306,7 +306,7 @@ describe('server helper exports', () => {
 
     expect(normalizeBaseModelKey('SDXL 1.0')).toBe('sdxl')
     expect(checkpoint.modelNsfw).toBe(false)
-    expect(levelFourCheckpoint.modelNsfw).toBe(false)
+    expect(levelFourCheckpoint.modelNsfw).toBe(true)
     expect(levelEightCheckpoint.modelNsfw).toBe(true)
     expect(compatibleLora.trainedWords).toEqual(['detail boost'])
     expect(classifyLoraCompatibility(checkpoint, compatibleLora)).toBe('compatible')

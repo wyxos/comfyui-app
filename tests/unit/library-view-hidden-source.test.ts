@@ -65,7 +65,7 @@ describe('LibraryView hidden source filtering', () => {
       const url = new URL(String(input), 'http://companion.test')
 
       if (url.pathname === '/api/settings/app') {
-        return jsonResponse({ ok: true, includeNsfw: true, blurNsfwContent: false })
+        return jsonResponse({ ok: true, includeNsfw: true, blurNsfwModels: false, blurNsfwMediaLevel: null })
       }
 
       if (url.pathname === '/api/controlnets') {

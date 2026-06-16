@@ -121,6 +121,7 @@ export type CivitaiImage = {
 export type CivitaiModelVersion = {
   id: number
   name?: string | null
+  nsfwLevel?: string | number | null
   description?: string | null
   createdAt?: string | null
   publishedAt?: string | null
@@ -156,6 +157,7 @@ export type CivitaiModel = {
   name: string
   type: string
   nsfw?: boolean
+  nsfwLevel?: string | number | null
   creator?: {
     username?: string | null
   } | null

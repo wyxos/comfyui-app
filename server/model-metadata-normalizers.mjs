@@ -56,7 +56,7 @@ export function normalizeImageSafetyOverrides(value) {
     }
 
     overrides[normalizedKey] = {
-      imageNsfw: normalizeOptionalBoolean(entry.imageNsfw ?? entry.nsfw),
+      imageNsfw: normalizeOptionalBoolean(entry.imageNsfw),
       imageNsfwOverride: normalizeOptionalBoolean(entry.imageNsfwOverride ?? entry.nsfwOverride),
     }
   }

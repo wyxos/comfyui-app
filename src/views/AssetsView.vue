@@ -13,7 +13,8 @@ const {
   activeImageModel,
   activeImageInitialIndex,
   includeNsfw,
-  blurNsfwContent,
+  blurNsfwModels,
+  blurNsfwMediaLevel,
   queuingDownloadKey,
   downloadForVersion,
   downloadStatusLabel,
@@ -41,7 +42,8 @@ function assetPreviewDownloadStatusLabel(download: AssetPreviewDownload | null) 
     :model="activeImageModel"
     :initial-image-index="activeImageInitialIndex"
     :include-nsfw="includeNsfw"
-    :blur-nsfw-content="blurNsfwContent"
+    :blur-nsfw-models="blurNsfwModels"
+    :blur-nsfw-media-level="blurNsfwMediaLevel"
     :queuing-download-key="queuingDownloadKey"
     :download-for-version="downloadForVersion"
     :download-status-label="assetPreviewDownloadStatusLabel"

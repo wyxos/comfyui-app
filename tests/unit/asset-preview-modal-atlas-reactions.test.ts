@@ -28,7 +28,8 @@ function atlasSettingsResponse() {
   return new Response(JSON.stringify({
     ok: true,
     includeNsfw: false,
-    blurNsfwContent: true,
+    blurNsfwModels: true,
+    blurNsfwMediaLevel: 4,
     atlasConfigured: true,
     atlasUrl: 'https://atlas.test',
     atlasKeyConfigured: true,
@@ -91,6 +92,43 @@ function requestBody(call: unknown[] | undefined) {
 describe('AssetPreviewModal Atlas reactions', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  it('shows a spinner instead of reactions until Atlas confirms the original media state', async () => {
+    let resolveStatus: ((response: Response) => void) | null = null
+    const statusResponse = new Promise<Response>((resolve) => {
+      resolveStatus = resolve
+    })
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), 'http://127.0.0.1')
+      if (url.pathname === '/api/settings/app') {
+        return atlasSettingsResponse()
+      }
+
+      if (url.pathname === '/api/atlas/civitai/status') {
+        return statusResponse
+      }
+
+      return new Response(JSON.stringify({ items: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+
+    const wrapper = await mountModal(fetchMock)
+
+    expect(wrapper.find('[data-test="asset-preview-main-atlas-reactions"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="asset-preview-main-atlas-loading"]').exists()).toBe(true)
+
+    resolveStatus?.(new Response(JSON.stringify({
+      ok: true,
+      configured: true,
+      items: [{ request_id: 'civitai:800', exists: false, filtered: false }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="asset-preview-main-atlas-loading"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="asset-preview-main-atlas-reactions"]').exists()).toBe(true)
   })
 
   it('renders an Atlas reaction widget under the original media and sends selected reactions', async () => {

@@ -40,9 +40,29 @@ export function normalizeNsfwLevel(value) {
   return normalized || null
 }
 
-export function nsfwLevelDetectedValue(value) {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value > 4 : null
+const NSFW_LEVEL_BITS = [32, 16, 8, 4, 2, 1]
+const NSFW_LEVEL_ALIASES = {
+  false: 0,
+  none: 0,
+  safe: 1,
+  pg: 1,
+  soft: 2,
+  'pg-13': 2,
+  pg13: 2,
+  r: 4,
+  mature: 7,
+  x: 8,
+  xxx: 16,
+  blocked: 32,
+  'not detected': 0,
+  not_detected: 0,
+}
+
+export const NSFW_BLUR_LEVELS = [4, 8, 16, 32]
+
+function normalizeNsfwLevelNumber(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.trunc(value)
   }
 
   const normalized = safeTrim(value).toLowerCase()
@@ -52,23 +72,34 @@ export function nsfwLevelDetectedValue(value) {
 
   const numericLevel = Number(normalized)
   if (Number.isFinite(numericLevel)) {
-    return numericLevel > 4
+    return Math.trunc(numericLevel)
   }
 
-  return ![
-    'false',
-    '0',
-    '1',
-    '2',
-    'none',
-    'safe',
-    'soft',
-    'pg',
-    'pg-13',
-    'pg13',
-    'not detected',
-    'not_detected',
-  ].includes(normalized)
+  return NSFW_LEVEL_ALIASES[normalized] ?? null
+}
+
+function highestNsfwLevel(value) {
+  const level = normalizeNsfwLevelNumber(value)
+  if (level === null) {
+    return null
+  }
+
+  for (const bit of NSFW_LEVEL_BITS) {
+    if ((level & bit) === bit) {
+      return bit
+    }
+  }
+
+  return level >= 4 ? level : 0
+}
+
+export function nsfwLevelDetectedValue(value) {
+  const highestLevel = highestNsfwLevel(value)
+  if (highestLevel === null) {
+    return null
+  }
+
+  return highestLevel >= 4
 }
 
 export function imageListNsfwLevelDetectedValue(images) {

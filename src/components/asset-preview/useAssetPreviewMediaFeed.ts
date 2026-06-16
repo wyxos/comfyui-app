@@ -43,6 +43,7 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
   const feedLoadingMore = ref(false)
   const feedError = ref('')
   const feedNextCursor = ref('')
+  const versionAtlasStatusesLoading = ref(false)
   const activeMediaSource = ref<'version' | 'feed'>('version')
   const {
     atlasActionError,
@@ -164,6 +165,7 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
     versionStatusController?.abort()
     versionStatusController = null
     versionAtlasStatuses.value = {}
+    versionAtlasStatusesLoading.value = false
   }
 
   function storeVersionAtlasStatuses(images: CivitaiImage[]) {
@@ -405,11 +407,13 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
     const images = imagesForVersion(options.selectedVersion.value)
     if (!options.open.value || images.length === 0) {
       versionAtlasStatuses.value = {}
+      versionAtlasStatusesLoading.value = false
       return
     }
 
     const controller = new AbortController()
     versionStatusController = controller
+    versionAtlasStatusesLoading.value = true
     try {
       const imagesWithStatuses = await fetchAtlasStatuses(images, controller.signal, false)
       if (versionStatusController === controller) {
@@ -422,6 +426,10 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
 
       if (versionStatusController === controller) {
         storeVersionAtlasStatuses(images)
+      }
+    } finally {
+      if (versionStatusController === controller) {
+        versionAtlasStatusesLoading.value = false
       }
     }
   }
@@ -475,26 +483,9 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
   })
 
   return {
-    feedImages,
-    feedLoading,
-    feedLoadingMore,
-    feedError,
-    atlasActionError,
-    atlasDeletePendingKey,
-    atlasReactionPendingKey,
-    atlasConfigured,
-    feedNextCursor,
-    canLoadMoreFeed,
-    feedSlides,
-    previewSlides,
-    activeSlide,
-    selectPreviewImage,
-    selectFeedImage,
-    loadMoreFeed,
-    retryFeed,
-    reactToFeedImage,
-    reactToActiveImage,
-    deleteFeedAtlasImage,
-    deleteActiveAtlasImage,
+    feedImages, feedLoading, feedLoadingMore, feedError, atlasActionError, atlasDeletePendingKey,
+    atlasReactionPendingKey, atlasConfigured, feedNextCursor, versionAtlasStatusesLoading,
+    canLoadMoreFeed, feedSlides, previewSlides, activeSlide, selectPreviewImage, selectFeedImage,
+    loadMoreFeed, retryFeed, reactToFeedImage, reactToActiveImage, deleteFeedAtlasImage, deleteActiveAtlasImage,
   }
 }

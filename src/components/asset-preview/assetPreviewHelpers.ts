@@ -9,6 +9,38 @@ import type {
 } from './assetPreviewTypes'
 
 type NsfwMediaSource = Pick<CivitaiImage, 'nsfw' | 'nsfwLevel'> | null | undefined
+type NsfwLevelSource = { nsfwLevel?: unknown } | null | undefined
+
+export const NSFW_BLUR_LEVELS = [4, 8, 16, 32] as const
+export type NsfwBlurLevel = (typeof NSFW_BLUR_LEVELS)[number]
+export type NsfwMediaBlurLevel = NsfwBlurLevel | null
+
+const NSFW_LEVEL_BITS = [32, 16, 8, 4, 2, 1] as const
+const NSFW_LEVEL_LABELS: Record<number, string> = {
+  1: 'PG',
+  2: 'PG-13',
+  4: 'R',
+  8: 'X',
+  16: 'XXX',
+  32: 'Blocked',
+}
+
+const NSFW_LEVEL_ALIASES: Record<string, number> = {
+  false: 0,
+  none: 0,
+  safe: 1,
+  pg: 1,
+  soft: 2,
+  'pg-13': 2,
+  pg13: 2,
+  r: 4,
+  mature: 7,
+  x: 8,
+  xxx: 16,
+  blocked: 32,
+  'not detected': 0,
+  not_detected: 0,
+}
 
 export function modelVersionLabel(version: CivitaiModelVersion) {
   const name = version.name ?? `Version ${version.id}`
@@ -178,9 +210,9 @@ export function isImageNsfw(_model: CivitaiModel | null, image: NsfwMediaSource)
   return imageNsfwDetectedValue(image) === true
 }
 
-function nsfwLevelDetectedValue(value: unknown): boolean | null {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value > 4 : null
+function normalizeNsfwLevelNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.trunc(value)
   }
 
   if (typeof value !== 'string') {
@@ -194,55 +226,74 @@ function nsfwLevelDetectedValue(value: unknown): boolean | null {
 
   const numericLevel = Number(normalized)
   if (Number.isFinite(numericLevel)) {
-    return numericLevel > 4
+    return Math.trunc(numericLevel)
   }
 
-  return ![
-    'false',
-    '0',
-    '1',
-    '2',
-    'none',
-    'safe',
-    'soft',
-    'pg',
-    'pg-13',
-    'pg13',
-    'not detected',
-    'not_detected',
-  ].includes(normalized)
+  return NSFW_LEVEL_ALIASES[normalized] ?? null
+}
+
+function highestNsfwLevel(value: unknown): number | null {
+  const level = normalizeNsfwLevelNumber(value)
+  if (level === null) {
+    return null
+  }
+
+  for (const bit of NSFW_LEVEL_BITS) {
+    if ((level & bit) === bit) {
+      return bit
+    }
+  }
+
+  return level >= 4 ? level : 0
+}
+
+function nsfwLevelDetectedValue(value: unknown): boolean | null {
+  const highestLevel = highestNsfwLevel(value)
+  if (highestLevel === null) {
+    return null
+  }
+
+  return highestLevel >= 4
 }
 
 export function imageNsfwDetectedValue(image: NsfwMediaSource): boolean | null {
   return nsfwLevelDetectedValue(image?.nsfwLevel)
 }
 
-function imagesNsfwDetectedValue(images: Array<NsfwMediaSource> | null | undefined) {
-  let hasCurrentSafeImage = false
-  for (const image of images ?? []) {
-    const detected = imageNsfwDetectedValue(image)
-    if (detected === true) {
-      return true
-    }
-    if (detected === false) {
-      hasCurrentSafeImage = true
-    }
+export function imageMatchesNsfwBlurLevel(image: NsfwMediaSource, blurLevel: NsfwMediaBlurLevel | number | undefined): boolean {
+  if (!NSFW_BLUR_LEVELS.includes(blurLevel as NsfwBlurLevel)) {
+    return false
   }
 
-  return hasCurrentSafeImage ? false : null
+  const highestLevel = highestNsfwLevel(image?.nsfwLevel)
+  return highestLevel !== null && highestLevel >= (blurLevel as NsfwBlurLevel)
+}
+
+export function nsfwLevelLabel(value: unknown): string {
+  const highestLevel = highestNsfwLevel(value)
+  if (highestLevel === null) {
+    return 'Unknown'
+  }
+
+  return NSFW_LEVEL_LABELS[highestLevel] ?? `Level ${highestLevel}`
 }
 
 export function modelHasNsfwContent(
-  model: Pick<CivitaiModel, 'id' | 'nsfw'> & {
-    modelVersions?: Array<{ images?: Array<Pick<CivitaiImage, 'nsfw' | 'nsfwLevel'>> }>
+  model: Pick<CivitaiModel, 'id' | 'nsfw'> & NsfwLevelSource & {
+    modelVersions?: Array<NsfwLevelSource & { images?: Array<Pick<CivitaiImage, 'nsfw' | 'nsfwLevel'>> }>
   },
 ) {
-  return imagesNsfwDetectedValue((model.modelVersions ?? []).flatMap((version) => version.images ?? [])) === true
+  const levels = [
+    model,
+    ...(model.modelVersions ?? []),
+    ...(model.modelVersions ?? []).flatMap((version) => version.images ?? []),
+  ]
+  return levels.some((source) => nsfwLevelDetectedValue(source?.nsfwLevel) === true)
 }
 
 export function civitaiModelWebUrl(
-  model: Pick<CivitaiModel, 'id' | 'nsfw'> & {
-    modelVersions?: Array<{ images?: Array<Pick<CivitaiImage, 'nsfw' | 'nsfwLevel'>> }>
+  model: Pick<CivitaiModel, 'id' | 'nsfw'> & NsfwLevelSource & {
+    modelVersions?: Array<NsfwLevelSource & { images?: Array<Pick<CivitaiImage, 'nsfw' | 'nsfwLevel'>> }>
   },
 ) {
   const baseUrl = modelHasNsfwContent(model) ? 'https://civitai.red' : 'https://civitai.com'
@@ -250,16 +301,7 @@ export function civitaiModelWebUrl(
 }
 
 export function imageNsfwLabel(model: CivitaiModel | null, image: CivitaiImage | null | undefined) {
-  if (isImageNsfw(model, image)) {
-    return 'Yes'
-  }
-
-  const imageDetected = imageNsfwDetectedValue(image)
-  if (imageDetected === false) {
-    return 'No'
-  }
-
-  return 'Unknown'
+  return nsfwLevelLabel(image?.nsfwLevel)
 }
 
 export function imageSafetyKeyFor(image: CivitaiImage | null | undefined, fallbackUrl = '') {

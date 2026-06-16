@@ -321,7 +321,6 @@ describe('AssetPreviewModal', () => {
 
     expect(wrapper.text()).toContain('Safety')
     await wrapper.get('button[aria-label="Mark NSFW"]').trigger('click')
-    await wrapper.get('button[aria-label="Save safety override"]').trigger('click')
 
     expect(wrapper.emitted('save-safety')).toEqual([
       [{ modelNsfw: true, modelNsfwOverride: true }],

@@ -61,7 +61,8 @@ const {
   currentPage,
   applyIncludeNsfwDefault,
 } = useLibraryRouteFilters()
-const blurNsfwContent = ref(true)
+const blurNsfwModels = ref(true)
+const blurNsfwMediaLevel = ref<4 | 8 | 16 | 32 | null>(4)
 const selectedModel = ref<LibraryModelItem | null>(null)
 const controlNetModels = ref<ControlNetLibraryItem[]>([])
 const controlNetLoadingError = ref('')
@@ -135,13 +136,14 @@ const libraryModels = computed(() =>
   [...downloadedModels.value, ...watchedModels.value, ...hiddenLibraryModels.value, ...controlNetModels.value]
     .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0)),
 )
+const backfilledLibraryModels = computed(() => libraryModels.value.map(withPreviewBackfill))
 const nonHiddenLibraryModels = computed(() =>
-  libraryModels.value.filter((item) => item.librarySource !== 'hidden'),
+  backfilledLibraryModels.value.filter((item) => item.librarySource !== 'hidden'),
 )
 
 const filteredModels = computed(() => {
   const search = query.value.trim().toLowerCase()
-  return libraryModels.value.filter((item) => {
+  return backfilledLibraryModels.value.filter((item) => {
     if (!matchesSourceFilter(item)) {
       return false
     }
@@ -183,7 +185,7 @@ const filteredModels = computed(() => {
 const pageCount = computed(() => Math.max(1, Math.ceil(filteredModels.value.length / PAGE_SIZE)))
 const pageStart = computed(() => (currentPage.value - 1) * PAGE_SIZE)
 const pageEnd = computed(() => pageStart.value + PAGE_SIZE)
-const pagedModels = computed(() => filteredModels.value.slice(pageStart.value, pageEnd.value).map(withPreviewBackfill))
+const pagedModels = computed(() => filteredModels.value.slice(pageStart.value, pageEnd.value))
 const visibleRangeLabel = computed(() => {
   if (!filteredModels.value.length) {
     return '0 of 0'
@@ -196,14 +198,14 @@ const typeCounts = computed(() => ({
   checkpoint: nonHiddenLibraryModels.value.filter((item) => item.itemKind === 'checkpoint').length,
   lora: nonHiddenLibraryModels.value.filter((item) => item.itemKind === 'lora').length,
   controlnet: nonHiddenLibraryModels.value.filter((item) => item.itemKind === 'controlnet').length,
-  hidden: libraryModels.value.filter((item) => item.librarySource === 'hidden').length,
+  hidden: backfilledLibraryModels.value.filter((item) => item.librarySource === 'hidden').length,
   hiddenStored: hiddenModelIds.value.length,
   watched: nonHiddenLibraryModels.value.filter((item) => item.librarySource === 'watched').length,
 }))
 const baseModelOptions = computed(() => {
   const counts = new Map<string, number>()
   let scopedTotal = 0
-  for (const item of libraryModels.value) {
+  for (const item of backfilledLibraryModels.value) {
     if (!matchesSourceFilter(item)) {
       continue
     }
@@ -305,10 +307,12 @@ async function loadAppSettingsDefaults() {
   try {
     const settings = await fetchAppSettings()
     applyIncludeNsfwDefault(settings.includeNsfw)
-    blurNsfwContent.value = settings.blurNsfwContent !== false
+    blurNsfwModels.value = settings.blurNsfwModels !== false
+    blurNsfwMediaLevel.value = settings.blurNsfwMediaLevel
   } catch {
     applyIncludeNsfwDefault(false)
-    blurNsfwContent.value = true
+    blurNsfwModels.value = true
+    blurNsfwMediaLevel.value = 4
   }
 }
 
@@ -425,7 +429,8 @@ onMounted(() => {
         v-for="item in pagedModels"
         :key="item.id"
         :item="item"
-        :blur-nsfw-content="blurNsfwContent"
+        :blur-nsfw-models="blurNsfwModels"
+        :blur-nsfw-media-level="blurNsfwMediaLevel"
         @open="openModelPreview"
         @restore="restoreLibraryHiddenModel"
       />
@@ -444,7 +449,8 @@ onMounted(() => {
       :preview-url="selectedModel ? previewFor(selectedModel) : null"
       :is-video="selectedModel ? isVideoPreview(selectedModel) : false"
       :include-nsfw="true"
-      :blur-nsfw-content="blurNsfwContent"
+      :blur-nsfw-models="blurNsfwModels"
+      :blur-nsfw-media-level="blurNsfwMediaLevel"
       :title="selectedModel?.modelName ?? 'Preview'"
       :subtitle="selectedModel?.versionName ?? null"
       :kind-label="selectedModel ? modelTypeLabel(selectedModel) : 'Preview'"

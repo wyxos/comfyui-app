@@ -42,7 +42,8 @@ const emit = defineEmits<{
 const searchInput = ref<HTMLInputElement | null>(null)
 const searchQuery = ref('')
 const includeNsfw = ref(false)
-const blurNsfwContent = ref(true)
+const blurNsfwModels = ref(true)
+const blurNsfwMediaLevel = ref<4 | 8 | 16 | 32 | null>(4)
 const selectedBaseModelFilter = ref('')
 const currentPage = ref(1)
 const previewIndexes = ref<Record<string, number>>({})
@@ -85,11 +86,15 @@ const baseModelFilterOptions = computed<BaseModelFilterOption[]>(() => {
 })
 const hasBaseModelFilters = computed(() => baseModelFilterOptions.value.length > 0)
 const filteredOptions = computed(() => {
+  const safetyFilteredOptions = includeNsfw.value
+    ? searchFilteredOptions.value
+    : searchFilteredOptions.value.filter((option) => !optionHasNsfw(option))
+
   if (!selectedBaseModelFilter.value) {
-    return searchFilteredOptions.value
+    return safetyFilteredOptions
   }
 
-  return searchFilteredOptions.value.filter((option) =>
+  return safetyFilteredOptions.filter((option) =>
     optionBaseModelLabels(option).some((label) => normalizeBaseModelFilterKey(label) === selectedBaseModelFilter.value),
   )
 })
@@ -187,14 +192,16 @@ async function loadOpenDefaults(token: number) {
       includeNsfw.value = settings.includeNsfw
     }
     if (props.open && token === openLoadToken) {
-      blurNsfwContent.value = settings.blurNsfwContent !== false
+      blurNsfwModels.value = settings.blurNsfwModels !== false
+      blurNsfwMediaLevel.value = settings.blurNsfwMediaLevel
     }
   } catch {
     if (props.open && token === openLoadToken && !includeNsfwTouched) {
       includeNsfw.value = false
     }
     if (props.open && token === openLoadToken) {
-      blurNsfwContent.value = true
+      blurNsfwModels.value = true
+      blurNsfwMediaLevel.value = 4
     }
   }
 }
@@ -224,7 +231,8 @@ watch(
       openLoadToken = token
       searchQuery.value = ''
       includeNsfw.value = false
-      blurNsfwContent.value = true
+      blurNsfwModels.value = true
+      blurNsfwMediaLevel.value = 4
       selectedBaseModelFilter.value = ''
       previewIndexes.value = {}
       includeNsfwTouched = false
@@ -366,7 +374,8 @@ onBeforeUnmount(() => {
         :preview-count="optionPreviewCount(option)"
         :base-model-label="optionBaseModelBadgeLabel(option)"
         :has-nsfw="optionHasNsfw(option)"
-        :blur-nsfw-content="blurNsfwContent"
+        :blur-nsfw-models="blurNsfwModels"
+        :blur-nsfw-media-level="blurNsfwMediaLevel"
         @select="selectOption(option)"
         @show-preview="showOptionPreview(option, $event)"
       />

@@ -154,7 +154,7 @@ describe('companion app e2e flows', () => {
     await expect.element(hidden.screen.getByText('Hidden Download LoRA')).toBeVisible()
     clickHostButton(hidden.host, 'Open Hidden Download LoRA preview')
     await vi.waitFor(() => {
-      expect(hidden.host.textContent).toContain('Model versions')
+      expect(hidden.host.textContent).toContain('Versions')
     })
     hostButtonByText(hidden.host, 'Download').click()
 

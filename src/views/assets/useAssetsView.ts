@@ -53,7 +53,8 @@ const route = useRoute()
 const router = useRouter()
 const query = ref('')
 const includeNsfw = ref(false)
-const blurNsfwContent = ref(true)
+const blurNsfwModels = ref(true)
+const blurNsfwMediaLevel = ref<4 | 8 | 16 | 32 | null>(4)
 const selectedType = ref<ModelTypeFilter>('')
 const selectedSort = ref<ModelSort>(DEFAULT_SORT)
 const selectedPeriod = ref<ModelPeriod>(DEFAULT_PERIOD)
@@ -162,7 +163,8 @@ const {
   error,
   hasStoredCivitaiApiKey,
   includeNsfw,
-  blurNsfwContent,
+  blurNsfwModels,
+  blurNsfwMediaLevel,
   loading,
   modelIdQuery,
   modelVersionIdQuery,
@@ -370,7 +372,8 @@ onBeforeUnmount(() => {
     BASE_MODEL_OPTIONS: VISIBLE_BASE_MODEL_OPTIONS,
     query,
     includeNsfw,
-    blurNsfwContent,
+    blurNsfwModels,
+    blurNsfwMediaLevel,
     selectedType,
     selectedSort,
     selectedPeriod,

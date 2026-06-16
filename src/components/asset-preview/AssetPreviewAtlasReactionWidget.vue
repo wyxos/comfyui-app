@@ -89,8 +89,8 @@ function handleDeleteClick(event: MouseEvent) {
 
 <template>
   <div
-    class="inline-flex flex-wrap items-center justify-center rounded-md border border-border bg-card/95 shadow-sm"
-    :class="compact ? 'gap-1 p-1' : 'gap-1.5 p-1.5'"
+    class="inline-flex items-center justify-center rounded-md border border-border bg-card/95 shadow-sm"
+    :class="compact ? 'flex-nowrap gap-0.5 px-0.5 py-1' : 'flex-wrap gap-1.5 p-1.5'"
     @click.stop
     @dblclick.stop
     @mousedown.stop
@@ -104,7 +104,7 @@ function handleDeleteClick(event: MouseEvent) {
       data-test="asset-preview-atlas-reaction-button"
       class="inline-flex items-center justify-center rounded-md border border-transparent transition focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-65"
       :class="[
-        compact ? 'h-7 w-7' : 'h-8 w-8',
+        compact ? 'h-6 w-6' : 'h-8 w-8',
         isActive(reaction.type) ? reaction.activeClass : reaction.inactiveClass,
       ]"
       :aria-label="reaction.label"
@@ -114,7 +114,7 @@ function handleDeleteClick(event: MouseEvent) {
     >
       <component
         :is="reaction.icon"
-        :class="compact ? 'h-3.5 w-3.5' : 'h-4 w-4'"
+        :class="compact ? 'h-3 w-3' : 'h-4 w-4'"
       />
     </button>
     <a
@@ -123,20 +123,20 @@ function handleDeleteClick(event: MouseEvent) {
       target="_blank"
       rel="noreferrer"
       class="inline-flex items-center justify-center rounded-md border border-transparent text-muted-foreground transition hover:border-secondary hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25"
-      :class="compact ? 'h-7 w-7' : 'h-8 w-8'"
+      :class="compact ? 'h-6 w-6' : 'h-8 w-8'"
       aria-label="Open file in Atlas"
       title="Open file in Atlas"
       @click.stop
       @mousedown.stop
       @dblclick.stop
     >
-      <ExternalLink :class="compact ? 'h-3.5 w-3.5' : 'h-4 w-4'" />
+      <ExternalLink :class="compact ? 'h-3 w-3' : 'h-4 w-4'" />
     </a>
     <button
       v-if="canDeleteFile()"
       type="button"
       class="inline-flex items-center justify-center rounded-md border border-transparent text-muted-foreground transition hover:border-destructive hover:text-destructive focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-65"
-      :class="compact ? 'h-7 w-7' : 'h-8 w-8'"
+      :class="compact ? 'h-6 w-6' : 'h-8 w-8'"
       :disabled="pending || deleting"
       aria-label="Delete downloaded file from Atlas"
       title="Delete downloaded file from Atlas"
@@ -144,11 +144,11 @@ function handleDeleteClick(event: MouseEvent) {
     >
       <LoaderCircle
         v-if="deleting"
-        :class="compact ? 'h-3.5 w-3.5 animate-spin' : 'h-4 w-4 animate-spin'"
+        :class="compact ? 'h-3 w-3 animate-spin' : 'h-4 w-4 animate-spin'"
       />
       <Trash2
         v-else
-        :class="compact ? 'h-3.5 w-3.5' : 'h-4 w-4'"
+        :class="compact ? 'h-3 w-3' : 'h-4 w-4'"
       />
     </button>
   </div>

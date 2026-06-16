@@ -1,4 +1,5 @@
 import {
+  imageMatchesNsfwBlurLevel,
   imageNsfwDetectedValue,
   imagesForVersion,
   isVideoUrl,
@@ -212,8 +213,61 @@ export function isVideoPreview(item: LibraryModelItem) {
   return primaryPreviewPath(item)?.mediaType === 'video' || isVideoUrl(previewUrl)
 }
 
+function previewIdentity(value: unknown) {
+  if (value === null || value === undefined) {
+    return ''
+  }
+
+  return String(value).trim().toLowerCase()
+}
+
+function previewsMatch(left: LibraryPreviewPath | null, right: LibraryPreviewPath | null) {
+  if (!left || !right) {
+    return false
+  }
+
+  const leftId = previewIdentity(left.id)
+  const rightId = previewIdentity(right.id)
+  if (leftId && rightId && leftId === rightId) {
+    return true
+  }
+
+  const leftHash = previewIdentity(left.hash)
+  const rightHash = previewIdentity(right.hash)
+  return Boolean(leftHash && rightHash && leftHash === rightHash)
+}
+
+function displayedPreviewSafetyPath(item: LibraryModelItem) {
+  const primaryPreview = primaryPreviewPath(item)
+  if (imageNsfwDetectedValue(primaryPreview) !== null) {
+    return primaryPreview
+  }
+
+  const previewImage = previewImagePathForItem(item)
+  if (
+    imageNsfwDetectedValue(previewImage) !== null &&
+    (!primaryPreview || previewsMatch(primaryPreview, previewImage) || (item.previewPaths?.length ?? 0) <= 1)
+  ) {
+    return previewImage
+  }
+
+  return primaryPreview ?? previewImage
+}
+
 export function previewHasNsfw(item: LibraryModelItem) {
-  return imageNsfwDetectedValue(primaryPreviewPath(item) ?? previewImagePathForItem(item)) === true
+  return imageNsfwDetectedValue(displayedPreviewSafetyPath(item)) === true
+}
+
+export function previewHasCurrentSafetyMetadata(item: LibraryModelItem) {
+  return previewSafetyPathsForItem(item).some((preview) => imageNsfwDetectedValue(preview) !== null)
+}
+
+export function previewNeedsBackfill(item: LibraryModelItem) {
+  return !previewFor(item) || !previewHasCurrentSafetyMetadata(item)
+}
+
+export function previewMatchesNsfwBlurLevel(item: LibraryModelItem, blurLevel: 4 | 8 | 16 | 32 | null | undefined) {
+  return imageMatchesNsfwBlurLevel(displayedPreviewSafetyPath(item), blurLevel)
 }
 
 function previewPathsNsfwDetectedValue(previewPaths: LibraryPreviewPath[] | null | undefined) {

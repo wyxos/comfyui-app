@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import {
+  previewNeedsBackfill,
   previewFor,
   type LibraryModelItem,
   type LibraryPreviewPath,
@@ -49,13 +50,96 @@ function normalizedBackfilledPreviews(previews: unknown): LibraryPreviewPath[] {
       url: previewRecord.url,
       type: previewRecord.type as LibraryPreviewPath['type'],
       mediaType: previewRecord.mediaType as LibraryPreviewPath['mediaType'],
-      nsfw: previewRecord.nsfw as LibraryPreviewPath['nsfw'],
       nsfwLevel: previewRecord.nsfwLevel as LibraryPreviewPath['nsfwLevel'],
       width: previewRecord.width as LibraryPreviewPath['width'],
       height: previewRecord.height as LibraryPreviewPath['height'],
       hash: previewRecord.hash as LibraryPreviewPath['hash'],
     }]
   })
+}
+
+function previewString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function previewIdentity(value: unknown) {
+  if (value === null || value === undefined) {
+    return ''
+  }
+
+  const normalized = String(value).trim()
+  return normalized ? normalized.toLowerCase() : ''
+}
+
+function matchingBackfillIndex(
+  preview: LibraryPreviewPath,
+  previews: LibraryPreviewPath[],
+  usedIndexes: Set<number>,
+  fallbackIndex: number,
+) {
+  const id = previewIdentity(preview.id)
+  const hash = previewIdentity(preview.hash)
+  const url = previewString(preview.url)
+
+  for (const [index, candidate] of previews.entries()) {
+    if (usedIndexes.has(index)) {
+      continue
+    }
+
+    if (id && id === previewIdentity(candidate.id)) {
+      return index
+    }
+
+    if (hash && hash === previewIdentity(candidate.hash)) {
+      return index
+    }
+
+    if (url && url === previewString(candidate.url)) {
+      return index
+    }
+  }
+
+  return fallbackIndex < previews.length && !usedIndexes.has(fallbackIndex) ? fallbackIndex : -1
+}
+
+function mergePreviewMetadata(preview: LibraryPreviewPath, backfill: LibraryPreviewPath | null): LibraryPreviewPath {
+  if (!backfill) {
+    return preview
+  }
+
+  return {
+    ...preview,
+    id: preview.id ?? backfill.id,
+    type: preview.type ?? backfill.type,
+    mediaType: preview.mediaType ?? backfill.mediaType ?? backfill.type,
+    nsfwLevel: preview.nsfwLevel ?? backfill.nsfwLevel,
+    width: preview.width ?? backfill.width,
+    height: preview.height ?? backfill.height,
+    hash: preview.hash ?? backfill.hash,
+  }
+}
+
+function mergedPreviewPaths(item: LibraryModelItem, previews: LibraryPreviewPath[]) {
+  const existingPreviews = item.previewPaths ?? []
+  if (!existingPreviews.length) {
+    return previews
+  }
+
+  const usedIndexes = new Set<number>()
+  const merged = existingPreviews.map((preview, index) => {
+    const backfillIndex = matchingBackfillIndex(preview, previews, usedIndexes, index)
+    const backfill = backfillIndex >= 0 ? previews[backfillIndex] : null
+    if (backfillIndex >= 0) {
+      usedIndexes.add(backfillIndex)
+    }
+
+    return mergePreviewMetadata(preview, backfill)
+  })
+
+  return [
+    ...merged,
+    ...previews.filter((_, index) => !usedIndexes.has(index)),
+  ]
 }
 
 export function useLibraryPreviewBackfills() {
@@ -68,13 +152,9 @@ export function useLibraryPreviewBackfills() {
       return item
     }
 
-    if (previewFor(item)) {
-      return item
-    }
-
     const key = previewBackfillKeyFor(item)
     const previews = key ? previewBackfills.value[key] : null
-    const previewUrl = previews?.find((preview) => preview.url)?.url ?? null
+    const previewUrl = previewFor(item) || (previews?.find((preview) => preview.url)?.url ?? null)
     if (!previewUrl || !previews?.length) {
       return item
     }
@@ -82,7 +162,7 @@ export function useLibraryPreviewBackfills() {
     return {
       ...item,
       previewUrl,
-      previewPaths: previews,
+      previewPaths: mergedPreviewPaths(item, previews),
     }
   }
 
@@ -94,7 +174,7 @@ export function useLibraryPreviewBackfills() {
     const key = previewBackfillKeyFor(item)
     return Boolean(
       key &&
-      !previewFor(item) &&
+      previewNeedsBackfill(item) &&
       !previewBackfills.value[key]?.length &&
       !pendingPreviewBackfillKeys.has(key) &&
       !failedPreviewBackfillKeys.has(key),

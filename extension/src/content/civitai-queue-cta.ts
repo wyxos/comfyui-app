@@ -55,11 +55,6 @@ export function isCivitaiHostname(hostname: string = window.location.hostname): 
   return CIVITAI_DOMAINS.some((domain) => normalized === domain || normalized.endsWith(`.${domain}`))
 }
 
-function isCivitaiNsfwHostname(hostname: string): boolean {
-  const normalized = normalizeHostname(hostname)
-  return normalized === 'civitai.red' || normalized.endsWith('.civitai.red')
-}
-
 export function parsePositiveInteger(value: string | null | undefined): number | null {
   if (typeof value !== 'string') {
     return null
@@ -197,7 +192,6 @@ function requestQueueCivitaiModel(reference: CivitaiModelReference): Promise<Run
         modelVersionId: reference.modelVersionId,
         sourceHostname: window.location.hostname,
         sourceUrl: window.location.href,
-        ...(isCivitaiNsfwHostname(window.location.hostname) ? { nsfw: true } : {}),
       }, (response: unknown) => {
         if (chrome.runtime?.lastError) {
           resolve(null)

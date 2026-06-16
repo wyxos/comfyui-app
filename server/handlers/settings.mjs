@@ -1,5 +1,5 @@
 import { readJsonBody, sendError, sendJson } from '../http.mjs'
-import { safeTrim } from '../shared.mjs'
+import { NSFW_BLUR_LEVELS, safeTrim } from '../shared.mjs'
 import {
   clearCivitaiApiKey,
   getAppSettings,
@@ -97,8 +97,21 @@ export async function handlePutAppSettings(request, response) {
     return sendError(response, 400, 'invalid-include-nsfw', 'includeNsfw must be a boolean.')
   }
 
-  if (body.blurNsfwContent !== undefined && typeof body.blurNsfwContent !== 'boolean') {
-    return sendError(response, 400, 'invalid-blur-nsfw-content', 'blurNsfwContent must be a boolean.')
+  if (body.blurNsfwModels !== undefined && typeof body.blurNsfwModels !== 'boolean') {
+    return sendError(response, 400, 'invalid-blur-nsfw-models', 'blurNsfwModels must be a boolean.')
+  }
+
+  if (
+    body.blurNsfwMediaLevel !== undefined &&
+    body.blurNsfwMediaLevel !== null &&
+    !NSFW_BLUR_LEVELS.includes(body.blurNsfwMediaLevel)
+  ) {
+    return sendError(
+      response,
+      400,
+      'invalid-blur-nsfw-media-level',
+      'blurNsfwMediaLevel must be null, 4, 8, 16, or 32.',
+    )
   }
 
   if (body.atlasUrl !== undefined && typeof body.atlasUrl !== 'string') {
@@ -112,7 +125,8 @@ export async function handlePutAppSettings(request, response) {
   try {
     return sendJson(response, 200, await saveAppSettings({
       includeNsfw: body.includeNsfw,
-      blurNsfwContent: body.blurNsfwContent,
+      blurNsfwModels: body.blurNsfwModels,
+      blurNsfwMediaLevel: body.blurNsfwMediaLevel,
       atlasUrl: body.atlasUrl,
       atlasApiKey: body.atlasApiKey,
     }))

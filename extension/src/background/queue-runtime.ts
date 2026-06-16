@@ -1,3 +1,5 @@
+import { modelHasNsfwContent } from './nsfw-level'
+
 const COMPANION_BASE_URL = 'http://127.0.0.1:3210'
 const QUEUE_MESSAGE_TYPE = 'COMFY_COMPANION_QUEUE_CIVITAI_MODEL'
 const STATUS_MESSAGE_TYPE = 'COMFY_COMPANION_CIVITAI_DOWNLOAD_STATUS'
@@ -12,7 +14,6 @@ type QueueCivitaiModelMessage = {
   type: typeof QUEUE_MESSAGE_TYPE
   modelId?: unknown
   modelVersionId?: unknown
-  nsfw?: unknown
   sourceHostname?: unknown
   sourceUrl?: unknown
 }
@@ -41,7 +42,7 @@ type CivitaiImage = {
   url?: string | null
   type?: string | null
   nsfw?: string | boolean | null
-  nsfwLevel?: string | null
+  nsfwLevel?: string | number | null
   width?: number
   height?: number
   hash?: string | null
@@ -54,6 +55,7 @@ type CivitaiImage = {
 type CivitaiModelVersion = {
   id?: number | string | null
   name?: string | null
+  nsfwLevel?: string | number | null
   availability?: string | null
   covered?: boolean
   baseModel?: string | null
@@ -67,6 +69,7 @@ type CivitaiModel = {
   name?: string | null
   type?: string | null
   nsfw?: boolean | null
+  nsfwLevel?: string | number | null
   creator?: Record<string, unknown> | null
   stats?: Record<string, unknown> | null
   tags?: string[]
@@ -228,15 +231,10 @@ function normalizeModelType(value: unknown): string {
   return safeTrim(value)
 }
 
-function modelHasNsfwContent(model: CivitaiModel, sourceNsfw: boolean): boolean {
-  return sourceNsfw || model.nsfw === true
-}
-
 export function buildCompanionDownloadPayload(
   model: CivitaiModel,
   version: CivitaiModelVersion,
   file: CivitaiModelFile,
-  sourceNsfw = false,
 ): QueueDownloadPayload | null {
   const modelId = parsePositiveInteger(model.id)
   const versionId = parsePositiveInteger(version.id)
@@ -249,7 +247,7 @@ export function buildCompanionDownloadPayload(
   }
 
   const previewImages = Array.isArray(version.images) ? version.images.filter((image) => safeTrim(image.url) !== '') : []
-  const nsfw = modelHasNsfwContent(model, sourceNsfw)
+  const nsfw = modelHasNsfwContent(model)
 
   return {
     modelId,
@@ -443,7 +441,7 @@ export async function queueCompanionCivitaiDownload(
       return { ok: false, error: 'file-not-found', message: 'No primary model file was found for that Civitai version.' }
     }
 
-    const downloadPayload = buildCompanionDownloadPayload(model, version, file, message.nsfw === true)
+    const downloadPayload = buildCompanionDownloadPayload(model, version, file)
     if (!downloadPayload) {
       return { ok: false, error: 'invalid-download', message: 'Civitai metadata could not be converted into a download.' }
     }

@@ -24,7 +24,8 @@ export type MockApiOptions = {
   watchedDownloads?: MockDownload[]
   civitaiConfigured?: boolean
   includeNsfwDefault?: boolean
-  blurNsfwContentDefault?: boolean
+  blurNsfwModelsDefault?: boolean
+  blurNsfwMediaLevelDefault?: number | null
   generateJobState?: string
   uploadInputImageNames?: string[]
   failures?: Record<string, MockFailure>

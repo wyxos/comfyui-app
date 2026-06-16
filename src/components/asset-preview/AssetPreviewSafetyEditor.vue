@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { LoaderCircle, Save } from 'lucide-vue-next'
+import { LoaderCircle } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
-import { Button } from '@/components/ui/button'
+import { toast } from 'vue-sonner'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 const props = withDefaults(
@@ -45,6 +45,9 @@ const emit = defineEmits<{
 type SafetyMode = 'detected' | 'safe' | 'nsfw'
 
 const safetyMode = ref<SafetyMode>('detected')
+const suppressNextSave = ref(false)
+const saveRequested = ref(false)
+const saveToastShown = ref(false)
 const detectedLabel = computed(() => {
   if (props.modelNsfw === true) {
     return 'Detected as NSFW'
@@ -56,24 +59,93 @@ const detectedLabel = computed(() => {
 })
 
 function syncSafetyDraft() {
-  safetyMode.value = props.modelNsfwOverride === true
+  const nextMode = props.modelNsfwOverride === true
     ? 'nsfw'
     : props.modelNsfwOverride === false
       ? 'safe'
       : 'detected'
+
+  if (safetyMode.value !== nextMode) {
+    suppressNextSave.value = true
+    safetyMode.value = nextMode
+  }
 }
 
-function saveSafety() {
-  const modelNsfwOverride = safetyMode.value === 'nsfw'
+function safetyPayloadFor(mode: SafetyMode) {
+  const modelNsfwOverride = mode === 'nsfw'
     ? true
-    : safetyMode.value === 'safe'
+    : mode === 'safe'
       ? false
       : null
-  emit('save', {
+
+  return {
     modelNsfw: modelNsfwOverride,
     modelNsfwOverride,
-  })
+  }
 }
+
+function saveSafety(mode: SafetyMode) {
+  saveRequested.value = true
+  saveToastShown.value = false
+  emit('save', safetyPayloadFor(mode))
+}
+
+function showSaveError(message: string) {
+  if (saveToastShown.value) {
+    return
+  }
+
+  toast.error(message || `${props.title} could not be saved.`)
+  saveToastShown.value = true
+  saveRequested.value = false
+}
+
+function showSaveSuccess() {
+  if (saveToastShown.value) {
+    return
+  }
+
+  toast.success(`${props.title} saved.`)
+  saveToastShown.value = true
+  saveRequested.value = false
+}
+
+watch(
+  safetyMode,
+  (mode) => {
+    if (suppressNextSave.value) {
+      suppressNextSave.value = false
+      return
+    }
+
+    if (!props.saving) {
+      saveSafety(mode)
+    }
+  },
+)
+
+watch(
+  () => props.saving,
+  (saving, wasSaving) => {
+    if (wasSaving && !saving && saveRequested.value) {
+      if (props.error) {
+        showSaveError(props.error)
+        return
+      }
+
+      showSaveSuccess()
+    }
+  },
+)
+
+watch(
+  () => props.error,
+  (error) => {
+    if (saveRequested.value && error) {
+      showSaveError(error)
+    }
+  },
+)
 
 watch(
   () => [props.modelNsfw, props.modelNsfwOverride],
@@ -89,25 +161,17 @@ watch(
         <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">{{ title }}</p>
         <p class="mt-1 text-xs text-muted-foreground">{{ detectedLabel }}</p>
       </div>
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        :aria-label="saveAriaLabel"
-        :disabled="saving"
-        @click="saveSafety"
+      <span
+        v-if="saving"
+        class="inline-flex h-8 shrink-0 items-center rounded-md border border-border bg-background px-2 text-xs font-semibold text-muted-foreground"
+        aria-live="polite"
       >
         <LoaderCircle
-          v-if="saving"
           data-icon="inline-start"
-          class="animate-spin"
+          class="mr-1.5 h-3.5 w-3.5 animate-spin text-secondary"
         />
-        <Save
-          v-else
-          data-icon="inline-start"
-        />
-        {{ saveLabel }}
-      </Button>
+        Saving
+      </span>
     </div>
 
     <div class="grid gap-2">
@@ -119,6 +183,7 @@ watch(
         size="sm"
         class="grid w-full grid-cols-3"
         :aria-label="groupLabel"
+        :disabled="saving"
       >
         <ToggleGroupItem
           value="detected"

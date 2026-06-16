@@ -77,6 +77,7 @@ export type CivitaiModelFile = {
 export type CivitaiModelVersion = {
   id: number
   name?: string | null
+  nsfwLevel?: string | number | null
   description?: string | null
   createdAt?: string | null
   publishedAt?: string | null
@@ -95,6 +96,7 @@ export type CivitaiModel = {
   name: string
   type: string
   nsfw?: boolean
+  nsfwLevel?: string | number | null
   creator?: {
     username?: string | null
   } | null
@@ -125,6 +127,8 @@ export type ImageSafetyOverride = {
   imageNsfwOverride?: boolean | null
 }
 
+export type NsfwMediaBlurLevel = 4 | 8 | 16 | 32 | null
+
 export type PreviewSlide = {
   key: string
   url: string
@@ -148,7 +152,8 @@ export type AssetPreviewModalProps = {
   initialImageIndex?: number
   isVideo?: boolean
   includeNsfw?: boolean
-  blurNsfwContent?: boolean
+  blurNsfwModels?: boolean
+  blurNsfwMediaLevel?: NsfwMediaBlurLevel
   subtitle?: string | null
   kindLabel?: string
   modelId?: number | null

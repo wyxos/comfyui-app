@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   civitaiModelWebUrl,
+  imageMatchesNsfwBlurLevel,
   imageNsfwDetectedValue,
+  imageNsfwLabel,
   modelHasNsfwContent,
   versionDownloadUnavailableLabel,
 } from '../../src/components/asset-preview/assetPreviewHelpers'
@@ -49,10 +51,11 @@ describe('asset preview helpers', () => {
     })).toBe('https://civitai.red/models/303')
   })
 
-  it('does not classify PG-13 numeric nsfwLevel images as NSFW', () => {
+  it('classifies current Civitai nsfwLevel values by browsing-level flags', () => {
     expect(imageNsfwDetectedValue({ nsfwLevel: 2 })).toBe(false)
     expect(imageNsfwDetectedValue({ nsfwLevel: 'PG-13' })).toBe(false)
-    expect(imageNsfwDetectedValue({ nsfwLevel: 4 })).toBe(false)
+    expect(imageNsfwDetectedValue({ nsfwLevel: 4 })).toBe(true)
+    expect(imageNsfwDetectedValue({ nsfwLevel: 7 })).toBe(true)
     expect(imageNsfwDetectedValue({ nsfwLevel: 8 })).toBe(true)
     expect(imageNsfwDetectedValue({ nsfwLevel: 'R' })).toBe(true)
   })
@@ -60,9 +63,30 @@ describe('asset preview helpers', () => {
   it('uses nsfwLevel instead of stale legacy nsfw flags', () => {
     expect(imageNsfwDetectedValue({ nsfw: true, nsfwLevel: 1 })).toBe(false)
     expect(imageNsfwDetectedValue({ nsfw: 'Mature', nsfwLevel: 'PG-13' })).toBe(false)
-    expect(imageNsfwDetectedValue({ nsfw: false, nsfwLevel: 4 })).toBe(false)
+    expect(imageNsfwDetectedValue({ nsfw: false, nsfwLevel: 4 })).toBe(true)
+    expect(imageNsfwDetectedValue({ nsfw: false, nsfwLevel: 7 })).toBe(true)
     expect(imageNsfwDetectedValue({ nsfw: false, nsfwLevel: 8 })).toBe(true)
     expect(imageNsfwDetectedValue({ nsfw: true })).toBe(null)
+  })
+
+  it('matches image blur thresholds from R through Blocked', () => {
+    expect(imageMatchesNsfwBlurLevel({ nsfwLevel: 4 }, 4)).toBe(true)
+    expect(imageMatchesNsfwBlurLevel({ nsfwLevel: 4 }, 8)).toBe(false)
+    expect(imageMatchesNsfwBlurLevel({ nsfwLevel: 7 }, 4)).toBe(true)
+    expect(imageMatchesNsfwBlurLevel({ nsfwLevel: 7 }, 8)).toBe(false)
+    expect(imageMatchesNsfwBlurLevel({ nsfwLevel: 16 }, 8)).toBe(true)
+    expect(imageMatchesNsfwBlurLevel({ nsfwLevel: 32 }, 32)).toBe(true)
+    expect(imageMatchesNsfwBlurLevel({ nsfwLevel: 32 }, null)).toBe(false)
+  })
+
+  it('labels modal image safety by Civitai level instead of yes or no', () => {
+    expect(imageNsfwLabel(null, { nsfwLevel: 1 })).toBe('PG')
+    expect(imageNsfwLabel(null, { nsfwLevel: 2 })).toBe('PG-13')
+    expect(imageNsfwLabel(null, { nsfw: false, nsfwLevel: 7 })).toBe('R')
+    expect(imageNsfwLabel(null, { nsfwLevel: 8 })).toBe('X')
+    expect(imageNsfwLabel(null, { nsfwLevel: 16 })).toBe('XXX')
+    expect(imageNsfwLabel(null, { nsfwLevel: 32 })).toBe('Blocked')
+    expect(imageNsfwLabel(null, { nsfw: true })).toBe('Unknown')
   })
 
   it('ignores legacy model nsfw when deciding model safety', () => {
@@ -71,6 +95,22 @@ describe('asset preview helpers', () => {
       nsfw: true,
       modelVersions: [{ images: [{ nsfw: true, nsfwLevel: 1 }] }],
     })).toBe(false)
+  })
+
+  it('uses model and version nsfwLevel fields for model safety', () => {
+    expect(modelHasNsfwContent({
+      id: 707,
+      nsfw: false,
+      nsfwLevel: 7,
+      modelVersions: [],
+    })).toBe(true)
+
+    expect(modelHasNsfwContent({
+      id: 808,
+      nsfw: false,
+      nsfwLevel: 1,
+      modelVersions: [{ nsfwLevel: 4, images: [{ nsfwLevel: 1 }] }],
+    })).toBe(true)
   })
 
   it('labels uncovered early-access versions as unavailable for app downloads', () => {

@@ -1,7 +1,7 @@
 import { civitaiModelsUrl } from './config.mjs'
 import { fetchCivitaiJsonWithCache } from './civitai-cache.mjs'
 import { parseInteger } from './civitai-query.mjs'
-import { imageListNsfwLevelDetectedValue, safeTrim } from './shared.mjs'
+import { imageListNsfwLevelDetectedValue, normalizeNsfwLevel, safeTrim } from './shared.mjs'
 import { getStoredCivitaiApiKey } from './settings.mjs'
 
 function parseCivitaiLookupId(value) {
@@ -36,13 +36,18 @@ function modelFromCivitaiVersion(version) {
     return null
   }
 
-  const modelNsfw = imageListNsfwLevelDetectedValue(modelVersion.images)
+  const modelNsfw = imageListNsfwLevelDetectedValue([
+    { nsfwLevel: version?.model?.nsfwLevel },
+    { nsfwLevel: version?.nsfwLevel },
+    ...(modelVersion.images ?? []),
+  ])
 
   return {
     id: modelId,
     name: safeTrim(version?.model?.name) || `Civitai model ${modelId}`,
     type: safeTrim(version?.model?.type) || 'Unknown',
     nsfw: modelNsfw === true,
+    nsfwLevel: normalizeNsfwLevel(version?.model?.nsfwLevel),
     creator: version?.model?.creator ?? null,
     stats: version?.model?.stats ?? version?.stats ?? undefined,
     tags: Array.isArray(version?.model?.tags) ? version.model.tags : [],
@@ -108,7 +113,12 @@ function mergeHydratedCivitaiModel(versionModel, hydratedModel) {
   }
 
   const modelVersions = versionModel.modelVersions
-  const modelNsfw = imageListNsfwLevelDetectedValue(modelVersions.flatMap((version) => version.images ?? []))
+  const modelNsfw = imageListNsfwLevelDetectedValue([
+    { nsfwLevel: hydratedModel.nsfwLevel },
+    { nsfwLevel: versionModel.nsfwLevel },
+    ...modelVersions,
+    ...modelVersions.flatMap((version) => version.images ?? []),
+  ])
 
   return {
     ...hydratedModel,
@@ -116,6 +126,7 @@ function mergeHydratedCivitaiModel(versionModel, hydratedModel) {
     name: safeTrim(hydratedModel.name) || versionModel.name,
     type: safeTrim(hydratedModel.type) || versionModel.type,
     nsfw: modelNsfw === true,
+    nsfwLevel: normalizeNsfwLevel(hydratedModel.nsfwLevel ?? versionModel.nsfwLevel),
     creator: hydratedModel.creator ?? versionModel.creator,
     stats: hydratedModel.stats ?? versionModel.stats,
     tags: Array.isArray(hydratedModel.tags) ? hydratedModel.tags : versionModel.tags,

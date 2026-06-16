@@ -78,7 +78,7 @@ describe('LibraryView route filters', () => {
       }),
     }))
     vi.doMock('../../src/composables/useAppSettings', () => ({
-      fetchAppSettings: vi.fn().mockResolvedValue({ includeNsfw: false, blurNsfwContent: true }),
+      fetchAppSettings: vi.fn().mockResolvedValue({ includeNsfw: false, blurNsfwModels: true, blurNsfwMediaLevel: 4 }),
     }))
 
     const router = createAppRouter(createMemoryHistory())
@@ -128,7 +128,7 @@ describe('LibraryView route filters', () => {
       }),
     }))
     vi.doMock('../../src/composables/useAppSettings', () => ({
-      fetchAppSettings: vi.fn().mockResolvedValue({ includeNsfw: true, blurNsfwContent: true }),
+      fetchAppSettings: vi.fn().mockResolvedValue({ includeNsfw: true, blurNsfwModels: true, blurNsfwMediaLevel: 4 }),
     }))
 
     const router = createAppRouter(createMemoryHistory())

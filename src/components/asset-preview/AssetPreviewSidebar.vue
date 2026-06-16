@@ -79,7 +79,7 @@ const props = defineProps<{
   activeImageMeta: string
   normalizedImageMetaRows: NormalizedMetaRow[]
   activeImageMetaSource: Record<string, unknown> | null
-  blurNsfwContent?: boolean
+  blurNsfwMediaLevel?: 4 | 8 | 16 | 32 | null
   feedLoading: boolean
   feedLoadingMore: boolean
   feedError: string
@@ -156,10 +156,10 @@ watch(
 
 function tabClasses(tab: SidebarTab) {
   return [
-    'rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition',
+    'inline-flex h-8 items-center justify-center rounded-sm px-2 text-[11px] font-semibold uppercase tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-ring/25',
     activeTab.value === tab
-      ? 'bg-secondary text-secondary-foreground'
-      : 'bg-background text-muted-foreground hover:text-card-foreground',
+      ? 'bg-secondary text-secondary-foreground shadow-sm'
+      : 'text-muted-foreground hover:bg-card hover:text-card-foreground',
   ]
 }
 
@@ -185,59 +185,56 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
   <aside class="min-h-0 overflow-y-auto border-l border-border bg-card p-5">
     <div class="space-y-5">
       <section class="space-y-3">
-        <div class="flex min-w-0 items-start justify-between gap-3">
-          <div class="min-w-0">
-            <div class="flex min-w-0 flex-wrap items-center gap-2">
-              <h2 class="min-w-0 text-lg font-semibold leading-6 text-card-foreground">
-                {{ modalTitle }}
-              </h2>
-              <span
-                v-if="showModelTypeBadge"
-                class="inline-flex h-6 shrink-0 items-center rounded-sm border border-secondary/30 bg-secondary/10 px-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-secondary"
-                data-test="asset-preview-model-type-badge"
+        <div class="min-w-0">
+          <h2 class="min-w-0 text-lg font-semibold leading-6 text-card-foreground">
+            {{ modalTitle }}
+          </h2>
+          <div class="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+            <span
+              v-if="showModelTypeBadge"
+              class="inline-flex h-6 shrink-0 items-center rounded-sm border border-secondary/30 bg-secondary/10 px-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-secondary"
+              data-test="asset-preview-model-type-badge"
+            >
+              {{ modelTypeValue }}
+            </span>
+            <UiTooltip
+              v-if="civitaiModelUrl"
+              content="Open on Civitai"
+            >
+              <a
+                :href="civitaiModelUrl"
+                target="_blank"
+                rel="noreferrer"
+                class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-secondary transition hover:border-secondary hover:text-accent focus:outline-none focus:ring-2 focus:ring-ring/25"
+                :aria-label="`Open ${modalTitle} on Civitai`"
+                data-test="asset-preview-civitai-link"
               >
-                {{ modelTypeValue }}
-              </span>
-            </div>
+                <ExternalLink class="h-3.5 w-3.5" />
+              </a>
+            </UiTooltip>
+            <UiTooltip
+              v-if="atlasConfigured && civitaiModel"
+              content="Open in Atlas"
+            >
+              <button
+                type="button"
+                class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-secondary transition hover:border-secondary hover:text-accent focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
+                :disabled="atlasOpening"
+                :aria-label="`Open ${modalTitle} in Atlas`"
+                data-test="asset-preview-atlas-link"
+                @click="emit('open-atlas-model')"
+              >
+                <Database class="h-3.5 w-3.5" />
+              </button>
+            </UiTooltip>
             <p
               v-if="modalSubtitle"
-              class="mt-1 break-words text-sm text-muted-foreground"
+              class="min-w-0 break-words text-sm text-muted-foreground"
               data-test="asset-preview-modal-subtitle"
             >
               {{ modalSubtitle }}
             </p>
           </div>
-
-          <UiTooltip
-            v-if="civitaiModelUrl"
-            content="Open on Civitai"
-          >
-            <a
-              :href="civitaiModelUrl"
-              target="_blank"
-              rel="noreferrer"
-              class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-secondary transition hover:border-secondary hover:text-accent focus:outline-none focus:ring-2 focus:ring-ring/25"
-              :aria-label="`Open ${modalTitle} on Civitai`"
-              data-test="asset-preview-civitai-link"
-            >
-              <ExternalLink class="h-3.5 w-3.5" />
-            </a>
-          </UiTooltip>
-          <UiTooltip
-            v-if="atlasConfigured && civitaiModel"
-            content="Open in Atlas"
-          >
-            <button
-              type="button"
-              class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-secondary transition hover:border-secondary hover:text-accent focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
-              :disabled="atlasOpening"
-              :aria-label="`Open ${modalTitle} in Atlas`"
-              data-test="asset-preview-atlas-link"
-              @click="emit('open-atlas-model')"
-            >
-              <Database class="h-3.5 w-3.5" />
-            </button>
-          </UiTooltip>
         </div>
 
         <p
@@ -253,13 +250,9 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
         >
           {{ atlasOpenError }}
         </p>
-        <AssetPreviewPreviewRepairAction
-          :download="downloadForVersion(selectedVersion)"
-          :repair-download-previews="repairDownloadPreviews"
-        />
       </section>
 
-      <nav class="flex flex-wrap gap-2 border-t border-border pt-5">
+      <nav class="grid grid-cols-3 rounded-md border border-border bg-background p-1">
         <button type="button" :class="tabClasses('model')" aria-label="Show model details" @click="activeTab = 'model'">
           Model
         </button>
@@ -272,16 +265,19 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
       </nav>
 
       <div v-if="activeTab === 'model'" class="space-y-6">
-        <dl class="grid gap-2 text-xs text-card-foreground">
+        <dl
+          class="overflow-hidden rounded-md border border-border bg-background text-xs text-card-foreground divide-y divide-border/70"
+          data-test="asset-preview-model-detail-group"
+        >
           <div
-            class="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3"
+            class="flex items-center justify-between gap-3 px-3 py-2.5"
             data-test="asset-preview-model-detail-row"
           >
             <dt class="text-muted-foreground">Type</dt>
             <dd class="min-w-0 truncate font-semibold">{{ modelTypeValue }}</dd>
           </div>
           <div
-            class="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3"
+            class="flex items-center justify-between gap-3 px-3 py-2.5"
             data-test="asset-preview-model-detail-row"
           >
             <dt class="text-muted-foreground">Base model</dt>
@@ -290,14 +286,14 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
           <div
             v-for="row in modelIdentifierRows"
             :key="row.label"
-            class="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3"
+            class="flex items-center justify-between gap-3 px-3 py-2.5"
             data-test="asset-preview-model-detail-row"
           >
             <dt class="text-muted-foreground">{{ row.label }}</dt>
             <dd class="min-w-0 truncate font-mono text-xs font-semibold">{{ row.value }}</dd>
           </div>
           <div
-            class="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3"
+            class="flex items-center justify-between gap-3 px-3 py-2.5"
             data-test="asset-preview-model-detail-row"
           >
             <dt class="text-muted-foreground">Creator</dt>
@@ -315,7 +311,7 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
           </div>
           <div
             v-if="civitaiModel?.stats"
-            class="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3"
+            class="flex items-center justify-between gap-3 px-3 py-2.5"
             data-test="asset-preview-model-detail-row"
           >
             <dt class="text-muted-foreground">Stats</dt>
@@ -324,6 +320,11 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
             </dd>
           </div>
         </dl>
+
+        <AssetPreviewPreviewRepairAction
+          :download="downloadForVersion(selectedVersion)"
+          :repair-download-previews="repairDownloadPreviews"
+        />
 
         <AssetPreviewSafetyEditor
           v-if="editableSafety"
@@ -366,7 +367,7 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
           class="space-y-3 border-t border-border pt-5"
         >
           <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">
-            {{ civitaiModel?.type === 'LORA' ? 'LoRA trigger words' : 'Trained words' }}
+            Trigger words
           </p>
           <div class="flex flex-wrap gap-2">
             <span
@@ -405,37 +406,40 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
             </p>
           </div>
 
-          <dl class="grid gap-2 text-sm">
-            <div class="rounded-md border border-border bg-background p-3">
+          <dl
+            class="overflow-hidden rounded-md border border-border bg-background text-sm divide-y divide-border/70"
+            data-test="asset-preview-media-detail-group"
+          >
+            <div class="px-3 py-2.5">
               <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Source</dt>
               <dd class="mt-1 font-semibold text-card-foreground">
                 {{ mediaSourceLabel(activeSlide) }}
               </dd>
             </div>
-            <div class="rounded-md border border-border bg-background p-3">
+            <div class="px-3 py-2.5">
               <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Type</dt>
               <dd class="mt-1 font-semibold text-card-foreground">
                 {{ activeSlide ? mediaKindLabel(activeSlide) : 'Unknown' }}
               </dd>
             </div>
-            <div class="rounded-md border border-border bg-background p-3">
+            <div class="px-3 py-2.5">
               <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Dimensions</dt>
               <dd class="mt-1 font-semibold text-card-foreground">{{ imageDimensions(activeImage) }}</dd>
             </div>
-            <div class="rounded-md border border-border bg-background p-3">
-              <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">NSFW</dt>
+            <div class="px-3 py-2.5">
+              <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">NSFW level</dt>
               <dd class="mt-1 font-semibold text-card-foreground">{{ activeImageSafetyLabel }}</dd>
             </div>
             <div
               v-if="activeImage?.id"
-              class="rounded-md border border-border bg-background p-3"
+              class="px-3 py-2.5"
             >
               <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Image ID</dt>
               <dd class="mt-1 break-all font-mono text-xs text-card-foreground">{{ activeImage.id }}</dd>
             </div>
             <div
               v-if="activeImage?.hash"
-              class="rounded-md border border-border bg-background p-3"
+              class="px-3 py-2.5"
             >
               <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Hash</dt>
               <dd class="mt-1 break-all font-mono text-xs text-card-foreground">{{ activeImage.hash }}</dd>
@@ -471,7 +475,7 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
         :selected-version="selectedVersion"
         :feed-slides="feedSlides"
         :active-slide="activeSlide"
-        :blur-nsfw-content="blurNsfwContent"
+        :blur-nsfw-media-level="blurNsfwMediaLevel"
         :feed-loading="feedLoading"
         :feed-loading-more="feedLoadingMore"
         :feed-error="feedError"

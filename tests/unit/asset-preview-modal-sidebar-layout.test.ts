@@ -91,6 +91,7 @@ describe('AssetPreviewModal sidebar layout', () => {
               id: 201,
               name: 'v1',
               baseModel: 'Pony',
+              trainedWords: ['cyberpunk'],
               files: [{ id: 301, name: 'compact-detail.safetensors', type: 'Model', primary: true }],
               images: [{ url: 'https://example.test/compact.jpg', type: 'image', nsfw: false }],
             },
@@ -109,6 +110,7 @@ describe('AssetPreviewModal sidebar layout', () => {
 
     expect(wrapper.find('[data-test="asset-preview-kind-label"]').exists()).toBe(false)
     expect(wrapper.get('[data-test="asset-preview-model-type-badge"]').text()).toBe('LORA')
+    expect(wrapper.get('[data-test="asset-preview-model-detail-group"]').classes()).toContain('divide-y')
     expect(wrapper.findAll('[data-test="asset-preview-model-detail-row"]').map((row) => [
       row.get('dt').text(),
       row.get('dd').text(),
@@ -121,6 +123,10 @@ describe('AssetPreviewModal sidebar layout', () => {
       ['Creator', 'samplemaker'],
       ['Stats', '1,234 downloads'],
     ])
+    expect(wrapper.text()).toContain('Versions')
+    expect(wrapper.text()).not.toContain('Model versions')
+    expect(wrapper.text()).toContain('Trigger words')
+    expect(wrapper.text()).not.toContain('LoRA trigger words')
     expect(wrapper.text()).toContain('Selected version')
     expect(wrapper.text()).not.toContain('Selected version file')
     expect(wrapper.text()).not.toContain('Downloaded')

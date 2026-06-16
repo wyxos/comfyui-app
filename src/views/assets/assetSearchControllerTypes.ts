@@ -20,7 +20,8 @@ export type AssetSearchState = {
   error: Ref<string>
   hasStoredCivitaiApiKey: Ref<boolean>
   includeNsfw: Ref<boolean>
-  blurNsfwContent: Ref<boolean>
+  blurNsfwModels: Ref<boolean>
+  blurNsfwMediaLevel: Ref<4 | 8 | 16 | 32 | null>
   loading: Ref<boolean>
   modelIdQuery: Ref<string>
   modelVersionIdQuery: Ref<string>

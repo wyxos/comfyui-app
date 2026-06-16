@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { configDir, settingsPath } from './config.mjs'
-import { normalizePlainObject, safeTrim } from './shared.mjs'
+import { NSFW_BLUR_LEVELS, normalizePlainObject, safeTrim } from './shared.mjs'
 
 export async function readSettings() {
   let rawSettings
@@ -124,13 +124,40 @@ export function normalizeBlurNsfwContent(value) {
   return true
 }
 
+export function normalizeBlurNsfwModels(value, legacyValue) {
+  if (value === undefined || value === null) {
+    return normalizeBlurNsfwContent(legacyValue)
+  }
+
+  return normalizeBlurNsfwContent(value)
+}
+
+export function normalizeBlurNsfwMediaLevel(value, legacyValue) {
+  if (value === undefined) {
+    return normalizeBlurNsfwContent(legacyValue) ? 4 : null
+  }
+
+  if (value === null || value === false) {
+    return null
+  }
+
+  const numericValue = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && value.trim()
+      ? Number(value)
+      : Number.NaN
+
+  return NSFW_BLUR_LEVELS.includes(numericValue) ? numericValue : 4
+}
+
 export function serializeAppSettings(settings) {
   const preferences = normalizePlainObject(settings.preferences)
 
   return {
     ok: true,
     includeNsfw: normalizeIncludeNsfw(preferences.includeNsfw),
-    blurNsfwContent: normalizeBlurNsfwContent(preferences.blurNsfwContent),
+    blurNsfwModels: normalizeBlurNsfwModels(preferences.blurNsfwModels, preferences.blurNsfwContent),
+    blurNsfwMediaLevel: normalizeBlurNsfwMediaLevel(preferences.blurNsfwMediaLevel, preferences.blurNsfwContent),
     ...serializeAtlasSettings(settings),
   }
 }
@@ -148,10 +175,14 @@ export async function saveAppSettings(patch) {
     includeNsfw: patch?.includeNsfw === undefined
       ? normalizeIncludeNsfw(preferences.includeNsfw)
       : normalizeIncludeNsfw(patch.includeNsfw),
-    blurNsfwContent: patch?.blurNsfwContent === undefined
-      ? normalizeBlurNsfwContent(preferences.blurNsfwContent)
-      : normalizeBlurNsfwContent(patch.blurNsfwContent),
+    blurNsfwModels: patch?.blurNsfwModels === undefined
+      ? normalizeBlurNsfwModels(preferences.blurNsfwModels, preferences.blurNsfwContent)
+      : normalizeBlurNsfwModels(patch.blurNsfwModels, preferences.blurNsfwContent),
+    blurNsfwMediaLevel: patch?.blurNsfwMediaLevel === undefined
+      ? normalizeBlurNsfwMediaLevel(preferences.blurNsfwMediaLevel, preferences.blurNsfwContent)
+      : normalizeBlurNsfwMediaLevel(patch.blurNsfwMediaLevel, preferences.blurNsfwContent),
   }
+  delete settings.preferences.blurNsfwContent
 
   const nextAtlasUrl = patch?.atlasUrl === undefined
     ? normalizeAtlasUrl(atlasSettings.baseUrl)

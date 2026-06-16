@@ -8,16 +8,18 @@ import {
   isVideoPreview,
   modelHasNsfw,
   modelTypeLabel,
-  previewHasNsfw,
+  previewMatchesNsfwBlurLevel,
   previewFor,
   type LibraryModelItem,
 } from './libraryModelHelpers'
 
 const props = withDefaults(defineProps<{
   item: LibraryModelItem
-  blurNsfwContent?: boolean
+  blurNsfwModels?: boolean
+  blurNsfwMediaLevel?: 4 | 8 | 16 | 32 | null
 }>(), {
-  blurNsfwContent: false,
+  blurNsfwModels: false,
+  blurNsfwMediaLevel: null,
 })
 
 defineEmits<{
@@ -26,11 +28,11 @@ defineEmits<{
 }>()
 
 function shouldBlurNsfwPreview() {
-  return props.blurNsfwContent && previewHasNsfw(props.item)
+  return previewMatchesNsfwBlurLevel(props.item, props.blurNsfwMediaLevel)
 }
 
 function shouldBlurNsfwTitle() {
-  return props.blurNsfwContent && modelHasNsfw(props.item)
+  return props.blurNsfwModels && modelHasNsfw(props.item)
 }
 </script>
 

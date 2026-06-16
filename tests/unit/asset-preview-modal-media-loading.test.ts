@@ -64,7 +64,8 @@ describe('AssetPreviewModal media loading', () => {
       attachTo: document.body,
       props: {
         open: true,
-        blurNsfwContent: true,
+        blurNsfwModels: true,
+        blurNsfwMediaLevel: 4,
         model: {
           id: 101,
           name: 'Safe preview on NSFW model',
@@ -95,7 +96,8 @@ describe('AssetPreviewModal media loading', () => {
       attachTo: document.body,
       props: {
         open: true,
-        blurNsfwContent: true,
+        blurNsfwModels: true,
+        blurNsfwMediaLevel: 4,
         model: {
           id: 101,
           name: 'PG-13 preview model',

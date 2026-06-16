@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 import {
-  imageNsfwDetectedValue,
+  imageMatchesNsfwBlurLevel,
   mediaExtensionFromUrl,
   modelVersionLabel,
 } from './assetPreviewHelpers'
@@ -17,7 +17,7 @@ const props = defineProps<{
   selectedVersion: CivitaiModelVersion | null
   feedSlides: PreviewSlide[]
   activeSlide: PreviewSlide | null
-  blurNsfwContent?: boolean
+  blurNsfwMediaLevel?: 4 | 8 | 16 | 32 | null
   feedLoading: boolean
   feedLoadingMore: boolean
   feedError: string
@@ -98,7 +98,7 @@ function atlasFileUrl(slide: PreviewSlide) {
 }
 
 function feedMediaClass(slide: PreviewSlide) {
-  return props.blurNsfwContent === true && imageNsfwDetectedValue(slide.image) === true
+  return imageMatchesNsfwBlurLevel(slide.image, props.blurNsfwMediaLevel)
     ? 'h-full w-full object-cover blur-sm saturate-50'
     : 'h-full w-full object-cover'
 }

@@ -112,7 +112,7 @@ describe('HomeAssetPickerModal', () => {
     expect(wrapper.emitted('select')).toEqual([['multi-preview.safetensors']])
   })
 
-  it('keeps NSFW models visible when the picker toggle is off', async () => {
+  it('filters NSFW models until the picker toggle is on', async () => {
     const wrapper = mount(HomeAssetPickerModal, {
       attachTo: document.body,
       props: {
@@ -136,11 +136,11 @@ describe('HomeAssetPickerModal', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('2 available assets')
-    expect(wrapper.text()).toContain('1-2 of 2')
+    expect(wrapper.text()).toContain('1 available asset')
+    expect(wrapper.text()).toContain('1-1 of 1')
     expect(wrapper.text()).toContain('SFW LoRA')
-    expect(wrapper.text()).toContain('NSFW LoRA')
-    expect(wrapper.findAll('span').filter((span) => span.text().trim() === 'NSFW')).toHaveLength(1)
+    expect(wrapper.text()).not.toContain('NSFW LoRA')
+    expect(wrapper.findAll('span').filter((span) => span.text().trim() === 'NSFW')).toHaveLength(0)
 
     await wrapper.get('[aria-label="Include NSFW asset picker models"]').setValue(true)
 

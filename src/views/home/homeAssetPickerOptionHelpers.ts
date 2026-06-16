@@ -1,4 +1,4 @@
-import { imageNsfwDetectedValue } from '../../components/asset-preview/assetPreviewHelpers'
+import { imageMatchesNsfwBlurLevel, imageNsfwDetectedValue } from '../../components/asset-preview/assetPreviewHelpers'
 
 export type AssetPickerPreviewMedia = {
   url: string
@@ -159,4 +159,11 @@ export function optionHasVideoPreview(media: AssetPickerPreviewMedia | null | un
 
 export function previewMediaHasNsfw(media: AssetPickerPreviewMedia | null | undefined) {
   return imageNsfwDetectedValue(media) === true
+}
+
+export function previewMediaMatchesNsfwBlurLevel(
+  media: AssetPickerPreviewMedia | null | undefined,
+  blurLevel: 4 | 8 | 16 | 32 | null | undefined,
+) {
+  return imageMatchesNsfwBlurLevel(media, blurLevel)
 }

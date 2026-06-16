@@ -1,4 +1,4 @@
-import { imageNsfwDetectedValue } from '../../components/asset-preview/assetPreviewHelpers'
+import { imageMatchesNsfwBlurLevel, imageNsfwDetectedValue } from '../../components/asset-preview/assetPreviewHelpers'
 import type { AssetDownloadItem, WatchedAssetDownloadItem } from '../../composables/useAssetDownloads'
 
 export type DownloadViewRowItem = Omit<AssetDownloadItem, 'state'> & { state: AssetDownloadItem['state'] | 'watched' }
@@ -68,6 +68,13 @@ export function previewHasNsfw(item: DownloadViewRowItem | null | undefined) {
   return imageNsfwDetectedValue(previewPathForDownload(item)) === true
 }
 
+export function previewMatchesNsfwBlurLevel(
+  item: DownloadViewRowItem | null | undefined,
+  blurLevel: 4 | 8 | 16 | 32 | null | undefined,
+) {
+  return imageMatchesNsfwBlurLevel(previewPathForDownload(item), blurLevel)
+}
+
 export function watchedDownloadToRowItem(item: WatchedAssetDownloadItem): DownloadViewRowItem {
   const previewUrl = watchedPreviewUrl(item)
   const previewPaths = watchedPreviewPaths(item)
@@ -98,6 +105,17 @@ export function itemHasNsfw(item: DownloadViewRowItem) {
   const override = item.modelNsfwOverride ?? item.modelMetadata?.modelNsfwOverride
   if (override !== null && override !== undefined) {
     return isNsfwValue(override)
+  }
+
+  if (item.modelNsfw !== null && item.modelNsfw !== undefined) {
+    return isNsfwValue(item.modelNsfw)
+  }
+
+  const modelMetadata = item.modelMetadata && typeof item.modelMetadata === 'object'
+    ? item.modelMetadata as Record<string, unknown>
+    : null
+  if (modelMetadata?.modelNsfw !== null && modelMetadata?.modelNsfw !== undefined) {
+    return isNsfwValue(modelMetadata.modelNsfw)
   }
 
   return [

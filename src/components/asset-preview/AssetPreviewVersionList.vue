@@ -87,7 +87,7 @@ watch(
   <section class="space-y-3 border-t border-border pt-5">
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0">
-        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">Model versions</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">Versions</p>
       </div>
     </div>
 

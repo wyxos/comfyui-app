@@ -87,7 +87,6 @@ function normalizeModelType(value, fallback) {
 
   return modelType.toLowerCase() === 'lora' ? 'LORA' : modelType
 }
-
 function getVersionCandidates(payload) {
   if (payload?.modelVersion && typeof payload.modelVersion === 'object') {
     return [payload.modelVersion]
@@ -107,7 +106,6 @@ function getVersionCandidates(payload) {
 
   return []
 }
-
 function getVersionPayload(payload) {
   const versions = getVersionCandidates(payload)
   if (!versions.length) {
@@ -148,6 +146,7 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
   const version = getVersionPayload(payload)
   const model = payload.model && typeof payload.model === 'object' ? payload.model : payload
   const currentSafetyImages = [
+    { nsfwLevel: payload.nsfwLevel }, { nsfwLevel: model.nsfwLevel }, { nsfwLevel: version.nsfwLevel },
     ...(Array.isArray(payload.images) ? payload.images : []),
     ...(Array.isArray(payload.previewImages) ? payload.previewImages : []),
     ...(
@@ -201,16 +200,15 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
     trainedWords,
     hashes,
     checkpointNames: normalizeStringList(payload.checkpointNames ?? payload.compatibleCheckpoints),
-    checkpointHashes,
-    compatibleBaseModels,
-    compatibleBaseModelKeys,
-    controlType: safeTrim(payload.controlType ?? payload.control_type ?? payload.metadata?.controlType),
-    loaderType: safeTrim(payload.loaderType ?? payload.loader_type ?? payload.metadata?.loaderType),
-    source,
-    status: options.status ?? 'ready',
+  checkpointHashes,
+  compatibleBaseModels,
+  compatibleBaseModelKeys,
+  controlType: safeTrim(payload.controlType ?? payload.control_type ?? payload.metadata?.controlType),
+  loaderType: safeTrim(payload.loaderType ?? payload.loader_type ?? payload.metadata?.loaderType),
+  source,
+  status: options.status ?? 'ready',
   }
 }
-
 function hasCompatibilityBasis(metadata) {
   return Boolean(
       metadata?.baseModelKey ||
@@ -230,11 +228,13 @@ function civitaiVersionToSidecar(payload, fallback = {}) {
     ? payload.files.find((file) => file?.primary) ?? payload.files[0]
     : null
   const previewImages = normalizeCivitaiPreviewImages(payload?.images)
-  const modelNsfw = imageListNsfwLevelDetectedValue(previewImages)
+  const modelNsfw = imageListNsfwLevelDetectedValue([
+    { nsfwLevel: payload?.model?.nsfwLevel }, { nsfwLevel: payload?.nsfwLevel }, ...previewImages,
+  ])
   const modelId = payload?.modelId ?? payload?.model?.id ?? fallback.modelId
   const modelName = payload?.model?.name ?? fallback.modelName
   const modelType = payload?.model?.type ?? fallback.modelType
-  const modelSafetyMetadata = { id: modelId, name: modelName, type: modelType, nsfw: modelNsfw, safetySchemaVersion: 2 }
+  const modelSafetyMetadata = { id: modelId, name: modelName, type: modelType, nsfw: modelNsfw, nsfwLevel: normalizeNsfwLevel(payload?.model?.nsfwLevel), safetySchemaVersion: 2 }
 
   return {
     source: 'civitai',

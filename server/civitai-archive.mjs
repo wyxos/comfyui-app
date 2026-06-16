@@ -172,7 +172,11 @@ function sidecarToArchiveModel(payload, type, modelName) {
     id: modelId,
     name: safeTrim(payload?.modelName ?? model.name ?? modelMetadata.name ?? modelName),
     type: normalizedType,
-    nsfw: imageListNsfwLevelDetectedValue(archiveImages),
+    nsfw: imageListNsfwLevelDetectedValue([
+      { nsfwLevel: model.nsfwLevel ?? modelMetadata.nsfwLevel },
+      ...archiveImages,
+    ]),
+    nsfwLevel: normalizeNsfwLevel(model.nsfwLevel ?? modelMetadata.nsfwLevel),
     creator: normalizePlainObject(model.creator ?? modelMetadata.creator),
     stats: normalizePlainObject(model.stats ?? modelMetadata.stats),
     tags: Array.isArray(model.tags ?? modelMetadata.tags) ? (model.tags ?? modelMetadata.tags) : [],

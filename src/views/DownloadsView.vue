@@ -69,7 +69,8 @@ const currentPage = ref(1)
 const actionKey = ref('')
 const actionError = ref('')
 const includeNsfw = ref(false)
-const blurNsfwContent = ref(true)
+const blurNsfwModels = ref(true)
+const blurNsfwMediaLevel = ref<4 | 8 | 16 | 32 | null>(4)
 const selectedDownload = ref<DownloadViewRowItem | null>(null)
 const confirm = useConfirmDialog()
 
@@ -221,10 +222,12 @@ async function loadAppSettingsDefaults() {
   try {
     const settings = await fetchAppSettings()
     includeNsfw.value = settings.includeNsfw
-    blurNsfwContent.value = settings.blurNsfwContent !== false
+    blurNsfwModels.value = settings.blurNsfwModels !== false
+    blurNsfwMediaLevel.value = settings.blurNsfwMediaLevel
   } catch {
     includeNsfw.value = false
-    blurNsfwContent.value = true
+    blurNsfwModels.value = true
+    blurNsfwMediaLevel.value = 4
   }
 }
 
@@ -363,7 +366,8 @@ onMounted(() => {
               :key="item.id"
               :item="item"
               :action-key="actionKey"
-              :blur-nsfw-preview="blurNsfwContent"
+              :blur-nsfw-models="blurNsfwModels"
+              :blur-nsfw-media-level="blurNsfwMediaLevel"
               @open-preview="openDownloadPreview"
               @pause="runDownloadAction($event, 'pause', pauseDownload)"
               @resume="runDownloadAction($event, 'resume', resumeDownload)"
@@ -411,7 +415,8 @@ onMounted(() => {
       :preview-url="previewForDownload(selectedDownload)"
       :is-video="isVideoPreviewDownload(selectedDownload)"
       :include-nsfw="includeNsfw"
-      :blur-nsfw-content="blurNsfwContent"
+      :blur-nsfw-models="blurNsfwModels"
+      :blur-nsfw-media-level="blurNsfwMediaLevel"
       :title="selectedDownload?.modelName ?? 'Preview'"
       :subtitle="selectedDownload?.versionName ?? null"
       :kind-label="rowModelTypeLabel(selectedDownload)"
