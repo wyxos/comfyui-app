@@ -14,7 +14,7 @@ async function readBody(request, response) {
   }
 }
 
-async function proxyAtlasRequest(response, pathname, body, { notConfiguredPayload = null } = {}) {
+async function proxyAtlasRequest(response, pathname, body, { method = 'POST', notConfiguredPayload = null } = {}) {
   let atlasSettings
   try {
     atlasSettings = await getStoredAtlasSettings()
@@ -47,7 +47,7 @@ async function proxyAtlasRequest(response, pathname, body, { notConfiguredPayloa
   let atlasResponse
   try {
     atlasResponse = await fetch(atlasEndpoint(atlasSettings.baseUrl, pathname), {
-      method: 'POST',
+      method,
       headers,
       body: JSON.stringify(body ?? {}),
     })
@@ -121,4 +121,20 @@ export async function handleAtlasCivitaiOpenModel(request, response) {
   }
 
   return proxyAtlasRequest(response, '/api/extension/browse-tabs/civitai-model', payload)
+}
+
+export async function handleAtlasFileDelete(request, response, fileId) {
+  const normalizedFileId = Number.parseInt(String(fileId ?? ''), 10)
+  if (!Number.isSafeInteger(normalizedFileId) || normalizedFileId <= 0) {
+    return sendError(response, 400, 'invalid-atlas-file-id', 'fileId must be a positive integer.')
+  }
+
+  const body = await readBody(request, response)
+  if (body === null) {
+    return
+  }
+
+  return proxyAtlasRequest(response, `/api/extension/files/${normalizedFileId}`, body, {
+    method: 'DELETE',
+  })
 }

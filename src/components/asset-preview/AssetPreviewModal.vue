@@ -5,7 +5,7 @@ import AssetPreviewAtlasReactionWidget from './AssetPreviewAtlasReactionWidget.v
 import AssetPreviewMediaStrip from './AssetPreviewMediaStrip.vue'
 import AssetPreviewSidebar from './AssetPreviewSidebar.vue'
 import type { AssetPreviewModalProps } from './assetPreviewTypes'
-import { atlasMediaKey, type AtlasReactionType } from './assetPreviewAtlasMedia'
+import { atlasFileUrlForStatus, atlasMediaKey, type AtlasReactionType } from './assetPreviewAtlasMedia'
 import { useAssetPreviewModal } from './useAssetPreviewModal'
 import UiPreloadedMedia from '../ui/UiPreloadedMedia.vue'
 
@@ -80,6 +80,8 @@ const {
   feedLoadingMore,
   feedError,
   atlasActionError,
+  atlasBaseUrl,
+  atlasDeletePendingKey,
   atlasReactionPendingKey,
   atlasConfigured,
   atlasOpenError,
@@ -116,8 +118,11 @@ const {
   selectPreviewImage,
   selectFeedImage,
   loadMoreFeed,
+  retryFeed,
   reactToFeedImage,
   reactToActiveImage,
+  deleteFeedAtlasImage,
+  deleteActiveAtlasImage,
   handleModalMediaReady,
   downloadForVersion,
   downloadStatusLabel,
@@ -144,9 +149,24 @@ function activeAtlasPending() {
   return image ? atlasReactionPendingKey.value === atlasMediaKey(image) : false
 }
 
+function activeAtlasDeleting() {
+  const image = activeSlide.value?.image
+  return image ? atlasDeletePendingKey.value === atlasMediaKey(image) : false
+}
+
+function activeAtlasFileUrl() {
+  return atlasFileUrlForStatus(activeAtlasStatus(), atlasBaseUrl.value)
+}
+
 function handleActiveAtlasReaction(type: AtlasReactionType) {
   if (canReactToActiveAtlasImage()) {
     void reactToActiveImage(type)
+  }
+}
+
+function handleActiveAtlasDelete() {
+  if (canReactToActiveAtlasImage()) {
+    void deleteActiveAtlasImage()
   }
 }
 
@@ -242,7 +262,7 @@ function handleMainMediaAuxClick(event: MouseEvent) {
         <ChevronLeft class="h-6 w-6" />
       </button>
 
-      <div class="flex h-full min-h-0 items-center justify-center p-6 pb-28 pt-20">
+      <div class="flex h-full min-h-0 items-center justify-center p-6 pb-36 pt-20 sm:pb-40">
         <div
           v-if="mediaLoading || civitaiLoading"
           class="absolute inset-0 z-10 flex items-center justify-center bg-background/55 text-sm font-semibold text-foreground backdrop-blur-sm"
@@ -281,9 +301,13 @@ function handleMainMediaAuxClick(event: MouseEvent) {
           <AssetPreviewAtlasReactionWidget
             v-if="canReactToActiveAtlasImage()"
             data-test="asset-preview-main-atlas-reactions"
+            class="relative z-30"
             :status="activeAtlasStatus()"
             :pending="activeAtlasPending()"
+            :deleting="activeAtlasDeleting()"
+            :atlas-file-url="activeAtlasFileUrl()"
             @react="handleActiveAtlasReaction"
+            @delete="handleActiveAtlasDelete"
           />
         </div>
         <div
@@ -356,7 +380,9 @@ function handleMainMediaAuxClick(event: MouseEvent) {
       :feed-loading="feedLoading"
       :feed-loading-more="feedLoadingMore"
       :feed-error="feedError"
+      :atlas-base-url="atlasBaseUrl"
       :atlas-action-error="atlasActionError"
+      :atlas-delete-pending-key="atlasDeletePendingKey"
       :atlas-reaction-pending-key="atlasReactionPendingKey"
       :can-load-more-feed="canLoadMoreFeed"
       :apply-generation-metadata="props.applyGenerationMetadata"
@@ -377,7 +403,9 @@ function handleMainMediaAuxClick(event: MouseEvent) {
       @select-preview="selectPreviewImage"
       @select-feed-preview="selectFeedImage"
       @load-more-feed="loadMoreFeed"
+      @retry-feed="retryFeed"
       @atlas-react-feed-preview="reactToFeedImage"
+      @atlas-delete-feed-preview="deleteFeedAtlasImage"
       @open-atlas-model="openAtlasModelTab"
       @request-image-metadata="loadActiveImageDetails"
       @close="close"

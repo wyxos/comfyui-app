@@ -53,6 +53,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
   const modelVersions = computed(() => sortModelVersions(civitaiModel.value?.modelVersions ?? []))
   const selectedVersion = computed(() => selectedVersionFor(modelVersions, activeVersionId))
   const {
+    atlasBaseUrl,
     atlasConfigured,
     atlasOpenError,
     atlasOpening,
@@ -69,6 +70,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     feedLoadingMore,
     feedError,
     atlasActionError,
+    atlasDeletePendingKey,
     atlasReactionPendingKey,
     canLoadMoreFeed,
     feedSlides,
@@ -77,8 +79,11 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     selectPreviewImage,
     selectFeedImage,
     loadMoreFeed,
+    retryFeed,
     reactToFeedImage,
     reactToActiveImage,
+    deleteFeedAtlasImage,
+    deleteActiveAtlasImage,
   } = useAssetPreviewMediaFeed({
     open: computed(() => props.open),
     model: civitaiModel,
@@ -418,6 +423,8 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     feedLoadingMore,
     feedError,
     atlasActionError,
+    atlasBaseUrl,
+    atlasDeletePendingKey,
     atlasReactionPendingKey,
     atlasConfigured,
     atlasOpenError,
@@ -451,8 +458,11 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     selectPreviewImage,
     selectFeedImage,
     loadMoreFeed,
+    retryFeed,
     reactToFeedImage,
     reactToActiveImage,
+    deleteFeedAtlasImage,
+    deleteActiveAtlasImage,
     handleModalMediaReady,
     downloadForVersion,
     downloadStatusLabel,

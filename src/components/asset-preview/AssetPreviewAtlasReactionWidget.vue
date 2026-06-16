@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Ban, Heart, Smile, ThumbsUp } from 'lucide-vue-next'
+import { Ban, ExternalLink, Heart, LoaderCircle, Smile, ThumbsUp, Trash2 } from 'lucide-vue-next'
 
 import type { AtlasMediaStatus } from './assetPreviewTypes'
 import type { AtlasReactionType } from './assetPreviewAtlasMedia'
@@ -7,15 +7,20 @@ import type { AtlasReactionType } from './assetPreviewAtlasMedia'
 const props = withDefaults(defineProps<{
   status?: AtlasMediaStatus | null
   pending?: boolean
+  deleting?: boolean
+  atlasFileUrl?: string
   compact?: boolean
 }>(), {
   status: null,
   pending: false,
+  deleting: false,
+  atlasFileUrl: '',
   compact: false,
 })
 
 const emit = defineEmits<{
   react: [type: AtlasReactionType]
+  delete: []
 }>()
 
 const reactions: Array<{
@@ -69,11 +74,22 @@ function handleClick(type: AtlasReactionType, event: MouseEvent) {
     ;(event.currentTarget as HTMLButtonElement | null)?.blur()
   }
 }
+
+function canDeleteFile() {
+  return props.status?.exists === true && Boolean(props.status.file_id)
+}
+
+function handleDeleteClick(event: MouseEvent) {
+  emit('delete')
+  if (event.detail > 0) {
+    ;(event.currentTarget as HTMLButtonElement | null)?.blur()
+  }
+}
 </script>
 
 <template>
   <div
-    class="inline-flex items-center justify-center rounded-md border border-border bg-card/95 shadow-sm"
+    class="inline-flex flex-wrap items-center justify-center rounded-md border border-border bg-card/95 shadow-sm"
     :class="compact ? 'gap-1 p-1' : 'gap-1.5 p-1.5'"
     @click.stop
     @dblclick.stop
@@ -93,11 +109,45 @@ function handleClick(type: AtlasReactionType, event: MouseEvent) {
       ]"
       :aria-label="reaction.label"
       :aria-pressed="isActive(reaction.type)"
-      :disabled="pending"
+      :disabled="pending || deleting"
       @click="handleClick(reaction.type, $event)"
     >
       <component
         :is="reaction.icon"
+        :class="compact ? 'h-3.5 w-3.5' : 'h-4 w-4'"
+      />
+    </button>
+    <a
+      v-if="atlasFileUrl"
+      :href="atlasFileUrl"
+      target="_blank"
+      rel="noreferrer"
+      class="inline-flex items-center justify-center rounded-md border border-transparent text-muted-foreground transition hover:border-secondary hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25"
+      :class="compact ? 'h-7 w-7' : 'h-8 w-8'"
+      aria-label="Open file in Atlas"
+      title="Open file in Atlas"
+      @click.stop
+      @mousedown.stop
+      @dblclick.stop
+    >
+      <ExternalLink :class="compact ? 'h-3.5 w-3.5' : 'h-4 w-4'" />
+    </a>
+    <button
+      v-if="canDeleteFile()"
+      type="button"
+      class="inline-flex items-center justify-center rounded-md border border-transparent text-muted-foreground transition hover:border-destructive hover:text-destructive focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-65"
+      :class="compact ? 'h-7 w-7' : 'h-8 w-8'"
+      :disabled="pending || deleting"
+      aria-label="Delete downloaded file from Atlas"
+      title="Delete downloaded file from Atlas"
+      @click="handleDeleteClick"
+    >
+      <LoaderCircle
+        v-if="deleting"
+        :class="compact ? 'h-3.5 w-3.5 animate-spin' : 'h-4 w-4 animate-spin'"
+      />
+      <Trash2
+        v-else
         :class="compact ? 'h-3.5 w-3.5' : 'h-4 w-4'"
       />
     </button>

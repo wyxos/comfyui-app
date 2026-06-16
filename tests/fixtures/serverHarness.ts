@@ -296,6 +296,15 @@ export async function createServerHarness(options: HarnessOptions = {}) {
       if (url.pathname === '/api/extension/browse-tabs/civitai-model' && method === 'POST') {
         return jsonResponse(upstream.atlasOpenModel)
       }
+
+      const atlasFileDeleteMatch = url.pathname.match(/^\/api\/extension\/files\/(\d+)$/)
+      if (atlasFileDeleteMatch && method === 'DELETE') {
+        return jsonResponse({
+          ok: true,
+          deleted: true,
+          file_id: Number.parseInt(atlasFileDeleteMatch[1], 10),
+        })
+      }
     }
 
     return jsonResponse({ ok: false, message: `Unhandled upstream ${method} ${url.href}` }, 500)

@@ -80,7 +80,9 @@ const props = defineProps<{
   feedLoading: boolean
   feedLoadingMore: boolean
   feedError: string
+  atlasBaseUrl: string
   atlasActionError: string
+  atlasDeletePendingKey: string
   atlasReactionPendingKey: string
   canLoadMoreFeed: boolean
   applyGenerationMetadata?: (metadata: Record<string, unknown>) => void | Promise<void>
@@ -104,7 +106,9 @@ const emit = defineEmits<{
   'select-preview': [index: number]
   'select-feed-preview': [index: number]
   'load-more-feed': []
+  'retry-feed': []
   'atlas-react-feed-preview': [index: number, type?: AtlasReactionType]
+  'atlas-delete-feed-preview': [index: number]
   'open-atlas-model': []
   'request-image-metadata': []
   close: []
@@ -454,14 +458,18 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
         :feed-loading="feedLoading"
         :feed-loading-more="feedLoadingMore"
         :feed-error="feedError"
+        :atlas-base-url="atlasBaseUrl"
         :atlas-action-error="atlasActionError"
+        :atlas-delete-pending-key="atlasDeletePendingKey"
         :atlas-reaction-pending-key="atlasReactionPendingKey"
         :atlas-configured="atlasConfigured"
         :can-load-more-feed="canLoadMoreFeed"
         @select-version="emit('select-version', $event)"
         @select-feed-preview="emit('select-feed-preview', $event)"
         @load-more="emit('load-more-feed')"
+        @retry="emit('retry-feed')"
         @atlas-react="(index, type) => emit('atlas-react-feed-preview', index, type)"
+        @atlas-delete="(index) => emit('atlas-delete-feed-preview', index)"
       />
     </div>
   </aside>

@@ -1,9 +1,11 @@
 import { ref, type ComputedRef } from 'vue'
 
 import {
+  type AtlasFileDeleteResponse,
   atlasItemFor,
   atlasMediaKey,
   atlasRequestId,
+  statusFromFileDeletePayload,
   statusFromReactionPayload,
   type AtlasReactionResponse,
   type AtlasReactionType,
@@ -32,6 +34,7 @@ function canSendToAtlas(image: CivitaiImage) {
 export function useAssetPreviewAtlasMediaActions(options: UseAssetPreviewAtlasMediaActionsOptions) {
   const atlasActionError = ref('')
   const atlasReactionPendingKey = ref('')
+  const atlasDeletePendingKey = ref('')
   const atlasConfigured = ref(false)
 
   async function fetchAtlasStatuses(
@@ -135,10 +138,54 @@ export function useAssetPreviewAtlasMediaActions(options: UseAssetPreviewAtlasMe
     }
   }
 
+  async function deleteAtlasFile(image: CivitaiImage) {
+    const fileId = image.atlasStatus?.file_id
+    if (!fileId || !Number.isFinite(fileId)) {
+      return null
+    }
+
+    const key = atlasMediaKey(image)
+    atlasDeletePendingKey.value = key
+    atlasActionError.value = ''
+
+    try {
+      const response = await fetch(`/api/atlas/files/${fileId}`, {
+        method: 'DELETE',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+        body: JSON.stringify({
+          also_from_disk: true,
+          also_delete_record: true,
+        }),
+      })
+
+      const payload = (await response.json().catch(() => null)) as AtlasFileDeleteResponse | null
+      if (!response.ok) {
+        throw new Error(payload?.message ?? `Atlas returned ${response.status}`)
+      }
+
+      return {
+        key,
+        status: statusFromFileDeletePayload(image.atlasStatus),
+      }
+    } catch (caughtError) {
+      atlasActionError.value = caughtError instanceof Error ? caughtError.message : 'Atlas file delete failed.'
+      return null
+    } finally {
+      if (atlasDeletePendingKey.value === key) {
+        atlasDeletePendingKey.value = ''
+      }
+    }
+  }
+
   return {
     atlasActionError,
     atlasConfigured,
+    atlasDeletePendingKey,
     atlasReactionPendingKey,
+    deleteAtlasFile,
     fetchAtlasStatuses,
     reactToAtlasImage,
   }

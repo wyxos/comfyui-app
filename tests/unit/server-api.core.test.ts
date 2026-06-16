@@ -183,6 +183,23 @@ describe('companion server API routes', () => {
         model_version_id: 201,
       })
 
+      await expect(server.json('DELETE', '/api/atlas/files/88', {
+        also_from_disk: true,
+        also_delete_record: true,
+      })).resolves.toMatchObject({
+        payload: expect.objectContaining({
+          configured: true,
+          deleted: true,
+          file_id: 88,
+        }),
+      })
+      const atlasDeleteCall = server.calls.find((call) => call.url.origin === 'https://atlas.test' && call.url.pathname === '/api/extension/files/88')
+      expect(atlasDeleteCall?.method).toBe('DELETE')
+      expect(atlasDeleteCall?.body).toMatchObject({
+        also_from_disk: true,
+        also_delete_record: true,
+      })
+
       await expect(server.json('DELETE', '/api/settings/civitai')).resolves.toMatchObject({
         payload: expect.objectContaining({
           ok: true,

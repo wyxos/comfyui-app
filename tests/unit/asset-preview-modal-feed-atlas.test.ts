@@ -283,6 +283,71 @@ describe('AssetPreviewModal feed and Atlas integration', () => {
     expect(wrapper.findAll('[data-test="asset-preview-feed-atlas-badge"]').map((badge) => badge.text())).toContain('Reacted')
   })
 
+  it('shows a retry action and upstream detail when a feed request fails', async () => {
+    let feedRequestCount = 0
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), 'http://127.0.0.1')
+      if (url.pathname === '/api/civitai/images') {
+        feedRequestCount += 1
+        if (feedRequestCount === 1) {
+          return new Response(JSON.stringify({
+            ok: false,
+            message: 'Civitai returned 503.',
+            details: { error: 'Image search is temporarily overloaded - please retry.' },
+          }), { status: 502, headers: { 'Content-Type': 'application/json' } })
+        }
+
+        return new Response(JSON.stringify({
+          items: [{ id: 903, url: 'https://example.test/feed-after-retry.jpg', type: 'image', nsfw: false }],
+          metadata: { nextCursor: null },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+
+      return new Response(JSON.stringify({ ok: true, includeNsfw: false, atlasConfigured: false }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
+    const wrapper = mount(AssetPreviewModal, {
+      attachTo: document.body,
+      global: {
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
+      },
+      props: {
+        open: true,
+        model: {
+          id: 101,
+          name: 'Retry feed model',
+          type: 'Checkpoint',
+          modelVersions: [
+            {
+              id: 201,
+              name: 'Latest version',
+              baseModel: 'Illustrious',
+              images: [{ url: 'https://example.test/fallback-1.jpg', type: 'image', nsfw: false }],
+            },
+          ],
+        },
+      },
+    })
+
+    await flushPromises()
+    await wrapper.get('button[aria-label="Show feed"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Civitai returned 503. Image search is temporarily overloaded - please retry.')
+    await wrapper.get('[data-test="asset-preview-feed-retry"]').trigger('click')
+    await flushPromises()
+
+    expect(feedRequestCount).toBe(2)
+    expect(wrapper.findAll('[data-test="asset-preview-feed-item"]')).toHaveLength(1)
+  })
+
   it('shows the Atlas open action when Atlas is configured even if the feed has no status items', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input), 'http://127.0.0.1')

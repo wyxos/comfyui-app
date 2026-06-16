@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { renderCompanionApp } from './appFlowTestUtils'
-import { createMockDownload, createMockJob } from '../fixtures/mockApi'
+import { createMockDownload, createMockJob, createMockModel } from '../fixtures/mockApi'
 
 describe('companion app e2e flows', () => {
   it('navigates all user-visible routes and reference pages', async () => {
@@ -236,10 +236,34 @@ describe('companion app e2e flows', () => {
         finishedAt: now - index,
         updatedAt: now - index,
         previewUrl: `/api/view?filename=library-${suffix}.png`,
+        ...(displayNumber === 1
+          ? {
+              civitaiModel: createMockModel({
+                id: 1001,
+                name: 'Library model 01',
+                type: modelType,
+                modelVersions: [
+                  {
+                    id: 2001,
+                    name: 'v1',
+                    baseModel: 'Illustrious',
+                    images: [
+                      {
+                        id: 9901,
+                        url: 'https://example.test/library-modal-preview.jpg',
+                        type: 'image',
+                        nsfw: true,
+                      },
+                    ],
+                  },
+                ],
+              }),
+            }
+          : {}),
       })
     })
 
-    const { screen } = await renderCompanionApp('/library', { downloads })
+    const { api, screen } = await renderCompanionApp('/library', { downloads })
 
     await expect.element(screen.getByRole('heading', { name: 'Library', exact: true })).toBeVisible()
 
@@ -258,6 +282,14 @@ describe('companion app e2e flows', () => {
     firstLibraryCard?.click()
     await vi.waitFor(() => {
       expect(document.querySelector('[role="dialog"][aria-label$="image preview"]')).not.toBeNull()
+    })
+    await vi.waitFor(() => {
+      expect(api.calls.some((call) =>
+        call.path === '/api/civitai/images' &&
+        call.search.get('modelId') === '1001' &&
+        call.search.get('modelVersionId') === '2001' &&
+        call.search.get('nsfw') === 'true',
+      )).toBe(true)
     })
     document.querySelector<HTMLButtonElement>('button[aria-label="Close image preview"]')?.click()
 

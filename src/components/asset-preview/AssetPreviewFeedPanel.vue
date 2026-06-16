@@ -7,7 +7,7 @@ import {
   modelVersionLabel,
 } from './assetPreviewHelpers'
 import AssetPreviewAtlasReactionWidget from './AssetPreviewAtlasReactionWidget.vue'
-import { atlasMediaKey, type AtlasReactionType } from './assetPreviewAtlasMedia'
+import { atlasFileUrlForStatus, atlasMediaKey, type AtlasReactionType } from './assetPreviewAtlasMedia'
 import type { CivitaiModelVersion, PreviewSlide } from './assetPreviewTypes'
 import UiPreloadedMedia from '../ui/UiPreloadedMedia.vue'
 import UiSelect from '../ui/UiSelect.vue'
@@ -21,7 +21,9 @@ const props = defineProps<{
   feedLoading: boolean
   feedLoadingMore: boolean
   feedError: string
+  atlasBaseUrl: string
   atlasActionError: string
+  atlasDeletePendingKey: string
   atlasReactionPendingKey: string
   atlasConfigured: boolean
   canLoadMoreFeed: boolean
@@ -31,7 +33,9 @@ const emit = defineEmits<{
   'select-version': [version: CivitaiModelVersion]
   'select-feed-preview': [index: number]
   'load-more': []
+  retry: []
   'atlas-react': [index: number, type: AtlasReactionType]
+  'atlas-delete': [index: number]
 }>()
 
 const selectedVersionId = computed(() => props.selectedVersion ? String(props.selectedVersion.id) : '')
@@ -85,6 +89,14 @@ function isAtlasPending(slide: PreviewSlide) {
   return slide.image ? props.atlasReactionPendingKey === atlasMediaKey(slide.image) : false
 }
 
+function isAtlasDeletePending(slide: PreviewSlide) {
+  return slide.image ? props.atlasDeletePendingKey === atlasMediaKey(slide.image) : false
+}
+
+function atlasFileUrl(slide: PreviewSlide) {
+  return atlasFileUrlForStatus(slide.image?.atlasStatus, props.atlasBaseUrl)
+}
+
 function feedMediaClass(slide: PreviewSlide) {
   return props.blurNsfwContent === true && imageNsfwDetectedValue(slide.image) === true
     ? 'h-full w-full object-cover blur-sm saturate-50'
@@ -102,6 +114,13 @@ function reactToSlide(index: number, type: AtlasReactionType) {
   const slide = props.feedSlides[index]
   if (slide && canReactInAtlas(slide)) {
     emit('atlas-react', index, type)
+  }
+}
+
+function deleteSlide(index: number) {
+  const slide = props.feedSlides[index]
+  if (slide && canReactInAtlas(slide)) {
+    emit('atlas-delete', index)
   }
 }
 
@@ -168,12 +187,21 @@ function handleFeedAuxClick(event: MouseEvent, slide: PreviewSlide) {
       </p>
     </div>
 
-    <p
+    <div
       v-if="feedError"
-      class="rounded-md border border-destructive/35 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive"
+      class="space-y-2 rounded-md border border-destructive/35 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive"
     >
-      {{ feedError }}
-    </p>
+      <p>{{ feedError }}</p>
+      <button
+        type="button"
+        data-test="asset-preview-feed-retry"
+        class="inline-flex h-8 items-center justify-center rounded-md border border-destructive/35 bg-background px-3 text-xs font-semibold text-card-foreground transition hover:border-secondary/60 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-wait disabled:opacity-60"
+        :disabled="feedLoading || feedLoadingMore"
+        @click="emit('retry')"
+      >
+        Retry
+      </button>
+    </div>
     <p
       v-if="atlasActionError"
       class="rounded-md border border-destructive/35 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive"
@@ -250,8 +278,11 @@ function handleFeedAuxClick(event: MouseEvent, slide: PreviewSlide) {
             class="w-full"
             :status="slide.image?.atlasStatus ?? null"
             :pending="isAtlasPending(slide)"
+            :deleting="isAtlasDeletePending(slide)"
+            :atlas-file-url="atlasFileUrl(slide)"
             compact
             @react="(type) => reactToSlide(index, type)"
+            @delete="deleteSlide(index)"
           />
         </div>
       </div>
@@ -269,7 +300,7 @@ function handleFeedAuxClick(event: MouseEvent, slide: PreviewSlide) {
     </div>
 
     <div
-      v-else
+      v-else-if="!feedError"
       class="rounded-md border border-border bg-background px-3 py-4 text-sm font-semibold text-muted-foreground"
     >
       No feed media available for this model version.

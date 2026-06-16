@@ -12,6 +12,7 @@ type UseAssetPreviewAtlasOptions = {
 
 export function useAssetPreviewAtlas(options: UseAssetPreviewAtlasOptions) {
   const atlasConfigured = ref(false)
+  const atlasBaseUrl = ref('')
   const atlasOpenError = ref('')
   const atlasOpening = ref(false)
 
@@ -25,10 +26,12 @@ export function useAssetPreviewAtlas(options: UseAssetPreviewAtlasOptions) {
       const settings = await fetchAppSettings()
       if (settingsToken === requestToken && options.open.value) {
         atlasConfigured.value = settings.atlasConfigured
+        atlasBaseUrl.value = settings.atlasUrl
       }
     } catch {
       if (settingsToken === requestToken && options.open.value) {
         atlasConfigured.value = false
+        atlasBaseUrl.value = ''
       }
     }
   }
@@ -80,10 +83,12 @@ export function useAssetPreviewAtlas(options: UseAssetPreviewAtlasOptions) {
 
       if (!isOpen) {
         atlasConfigured.value = false
+        atlasBaseUrl.value = ''
         return
       }
 
       atlasConfigured.value = false
+      atlasBaseUrl.value = ''
       void loadAtlasSettings()
     },
     { immediate: true },
@@ -94,6 +99,7 @@ export function useAssetPreviewAtlas(options: UseAssetPreviewAtlasOptions) {
   })
 
   return {
+    atlasBaseUrl,
     atlasConfigured,
     atlasOpenError,
     atlasOpening,

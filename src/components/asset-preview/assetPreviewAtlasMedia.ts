@@ -17,8 +17,16 @@ export type AtlasReactionResponse = {
   reaction?: {
     type?: string | null
   } | null
+  reacted_at?: string | null
   download?: AtlasMediaStatus['download']
   blacklisted_at?: string | null
+  message?: string
+}
+
+export type AtlasFileDeleteResponse = {
+  configured?: boolean
+  deleted?: boolean
+  file_id?: number | null
   message?: string
 }
 
@@ -32,6 +40,25 @@ export function atlasMediaKey(image: CivitaiImage) {
   }
 
   return `url:${image.url ?? ''}`
+}
+
+export function atlasImagesShareIdentity(left: CivitaiImage, right: CivitaiImage) {
+  if (atlasMediaKey(left) === atlasMediaKey(right)) {
+    return true
+  }
+
+  const leftUrl = typeof left.url === 'string' ? left.url.trim() : ''
+  const rightUrl = typeof right.url === 'string' ? right.url.trim() : ''
+  return leftUrl !== '' && rightUrl !== '' && leftUrl === rightUrl
+}
+
+export function atlasFileUrlForStatus(status: AtlasMediaStatus | null | undefined, atlasBaseUrl: string | null | undefined) {
+  const baseUrl = typeof atlasBaseUrl === 'string' ? atlasBaseUrl.trim().replace(/\/+$/, '') : ''
+  if (!baseUrl || !status?.file_id || (status.downloaded !== true && !status.downloaded_at)) {
+    return ''
+  }
+
+  return `${baseUrl}/browse/file/${status.file_id}`
 }
 
 function atlasResourceType(modelType: string | null | undefined) {
@@ -95,9 +122,31 @@ export function statusFromReactionPayload(
     file_id: payload?.file?.id ?? currentStatus?.file_id ?? null,
     reaction: isBlacklist ? currentStatus?.reaction ?? null : payload?.reaction?.type ?? type,
     downloaded: currentStatus?.downloaded === true || Boolean(payload?.download?.downloaded_at),
+    downloaded_at: payload?.download?.downloaded_at ?? currentStatus?.downloaded_at ?? null,
     blacklisted: isBlacklist || currentStatus?.blacklisted === true,
     blacklisted_at: isBlacklist ? blacklistedAt ?? new Date().toISOString() : blacklistedAt,
+    reacted_at: payload?.reacted_at ?? currentStatus?.reacted_at ?? null,
     download: payload?.download ?? currentStatus?.download ?? null,
+    filtered: false,
+    ignored: false,
+  }
+}
+
+export function statusFromFileDeletePayload(
+  currentStatus: AtlasMediaStatus | null | undefined,
+): AtlasMediaStatus {
+  return {
+    ...(currentStatus ?? {}),
+    exists: false,
+    file_id: null,
+    downloaded: false,
+    downloaded_at: null,
+    reaction: null,
+    reacted_at: null,
+    blacklisted: false,
+    blacklisted_at: null,
+    auto_blacklisted: false,
+    download: null,
     filtered: false,
     ignored: false,
   }
