@@ -258,11 +258,16 @@ export async function handleDownloadGalleryPreview(downloadId, index, response) 
   const download = civitaiDownloads.get(downloadId)
   const previewIndex = parseInteger(index)
   const preview = previewIndex === null ? null : download?.previewPaths?.[previewIndex]
-  if (!preview?.path || !(await statFileIfExists(preview.path))) {
+  const previewPath = preview?.path && (await statFileIfExists(preview.path))
+    ? preview.path
+    : previewIndex === 0 && download?.previewPath && (await statFileIfExists(download.previewPath))
+      ? download.previewPath
+      : null
+  if (!previewPath) {
     return sendError(response, 404, 'preview-not-found', 'Download preview was not found.')
   }
 
-  return streamFile(response, preview.path)
+  return streamFile(response, previewPath)
 }
 
 export async function handleRepairDownloadPreviews(response) {

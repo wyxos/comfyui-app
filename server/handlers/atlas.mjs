@@ -102,6 +102,40 @@ export async function handleAtlasCivitaiReaction(request, response) {
   return proxyAtlasRequest(response, '/api/extension/civitai/reactions', body)
 }
 
+export async function handleAtlasCivitaiFeed(request, response) {
+  const body = await readBody(request, response)
+  if (body === null) {
+    return
+  }
+
+  const modelId = Number.parseInt(String(body.modelId ?? body.model_id ?? ''), 10)
+  const modelVersionId = Number.parseInt(String(body.modelVersionId ?? body.model_version_id ?? ''), 10)
+  const limit = Number.parseInt(String(body.limit ?? 20), 10)
+  const cursor = typeof body.cursor === 'string' ? body.cursor.trim() : ''
+  const sort = typeof body.sort === 'string' && body.sort.trim() ? body.sort.trim() : 'Newest'
+
+  if (!Number.isSafeInteger(modelId) || modelId <= 0) {
+    return sendError(response, 400, 'invalid-atlas-feed-model-id', 'modelId must be a positive integer.')
+  }
+
+  if (body.modelVersionId !== undefined && body.modelVersionId !== null && body.modelVersionId !== ''
+    && (!Number.isSafeInteger(modelVersionId) || modelVersionId <= 0)) {
+    return sendError(response, 400, 'invalid-atlas-feed-version-id', 'modelVersionId must be a positive integer.')
+  }
+
+  const payload = {
+    model_id: modelId,
+    sort,
+    limit: Number.isSafeInteger(limit) && limit > 0 ? Math.min(limit, 200) : 20,
+    ...(Number.isSafeInteger(modelVersionId) && modelVersionId > 0 ? { model_version_id: modelVersionId } : {}),
+    ...(typeof body.modelType === 'string' && body.modelType.trim() ? { model_type: body.modelType.trim() } : {}),
+    ...(body.nsfw === true ? { nsfw: true } : {}),
+    ...(cursor ? { cursor } : {}),
+  }
+
+  return proxyAtlasRequest(response, '/api/extension/civitai/feed', payload)
+}
+
 export async function handleAtlasCivitaiOpenModel(request, response) {
   const body = await readBody(request, response)
   if (body === null) {

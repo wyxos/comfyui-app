@@ -210,6 +210,16 @@ describe('companion server API routes', () => {
           finishedAt: 2,
           progressPercent: 100,
         }),
+        downloadItem('legacy-preview', 'complete', {
+          targetPath: join(server.loraDir, 'complete.safetensors'),
+          previewPath,
+          previewPaths: [
+            {
+              path: join(server.root, 'missing-gallery-preview.png'),
+              url: '/api/civitai/downloads/legacy-preview/previews/0',
+            },
+          ],
+        }),
         downloadItem('error', 'error', {
           error: 'Network failed',
         }),
@@ -221,7 +231,7 @@ describe('companion server API routes', () => {
           ok: true,
           counts: expect.objectContaining({
             paused: 1,
-            complete: 1,
+            complete: 2,
             error: 1,
           }),
         }),
@@ -253,6 +263,10 @@ describe('companion server API routes', () => {
       await expect(server.request('/api/civitai/downloads/complete/previews/0')).resolves.toMatchObject({
         response: expect.objectContaining({ status: 200 }),
         payload: 'gallery preview',
+      })
+      await expect(server.request('/api/civitai/downloads/legacy-preview/previews/0')).resolves.toMatchObject({
+        response: expect.objectContaining({ status: 200 }),
+        payload: 'download preview',
       })
       await expect(server.request('/api/civitai/downloads/complete/previews/not-a-number')).resolves.toMatchObject({
         response: expect.objectContaining({ status: 404 }),

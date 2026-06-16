@@ -13,7 +13,7 @@ import {
   parseRequestBody,
 } from './mockApiData'
 import type { FetchCall, MockApiOptions, MockDownload, MockJob, MockModel } from './mockApiData'
-import { createMockSettingsApiState, handleMockSettingsApi } from './mockSettingsApi'
+import { createMockSettingsApiState, handleMockSettingsApi, isMockAtlasConfigured } from './mockSettingsApi'
 import { handleMockWatchedDownloads } from './mockWatchedDownloads'
 import { installMockDownloadEventsSocket } from './mockDownloadEventsSocket'
 
@@ -322,6 +322,14 @@ export function installMockApi(options: MockApiOptions = {}) {
     const settingsResponse = handleMockSettingsApi(settingsState, url.pathname, method, body)
     if (settingsResponse) {
       return settingsResponse
+    }
+
+    if (url.pathname === '/api/atlas/civitai/feed' && method === 'POST') {
+      if (!isMockAtlasConfigured(settingsState)) {
+        return jsonResponse({ ok: false, error: 'atlas-not-configured', message: 'Atlas integration is not configured.' }, 409)
+      }
+
+      return jsonResponse({ ok: true, configured: true, items: modelImages(models), metadata: { nextCursor: null } })
     }
 
     if (url.pathname === '/api/civitai/models' && method === 'GET') {

@@ -16,12 +16,8 @@ function installLocalStorageStub() {
     setItem: vi.fn((key: string, value: string) => {
       values.set(key, String(value))
     }),
-    removeItem: vi.fn((key: string) => {
-      values.delete(key)
-    }),
-    clear: vi.fn(() => {
-      values.clear()
-    }),
+    removeItem: vi.fn((key: string) => values.delete(key)),
+    clear: vi.fn(() => values.clear()),
   }
   Object.defineProperty(window, 'localStorage', {
     configurable: true,
@@ -34,6 +30,8 @@ function installLocalStorageStub() {
 describe('LibraryView filters', () => {
   beforeEach(() => {
     vi.resetModules()
+    vi.doUnmock('../../src/composables/useAppSettings')
+    vi.doUnmock('../../src/composables/useAssetDownloads')
     vi.unstubAllGlobals()
     installLocalStorageStub()
   })

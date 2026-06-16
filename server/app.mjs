@@ -42,6 +42,7 @@ import {
 } from './handlers/settings.mjs'
 import {
   handleAtlasFileDelete,
+  handleAtlasCivitaiFeed,
   handleAtlasCivitaiOpenModel,
   handleAtlasCivitaiReaction,
   handleAtlasCivitaiStatus,
@@ -169,6 +170,10 @@ export function createCompanionServer({ connectWebSocket = true, devAssetOrigin 
 
   if (url.pathname === '/api/atlas/civitai/reactions' && request.method === 'POST') {
     return handleAtlasCivitaiReaction(request, response)
+  }
+
+  if (url.pathname === '/api/atlas/civitai/feed' && request.method === 'POST') {
+    return handleAtlasCivitaiFeed(request, response)
   }
 
   if (url.pathname === '/api/atlas/civitai/open-model' && request.method === 'POST') {

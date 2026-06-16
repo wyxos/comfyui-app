@@ -10,6 +10,7 @@ export type UpstreamState = {
   civitaiImagePages: Record<string, string>
   civitaiVersion: unknown
   atlasStatus: unknown
+  atlasFeed: unknown
   atlasReaction: unknown
   atlasOpenModel: unknown
   queue: unknown
@@ -85,6 +86,11 @@ function createDefaultUpstreamState(): UpstreamState {
     atlasStatus: {
       ok: true,
       items: [],
+    },
+    atlasFeed: {
+      ok: true,
+      items: [{ id: 401, url: 'https://image.test/detail.png', atlasStatus: { request_id: 'civitai:401' } }],
+      metadata: { nextCursor: null },
     },
     atlasReaction: {
       file: { id: 501, source: 'CivitAI', source_id: '401', url: 'https://image.test/detail.png' },

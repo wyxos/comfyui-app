@@ -1,11 +1,15 @@
 import { jsonResponse, type MockApiOptions } from './mockApiData'
 
-type MockSettingsApiState = {
+export type MockSettingsApiState = {
   civitaiConfigured: boolean
   includeNsfwDefault: boolean
   blurNsfwContentDefault: boolean
   atlasUrl: string
   atlasKeyConfigured: boolean
+}
+
+export function isMockAtlasConfigured(state: MockSettingsApiState) {
+  return Boolean(state.atlasUrl)
 }
 
 export function createMockSettingsApiState(options: MockApiOptions): MockSettingsApiState {

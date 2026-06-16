@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 
-import { imagesForVersion, isVideoPreview, numberProp, previewSizedImageUrl } from './assetPreviewHelpers'
+import { imagesForVersion, isVideoPreview, numberProp } from './assetPreviewHelpers'
 import type {
   CivitaiImage,
   CivitaiImagesResponse,
@@ -10,13 +10,21 @@ import type {
 } from './assetPreviewTypes'
 import {
   atlasImagesShareIdentity,
-  atlasMediaKey,
   atlasRequestId,
   type AtlasReactionType,
 } from './assetPreviewAtlasMedia'
+import {
+  feedRequestErrorMessage,
+  MEDIA_FEED_LIMIT,
+  mergeFeedImages,
+  normalizeAtlasFeedImages,
+  normalizeFeedImages,
+  normalizeNextCursor,
+  previewUrlFor,
+  versionUsesArchivedMedia,
+  type AtlasFeedResponse,
+} from './assetPreviewFeedRequests'
 import { useAssetPreviewAtlasMediaActions } from './useAssetPreviewAtlasMediaActions'
-
-const MEDIA_FEED_LIMIT = 20
 
 type UseAssetPreviewMediaFeedOptions = {
   open: ComputedRef<boolean>
@@ -26,56 +34,6 @@ type UseAssetPreviewMediaFeedOptions = {
   previewUrl: string | null | undefined
   isVideo: boolean
   activeImageIndex: Ref<number>
-}
-
-function normalizeFeedImages(items: CivitaiImage[] | null | undefined) {
-  return (items ?? [])
-    .filter((image) => Boolean(image?.url))
-    .slice(0, MEDIA_FEED_LIMIT)
-}
-
-function mergeFeedImages(currentImages: CivitaiImage[], nextImages: CivitaiImage[]) {
-  const seen = new Set(currentImages.map(atlasMediaKey))
-  const merged = [...currentImages]
-  for (const image of nextImages) {
-    const key = atlasMediaKey(image)
-    if (!seen.has(key)) {
-      seen.add(key)
-      merged.push(image)
-    }
-  }
-
-  return merged
-}
-
-function normalizeNextCursor(payload: CivitaiImagesResponse) {
-  const cursor = payload.metadata?.nextCursor
-  return typeof cursor === 'string' && cursor.trim() ? cursor.trim() : ''
-}
-
-function versionUsesArchivedMedia(version: CivitaiModelVersion | null) {
-  return imagesForVersion(version).some((image) => image.archiveSource === 'local' || Boolean(image.remoteUrl))
-}
-
-function previewUrlFor(url: string, isVideo: boolean) {
-  return isVideo ? url : previewSizedImageUrl(url)
-}
-
-async function feedRequestErrorMessage(response: Response) {
-  const payload = await response.json().catch(() => null) as {
-    message?: string
-    details?: { error?: string } | string | null
-  } | null
-  const message = typeof payload?.message === 'string' && payload.message.trim()
-    ? payload.message.trim()
-    : `Civitai returned ${response.status}`
-  const detail = typeof payload?.details === 'string'
-    ? payload.details.trim()
-    : typeof payload?.details?.error === 'string'
-      ? payload.details.error.trim()
-      : ''
-
-  return detail ? `${message} ${detail}` : message
 }
 
 export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOptions) {
@@ -230,20 +188,34 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
     feedLoadingMore.value = isLoadingMore
     feedError.value = ''
 
-    const params = new URLSearchParams({
-      limit: String(MEDIA_FEED_LIMIT),
-      modelId: String(modelId),
-      modelVersionId: String(versionId),
-      sort: 'Newest',
-    })
-    if (options.includeNsfw.value) {
-      params.set('nsfw', 'true')
-    }
-    if (cursor) {
-      params.set('cursor', cursor)
-    }
-
     try {
+      const atlasFeed = await fetchAtlasFeed(modelId, versionId, cursor, controller.signal)
+      if (feedController !== controller || feedToken !== requestToken) {
+        return
+      }
+
+      if (atlasFeed) {
+        feedImages.value = isLoadingMore
+          ? mergeFeedImages(feedImages.value, atlasFeed.images)
+          : atlasFeed.images
+        feedNextCursor.value = atlasFeed.nextCursor
+        feedRetryCursor = ''
+        return
+      }
+
+      const params = new URLSearchParams({
+        limit: String(MEDIA_FEED_LIMIT),
+        modelId: String(modelId),
+        modelVersionId: String(versionId),
+        sort: 'Newest',
+      })
+      if (options.includeNsfw.value) {
+        params.set('nsfw', 'true')
+      }
+      if (cursor) {
+        params.set('cursor', cursor)
+      }
+
       const response = await fetch(`/api/civitai/images?${params.toString()}`, {
         headers: {
           Accept: 'application/json',
@@ -283,6 +255,47 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
         feedLoading.value = false
         feedLoadingMore.value = false
       }
+    }
+  }
+
+  async function fetchAtlasFeed(modelId: number, versionId: number, cursor: string, signal: AbortSignal) {
+    const response = await fetch('/api/atlas/civitai/feed', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({
+        limit: MEDIA_FEED_LIMIT,
+        modelId,
+        modelVersionId: versionId,
+        modelType: options.model.value?.type ?? null,
+        sort: 'Newest',
+        ...(options.includeNsfw.value ? { nsfw: true } : {}),
+        ...(cursor ? { cursor } : {}),
+      }),
+      signal,
+    })
+
+    if (response.status === 409) {
+      atlasConfigured.value = false
+      return null
+    }
+
+    if (!response.ok) {
+      throw new Error(await feedRequestErrorMessage(response))
+    }
+
+    const payload = (await response.json().catch(() => null)) as AtlasFeedResponse | null
+    if (payload?.configured !== true) {
+      atlasConfigured.value = false
+      return null
+    }
+
+    atlasConfigured.value = true
+    return {
+      images: normalizeAtlasFeedImages(payload.items),
+      nextCursor: normalizeNextCursor(payload),
     }
   }
 

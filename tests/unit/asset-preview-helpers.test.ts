@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { civitaiModelWebUrl, versionDownloadUnavailableLabel } from '../../src/components/asset-preview/assetPreviewHelpers'
+import {
+  civitaiModelWebUrl,
+  imageNsfwDetectedValue,
+  versionDownloadUnavailableLabel,
+} from '../../src/components/asset-preview/assetPreviewHelpers'
 
 describe('asset preview helpers', () => {
   it('uses civitai.com for safe model web links', () => {
@@ -35,6 +39,13 @@ describe('asset preview helpers', () => {
         },
       ],
     })).toBe('https://civitai.red/models/303')
+  })
+
+  it('does not classify PG-13 numeric nsfwLevel images as NSFW', () => {
+    expect(imageNsfwDetectedValue({ nsfwLevel: 2 })).toBe(false)
+    expect(imageNsfwDetectedValue({ nsfwLevel: 'PG-13' })).toBe(false)
+    expect(imageNsfwDetectedValue({ nsfwLevel: 4 })).toBe(true)
+    expect(imageNsfwDetectedValue({ nsfwLevel: 'R' })).toBe(true)
   })
 
   it('labels uncovered early-access versions as unavailable for app downloads', () => {

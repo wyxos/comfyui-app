@@ -91,7 +91,7 @@ describe('AssetPreviewModal sidebar layout', () => {
               id: 201,
               name: 'v1',
               baseModel: 'Pony',
-              files: [{ name: 'compact-detail.safetensors', type: 'Model', primary: true }],
+              files: [{ id: 301, name: 'compact-detail.safetensors', type: 'Model', primary: true }],
               images: [{ url: 'https://example.test/compact.jpg', type: 'image', nsfw: false }],
             },
           ],
@@ -115,6 +115,9 @@ describe('AssetPreviewModal sidebar layout', () => {
     ])).toEqual([
       ['Type', 'LORA'],
       ['Base model', 'Pony'],
+      ['Model ID', '101'],
+      ['Version ID', '201'],
+      ['File ID', '301'],
       ['Creator', 'samplemaker'],
       ['Stats', '1,234 downloads'],
     ])

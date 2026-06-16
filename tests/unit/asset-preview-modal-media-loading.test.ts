@@ -89,6 +89,36 @@ describe('AssetPreviewModal media loading', () => {
     expect(wrapper.get('img[alt="Safe preview on NSFW model preview image"]').classes()).not.toContain('blur-2xl')
   })
 
+  it('does not blur PG-13 numeric nsfwLevel preview images', async () => {
+    const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
+    const wrapper = mount(AssetPreviewModal, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        blurNsfwContent: true,
+        model: {
+          id: 101,
+          name: 'PG-13 preview model',
+          type: 'Checkpoint',
+          modelVersions: [
+            {
+              id: 201,
+              name: 'v1',
+              baseModel: 'Illustrious',
+              images: [
+                { url: 'https://example.test/pg13-preview.jpg', type: 'image', nsfwLevel: 2 },
+              ],
+            },
+          ],
+        },
+      },
+    })
+
+    await nextTick()
+
+    expect(wrapper.get('img[alt="PG-13 preview model preview image"]').classes()).not.toContain('blur-2xl')
+  })
+
   it('does not request preview feed images with nsfw=false when the saved default toggle is off', async () => {
     const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify({ items: [] }), {

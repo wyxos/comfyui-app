@@ -22,6 +22,7 @@ const props = withDefaults(
     kindLabel: 'Preview',
     modelId: null,
     versionId: null,
+    fileId: null,
     modelType: null,
     baseModel: null,
     trainedWords: () => [],
@@ -103,6 +104,9 @@ const {
   normalizedImageMetaRows,
   activeTriggerWords,
   activePrimaryFile,
+  modelIdentifier,
+  versionIdentifier,
+  fileIdentifier,
   modalTitle,
   modalSubtitle,
   modelTypeLabel,
@@ -341,6 +345,9 @@ function handleMainMediaAuxClick(event: MouseEvent) {
       :modal-title="modalTitle"
       :modal-subtitle="modalSubtitle"
       :model-type-label="modelTypeLabel"
+      :model-identifier="modelIdentifier"
+      :version-identifier="versionIdentifier"
+      :file-identifier="fileIdentifier"
       :civitai-model="civitaiModel ?? null"
       :civitai-error="civitaiError"
       :civitai-model-url="civitaiModelUrl"

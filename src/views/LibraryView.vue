@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import AssetPreviewModal from '../components/asset-preview/AssetPreviewModal.vue'
 import { useAssetPreviewDownloadActions } from '../components/asset-preview/useAssetPreviewDownloadActions'
 import UiPaginatedCardGrid from '../components/ui/UiPaginatedCardGrid.vue'
@@ -19,22 +18,19 @@ import {
   modelHasNsfw,
   modelTypeLabel,
   normalizedModelType,
-  parseLibrarySourceFilter,
   previewFor,
   watchedPreviewPathsFor,
   watchedPreviewUrlFor,
   type ControlNetLibraryItem,
   type ControlNetResponse,
   type HiddenLibraryItem,
-  type LibrarySourceFilter,
   type LibraryModelItem,
-  type LibraryTypeFilter,
 } from './library/libraryModelHelpers'
 import { useHiddenLibraryModels } from './library/useHiddenLibraryModels'
+import { useLibraryRouteFilters } from './library/useLibraryRouteFilters'
 import { useLibrarySafetyOverrides } from './library/useLibrarySafetyOverrides'
 
 const PAGE_SIZE = 40
-const route = useRoute()
 
 const {
   completedDownloads,
@@ -55,13 +51,16 @@ const {
   modelDownloadKey,
 } = useAssetPreviewDownloadActions()
 
-const query = ref('')
-const includeNsfw = ref(false)
+const {
+  query,
+  includeNsfw,
+  typeFilter,
+  sourceFilter,
+  baseModelFilter,
+  currentPage,
+  applyIncludeNsfwDefault,
+} = useLibraryRouteFilters()
 const blurNsfwContent = ref(true)
-const typeFilter = ref<LibraryTypeFilter>('all')
-const sourceFilter = ref<LibrarySourceFilter>(parseLibrarySourceFilter(route.query.source))
-const baseModelFilter = ref('all')
-const currentPage = ref(1)
 const selectedModel = ref<LibraryModelItem | null>(null)
 const controlNetModels = ref<ControlNetLibraryItem[]>([])
 const controlNetLoadingError = ref('')
@@ -220,10 +219,6 @@ const baseModelOptions = computed(() => {
       .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
   ]
 })
-watch([query, typeFilter, sourceFilter, baseModelFilter, includeNsfw], () => {
-  currentPage.value = 1
-})
-
 watch(baseModelOptions, (options) => {
   if (baseModelFilter.value !== 'all' && !options.some((option) => option.value === baseModelFilter.value)) {
     baseModelFilter.value = 'all'
@@ -233,13 +228,6 @@ watch(baseModelOptions, (options) => {
 watch(pageCount, (nextPageCount) => {
   currentPage.value = Math.min(currentPage.value, nextPageCount)
 })
-
-watch(
-  () => route.query.source,
-  (value) => {
-    sourceFilter.value = parseLibrarySourceFilter(value)
-  },
-)
 
 watch(controlNetModels, () => {
   if (selectedModel.value?.itemKind !== 'controlnet') {
@@ -279,6 +267,10 @@ function selectedCivitaiModel(item: LibraryModelItem | null) {
   return item && 'civitaiModel' in item ? item.civitaiModel : null
 }
 
+function selectedFileId(item: LibraryModelItem | null) {
+  return item && 'fileId' in item && typeof item.fileId === 'number' ? item.fileId : null
+}
+
 function restoreLibraryHiddenModel(item: LibraryModelItem) {
   if (item.librarySource === 'hidden') {
     restoreHiddenModelId(item.modelId)
@@ -303,10 +295,10 @@ function closeModelPreview() {
 async function loadAppSettingsDefaults() {
   try {
     const settings = await fetchAppSettings()
-    includeNsfw.value = settings.includeNsfw
+    applyIncludeNsfwDefault(settings.includeNsfw)
     blurNsfwContent.value = settings.blurNsfwContent !== false
   } catch {
-    includeNsfw.value = false
+    applyIncludeNsfwDefault(false)
     blurNsfwContent.value = true
   }
 }
@@ -439,6 +431,7 @@ onMounted(() => {
       :model="selectedCivitaiModel(selectedModel)"
       :model-id="selectedModel?.modelId ?? null"
       :version-id="selectedModel?.versionId ?? null"
+      :file-id="selectedFileId(selectedModel)"
       :preview-url="selectedModel ? previewFor(selectedModel) : null"
       :is-video="selectedModel ? isVideoPreview(selectedModel) : false"
       :include-nsfw="true"

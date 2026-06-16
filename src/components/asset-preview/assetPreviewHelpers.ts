@@ -30,8 +30,17 @@ export function primaryFileForVersion(version: CivitaiModelVersion | null | unde
     ?? null
 }
 
-export function numberProp(value: number | null | undefined) {
-  return typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : null
+export function numberProp(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.trunc(value)
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? Math.trunc(parsed) : null
+  }
+
+  return null
 }
 
 export function selectedVersionFor(versions: Ref<CivitaiModelVersion[]>, activeVersionId: Ref<number | null>) {
@@ -192,7 +201,7 @@ function nsfwFlagDetectedValue(value: unknown): boolean | null {
 
 function nsfwLevelDetectedValue(value: unknown): boolean | null {
   if (typeof value === 'number') {
-    return Number.isFinite(value) ? value > 1 : null
+    return Number.isFinite(value) ? value >= 4 : null
   }
 
   if (typeof value !== 'string') {
@@ -206,10 +215,23 @@ function nsfwLevelDetectedValue(value: unknown): boolean | null {
 
   const numericLevel = Number(normalized)
   if (Number.isFinite(numericLevel)) {
-    return numericLevel > 1
+    return numericLevel >= 4
   }
 
-  return !['false', '0', '1', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized)
+  return ![
+    'false',
+    '0',
+    '1',
+    '2',
+    'none',
+    'safe',
+    'soft',
+    'pg',
+    'pg-13',
+    'pg13',
+    'not detected',
+    'not_detected',
+  ].includes(normalized)
 }
 
 export function imageNsfwDetectedValue(image: NsfwMediaSource): boolean | null {

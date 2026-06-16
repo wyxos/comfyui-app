@@ -153,6 +153,7 @@ export type AssetPreviewModalProps = {
   kindLabel?: string
   modelId?: number | null
   versionId?: number | null
+  fileId?: number | null
   modelType?: string | null
   baseModel?: string | null
   trainedWords?: string[]

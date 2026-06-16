@@ -33,6 +33,9 @@ const props = defineProps<{
   modalTitle: string
   modalSubtitle: string
   modelTypeLabel: string
+  modelIdentifier: number | null
+  versionIdentifier: number | null
+  fileIdentifier: number | null
   civitaiModel: CivitaiModel | null
   civitaiError: string
   civitaiModelUrl: string
@@ -120,6 +123,11 @@ const creatorUsername = computed(() => props.civitaiModel?.creator?.username?.tr
 const creatorLabel = computed(() => creatorUsername.value || 'Unknown creator')
 const modelTypeValue = computed(() => props.modelTypeLabel.trim() || props.kindLabel || 'Unknown')
 const showModelTypeBadge = computed(() => !['model', 'preview'].includes(modelTypeValue.value.toLowerCase()))
+const modelIdentifierRows = computed(() => [
+  { label: 'Model ID', value: props.modelIdentifier },
+  { label: 'Version ID', value: props.versionIdentifier },
+  { label: 'File ID', value: props.fileIdentifier },
+].filter((row): row is { label: string; value: number } => row.value !== null))
 const creatorAssetsRoute = computed(() => {
   return creatorUsername.value
     ? { name: 'assets', query: { username: creatorUsername.value } }
@@ -278,6 +286,15 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
           >
             <dt class="text-muted-foreground">Base model</dt>
             <dd class="min-w-0 truncate font-semibold">{{ selectedVersion?.baseModel ?? 'Unknown' }}</dd>
+          </div>
+          <div
+            v-for="row in modelIdentifierRows"
+            :key="row.label"
+            class="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3"
+            data-test="asset-preview-model-detail-row"
+          >
+            <dt class="text-muted-foreground">{{ row.label }}</dt>
+            <dd class="min-w-0 truncate font-mono text-xs font-semibold">{{ row.value }}</dd>
           </div>
           <div
             class="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3"

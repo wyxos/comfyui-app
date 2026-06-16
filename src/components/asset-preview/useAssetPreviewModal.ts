@@ -118,6 +118,9 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     return words.filter((word) => typeof word === 'string' && word.trim()).map((word) => word.trim())
   })
   const activePrimaryFile = computed(() => primaryFileForVersion(selectedVersion.value))
+  const modelIdentifier = computed(() => numberProp(civitaiModel.value?.id) ?? normalizedModelId.value)
+  const versionIdentifier = computed(() => numberProp(selectedVersion.value?.id) ?? normalizedVersionId.value)
+  const fileIdentifier = computed(() => numberProp(activePrimaryFile.value?.id) ?? numberProp(props.fileId))
   const modalTitle = computed(() => civitaiModel.value?.name ?? props.title ?? 'Preview')
   const modalSubtitle = computed(() => {
     const versionLabel = selectedVersion.value ? modelVersionLabel(selectedVersion.value) : ''
@@ -440,6 +443,9 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     normalizedImageMetaRows,
     activeTriggerWords,
     activePrimaryFile,
+    modelIdentifier,
+    versionIdentifier,
+    fileIdentifier,
     modalTitle,
     modalSubtitle,
     modelTypeLabel,

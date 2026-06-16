@@ -284,6 +284,11 @@ describe('companion app e2e flows', () => {
       expect(document.querySelector('[role="dialog"][aria-label$="image preview"]')).not.toBeNull()
     })
     await vi.waitFor(() => {
+      expect(api.calls.find((call) => call.path === '/api/atlas/civitai/feed')?.body).toMatchObject({
+        modelId: 1001,
+        modelVersionId: 2001,
+        nsfw: true,
+      })
       expect(api.calls.some((call) =>
         call.path === '/api/civitai/images' &&
         call.search.get('modelId') === '1001' &&
