@@ -1,7 +1,7 @@
 import { civitaiModelsUrl } from './config.mjs'
 import { fetchCivitaiJsonWithCache } from './civitai-cache.mjs'
 import { parseInteger } from './civitai-query.mjs'
-import { safeTrim } from './shared.mjs'
+import { imageListNsfwLevelDetectedValue, safeTrim } from './shared.mjs'
 import { getStoredCivitaiApiKey } from './settings.mjs'
 
 function parseCivitaiLookupId(value) {
@@ -36,11 +36,13 @@ function modelFromCivitaiVersion(version) {
     return null
   }
 
+  const modelNsfw = imageListNsfwLevelDetectedValue(modelVersion.images)
+
   return {
     id: modelId,
     name: safeTrim(version?.model?.name) || `Civitai model ${modelId}`,
     type: safeTrim(version?.model?.type) || 'Unknown',
-    nsfw: version?.model?.nsfw === true,
+    nsfw: modelNsfw === true,
     creator: version?.model?.creator ?? null,
     stats: version?.model?.stats ?? version?.stats ?? undefined,
     tags: Array.isArray(version?.model?.tags) ? version.model.tags : [],
@@ -105,16 +107,19 @@ function mergeHydratedCivitaiModel(versionModel, hydratedModel) {
     return versionModel
   }
 
+  const modelVersions = versionModel.modelVersions
+  const modelNsfw = imageListNsfwLevelDetectedValue(modelVersions.flatMap((version) => version.images ?? []))
+
   return {
     ...hydratedModel,
     id: versionModel.id,
     name: safeTrim(hydratedModel.name) || versionModel.name,
     type: safeTrim(hydratedModel.type) || versionModel.type,
-    nsfw: hydratedModel.nsfw === true || versionModel.nsfw === true,
+    nsfw: modelNsfw === true,
     creator: hydratedModel.creator ?? versionModel.creator,
     stats: hydratedModel.stats ?? versionModel.stats,
     tags: Array.isArray(hydratedModel.tags) ? hydratedModel.tags : versionModel.tags,
-    modelVersions: versionModel.modelVersions,
+    modelVersions,
   }
 }
 

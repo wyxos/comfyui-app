@@ -2,6 +2,7 @@ import {
   civitaiModelWebUrl,
   imageNsfwDetectedValue,
   isVersionDownloadable,
+  modelHasNsfwContent,
   sortModelVersions,
 } from '../../components/asset-preview/assetPreviewHelpers'
 import type { CivitaiImage, CivitaiModel, CivitaiModelVersion } from './assetViewTypes'
@@ -92,7 +93,7 @@ export function isImageNsfw(_model: CivitaiModel, image?: CivitaiImage) {
 }
 
 export function modelHasNsfw(model: CivitaiModel) {
-  return model.nsfw === true
+  return modelHasNsfwContent(model)
 }
 
 export function formatFileSize(sizeKb: number | undefined) {
@@ -146,7 +147,6 @@ export function previewImageForVersion(version: CivitaiModelVersion) {
         height: image.height,
         hash: image.hash,
         type: image.type,
-        nsfw: image.nsfw,
         nsfwLevel: image.nsfwLevel,
       }
     : null
@@ -162,7 +162,6 @@ export function previewImagesForVersion(version: CivitaiModelVersion) {
       height: image.height,
       hash: image.hash,
       type: image.type,
-      nsfw: image.nsfw,
       nsfwLevel: image.nsfwLevel,
     }))
 }

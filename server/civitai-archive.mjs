@@ -7,7 +7,7 @@ import { resolveModelPath } from './model-paths.mjs'
 import { extractCivitaiImageId, hydrateArchiveImageMetadata } from './civitai-archive-images.mjs'
 import { fetchCivitaiArchiveVersionMetadata } from './civitai-archive-metadata.mjs'
 import { readJsonFileIfExists } from './model-trigger-words.mjs'
-import { normalizePlainObject, safeTrim } from './shared.mjs'
+import { imageListNsfwLevelDetectedValue, normalizeNsfwLevel, normalizePlainObject, safeTrim } from './shared.mjs'
 import { getStoredCivitaiApiKey } from './settings.mjs'
 import {
   archiveModelType,
@@ -62,8 +62,7 @@ function normalizeArchiveImage(image, index = 0) {
     height: normalizeNumber(item.height),
     hash: safeTrim(item.hash),
     type: safeTrim(item.type),
-    nsfw: item.nsfw ?? null,
-    nsfwLevel: item.nsfwLevel ?? null,
+    nsfwLevel: normalizeNsfwLevel(item.nsfwLevel),
     meta: normalizePlainObject(item.meta),
     postId: item.postId ?? null,
     username: safeTrim(item.username),
@@ -173,7 +172,7 @@ function sidecarToArchiveModel(payload, type, modelName) {
     id: modelId,
     name: safeTrim(payload?.modelName ?? model.name ?? modelMetadata.name ?? modelName),
     type: normalizedType,
-    nsfw: payload?.modelNsfw ?? model.nsfw ?? modelMetadata.nsfw ?? null,
+    nsfw: imageListNsfwLevelDetectedValue(archiveImages),
     creator: normalizePlainObject(model.creator ?? modelMetadata.creator),
     stats: normalizePlainObject(model.stats ?? modelMetadata.stats),
     tags: Array.isArray(model.tags ?? modelMetadata.tags) ? (model.tags ?? modelMetadata.tags) : [],
@@ -286,7 +285,7 @@ function mergeArchiveModelPayload(download, versionPayload) {
     modelId: normalizeNumber(download.modelId ?? version.modelId ?? model.id),
     modelName: safeTrim(download.modelName ?? model.name),
     modelType: safeTrim(download.modelType ?? model.type),
-    modelNsfw: download.modelNsfw ?? model.nsfw ?? null,
+    modelNsfw: imageListNsfwLevelDetectedValue(download.previewImages),
     model: {
       ...model,
       id: normalizeNumber(model.id ?? download.modelId ?? version.modelId),

@@ -3,7 +3,7 @@ import { fetchCivitaiJsonWithCache } from './civitai-cache.mjs'
 import { buildCivitaiImagesQueryParams, parseInteger } from './civitai-query.mjs'
 import { sendError, sendJson } from './http.mjs'
 import { getStoredCivitaiApiKey } from './settings.mjs'
-import { safeTrim, tryParseJson } from './shared.mjs'
+import { normalizeNsfwLevel, safeTrim, tryParseJson } from './shared.mjs'
 
 const civitaiImagePageUrl = new URL('https://civitai.com/images/')
 
@@ -100,6 +100,8 @@ function imageMetaFromItem(image) {
 
 function normalizeCivitaiPageImage(imageId, image, generationData) {
   const metadata = isPlainObject(image?.metadata) ? image.metadata : null
+  const imageFields = { ...(isPlainObject(image) ? image : {}) }
+  delete imageFields.nsfw
   const meta = usableMetaObject(generationData?.meta)
     ?? usableMetaObject(image?.meta)
     ?? usableMetaObject(metadata?.meta)
@@ -111,15 +113,14 @@ function normalizeCivitaiPageImage(imageId, image, generationData) {
   const imageType = safeTrim(image?.type) || (mimeType.startsWith('video/') ? 'video' : 'image')
 
   return {
-    ...image,
+    ...imageFields,
     id: parseCivitaiLookupId(image?.id) ?? imageId,
     url: safeTrim(image?.url),
     width: parseInteger(image?.width) ?? undefined,
     height: parseInteger(image?.height) ?? undefined,
     hash: image?.hash ?? null,
     type: imageType,
-    nsfw: image?.nsfw,
-    nsfwLevel: image?.nsfwLevel ?? null,
+    nsfwLevel: normalizeNsfwLevel(image?.nsfwLevel),
     postId: parseCivitaiLookupId(image?.postId) ?? undefined,
     meta: meta ?? null,
   }
@@ -206,10 +207,13 @@ function mergeCivitaiPageImageFallback(imageId, items, fallbackImage) {
     }
 
     merged = true
+    const itemFields = { ...item }
+    delete itemFields.nsfw
     return {
       ...fallbackImage,
-      ...item,
+      ...itemFields,
       id: itemId ?? imageId,
+      nsfwLevel: normalizeNsfwLevel(item.nsfwLevel ?? fallbackImage.nsfwLevel),
       meta: imageMetaFromItem(item) ?? fallbackMeta ?? null,
     }
   })

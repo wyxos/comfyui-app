@@ -13,6 +13,7 @@ import {
   parseRequestBody,
 } from './mockApiData'
 import type { FetchCall, MockApiOptions, MockDownload, MockJob, MockModel } from './mockApiData'
+import { mockCivitaiModelPreviews } from './mockCivitaiModelPreviews'
 import { createMockSettingsApiState, handleMockSettingsApi, isMockAtlasConfigured } from './mockSettingsApi'
 import { handleMockWatchedDownloads } from './mockWatchedDownloads'
 import { installMockDownloadEventsSocket } from './mockDownloadEventsSocket'
@@ -330,6 +331,10 @@ export function installMockApi(options: MockApiOptions = {}) {
       }
 
       return jsonResponse({ ok: true, configured: true, items: modelImages(models), metadata: { nextCursor: null } })
+    }
+
+    if (url.pathname === '/api/civitai/model-previews' && method === 'GET') {
+      return jsonResponse({ ok: true, items: mockCivitaiModelPreviews(models, url) })
     }
 
     if (url.pathname === '/api/civitai/models' && method === 'GET') {

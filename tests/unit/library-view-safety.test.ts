@@ -39,6 +39,7 @@ describe('LibraryView safety overrides', () => {
         finishedAt: 10,
         updatedAt: 10,
         previewUrl: '/api/view?filename=library.png',
+        previewImage: { url: '/api/view?filename=library.png', nsfwLevel: 8 },
         previewPaths: [],
       },
     ])

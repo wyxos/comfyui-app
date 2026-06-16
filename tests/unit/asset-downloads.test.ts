@@ -229,6 +229,7 @@ describe('DownloadsView', () => {
         targetPath: 'C:\\models\\checkpoints\\complete.safetensors',
         progressPercent: 100,
         previewUrl: '/api/civitai/downloads/complete-download/preview',
+        previewImage: { url: '/api/civitai/downloads/complete-download/preview', nsfwLevel: 8 },
         updatedAt: 10,
       },
       {

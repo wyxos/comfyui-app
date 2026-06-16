@@ -42,13 +42,24 @@ function watchedPayloadForDownload(download, version) {
   const model = version?.model && typeof version.model === 'object' ? version.model : null
   const versionFile = versionFileForDownload(download, version)
   const fileName = sanitizeModelFilename(download.fileName || versionFile?.name)
+  const previewImages = normalizePreviewImages([
+    ...(Array.isArray(version?.images) ? version.images : []),
+    ...(Array.isArray(download.previewImages) ? download.previewImages : []),
+    download.previewImage,
+  ])
+  const modelMetadata = normalizeDownloadModelMetadata(model ?? download.modelMetadata, {
+    modelId: parseInteger(model?.id) ?? download.modelId,
+    modelName: safeTrim(model?.name) || download.modelName,
+    modelType: safeTrim(model?.type) || download.modelType,
+    previewImages,
+  })
 
   return {
     modelId: parseInteger(model?.id) ?? download.modelId,
     modelName: safeTrim(model?.name) || download.modelName,
     modelType: safeTrim(model?.type) || download.modelType,
-    modelNsfw: model?.nsfw ?? download.modelNsfw ?? null,
-    modelMetadata: model ?? download.modelMetadata,
+    modelNsfw: modelMetadata.nsfw,
+    modelMetadata,
     versionId: parseInteger(version?.id) ?? download.versionId,
     versionName: safeTrim(version?.name) || download.versionName,
     baseModel: safeTrim(version?.baseModel) || download.baseModel,
@@ -64,11 +75,7 @@ function watchedPayloadForDownload(download, version) {
     },
     trainedWords: Array.isArray(version?.trainedWords) ? version.trainedWords.filter((word) => typeof word === 'string') : download.trainedWords,
     previewImage: normalizePreviewImage(version?.images?.[0]) ?? download.previewImage,
-    previewImages: normalizePreviewImages([
-      ...(Array.isArray(version?.images) ? version.images : []),
-      ...(Array.isArray(download.previewImages) ? download.previewImages : []),
-      download.previewImage,
-    ]),
+    previewImages,
   }
 }
 
@@ -170,22 +177,24 @@ export async function enqueueCivitaiDownload(body) {
   }
 
   const id = buildDownloadId(modelId, versionId, file)
+  const incomingPreviewImage = normalizePreviewImage(body?.previewImage)
+  const incomingPreviewImages = normalizePreviewImages(body?.previewImages)
   const modelMetadata = normalizeDownloadModelMetadata(body?.modelMetadata ?? body?.model, {
     modelId,
     modelName: body?.modelName,
     modelType: body?.modelType,
-    modelNsfw: body?.modelNsfw ?? body?.nsfw,
     creator: body?.creator,
     stats: body?.stats,
     tags: body?.tags,
+    previewImages: [incomingPreviewImage, ...incomingPreviewImages].filter(Boolean),
   })
   const existingDownload = civitaiDownloads.get(id)
   if (existingDownload) {
     const forceRedownload = body?.force === true || body?.redownload === true
     existingDownload.dismissedAt = null
-    existingDownload.previewImage = normalizePreviewImage(body?.previewImage) ?? existingDownload.previewImage ?? null
+    existingDownload.previewImage = incomingPreviewImage ?? existingDownload.previewImage ?? null
     existingDownload.previewImages = normalizePreviewImages([
-      ...(Array.isArray(body?.previewImages) ? body.previewImages : []),
+      ...incomingPreviewImages,
       existingDownload.previewImage,
       ...(Array.isArray(existingDownload.previewImages) ? existingDownload.previewImages : []),
     ])
@@ -243,8 +252,8 @@ export async function enqueueCivitaiDownload(body) {
     targetPath,
     partialPath: `${targetPath}.part`,
     sidecarPath: `${targetPath}.civitai.info`,
-    previewImage: normalizePreviewImage(body?.previewImage),
-    previewImages: normalizePreviewImages(body?.previewImages),
+    previewImage: incomingPreviewImage,
+    previewImages: incomingPreviewImages,
     previewPaths: [],
     previewPath: null,
     previewUrl: null,

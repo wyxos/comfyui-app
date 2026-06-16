@@ -236,6 +236,11 @@ describe('companion app e2e flows', () => {
         finishedAt: now - index,
         updatedAt: now - index,
         previewUrl: `/api/view?filename=library-${suffix}.png`,
+        previewPaths: [{
+          url: `/api/civitai/downloads/library-download-${suffix}/previews/0`,
+          mediaType: 'image',
+          nsfwLevel: modelNsfw ? 8 : 1,
+        }],
         ...(displayNumber === 1
           ? {
               civitaiModel: createMockModel({

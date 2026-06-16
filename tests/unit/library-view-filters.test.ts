@@ -67,6 +67,7 @@ describe('LibraryView filters', () => {
             {
               url: `/api/civitai/downloads/library-download-${suffix}/previews/0`,
               mediaType: displayNumber === 1 ? 'video' : 'image',
+              nsfwLevel: modelNsfw ? 8 : 1,
             },
           ],
         }

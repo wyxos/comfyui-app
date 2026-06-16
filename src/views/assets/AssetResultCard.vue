@@ -153,7 +153,7 @@ function shouldBlurNsfwPreview(model: CivitaiModel) {
 }
 
 function shouldBlurNsfwTitle(model: CivitaiModel) {
-  return blurNsfwContent?.value === true && model.nsfw === true
+  return blurNsfwContent?.value === true && modelHasNsfw(model)
 }
 </script>
 

@@ -129,6 +129,7 @@ describe('HomeAssetPickerModal', () => {
             label: 'NSFW LoRA',
             value: 'nsfw.safetensors',
             modelNsfw: true,
+            previewPaths: [{ url: '/nsfw-preview.png', nsfwLevel: 8 }],
             typeLabel: 'LoRA',
           },
         ],

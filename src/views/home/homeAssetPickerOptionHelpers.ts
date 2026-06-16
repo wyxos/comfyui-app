@@ -45,25 +45,8 @@ export type BaseModelFilterOption = {
   count: number
 }
 
-function isNsfwValue(value: unknown) {
-  if (typeof value === 'boolean') {
-    return value
-  }
-
-  if (typeof value === 'number') {
-    return value > 0
-  }
-
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase()
-    return Boolean(normalized && !['false', '0', 'no', 'none', 'safe'].includes(normalized))
-  }
-
-  return false
-}
-
 export function optionHasNsfw(option: AssetPickerOption) {
-  return isNsfwValue(option.modelNsfw ?? option.modelMetadata?.nsfw)
+  return optionPreviewMedia(option).some((media) => imageNsfwDetectedValue(media) === true)
 }
 
 export function normalizeBaseModelFilterKey(value: unknown) {
@@ -133,7 +116,6 @@ function addPreviewMedia(
   media.push({
     url,
     mediaType: source?.mediaType ?? source?.type ?? null,
-    nsfw: source?.nsfw ?? null,
     nsfwLevel: source?.nsfwLevel ?? null,
   })
 }

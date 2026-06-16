@@ -1,5 +1,5 @@
 import { parseInteger } from '../civitai-query.mjs'
-import { normalizeOptionalBoolean, safeTrim } from '../shared.mjs'
+import { safeTrim } from '../shared.mjs'
 import {
   normalizeDownloadFile,
   normalizeDownloadModelMetadata,
@@ -89,17 +89,22 @@ function enqueuePayloadForWatchedVersion(item, version, file) {
   const model = version?.model && typeof version.model === 'object' ? version.model : null
   const modelId = parseInteger(model?.id) ?? item.modelId
   const modelType = normalizeModelType(model?.type) || item.modelType
-  const modelNsfw = normalizeOptionalBoolean(model?.nsfw) ?? item.modelNsfw ?? null
   const modelName = safeTrim(model?.name) || item.modelName
+  const previewImages = normalizePreviewImages([
+    ...(Array.isArray(version?.images) ? version.images : []),
+    ...(Array.isArray(item.previewImages) ? item.previewImages : []),
+    item.previewImage,
+  ])
   const modelMetadata = normalizeDownloadModelMetadata(model ?? item.modelMetadata, {
     modelId,
     modelName,
     modelType,
-    modelNsfw,
+    previewImages,
     creator: item.modelMetadata?.creator,
     stats: item.modelMetadata?.stats,
     tags: item.modelMetadata?.tags,
   })
+  const modelNsfw = modelMetadata.nsfw
 
   return {
     modelId,
@@ -113,11 +118,7 @@ function enqueuePayloadForWatchedVersion(item, version, file) {
     file,
     trainedWords: Array.isArray(version?.trainedWords) ? version.trainedWords.filter((word) => typeof word === 'string') : item.trainedWords,
     previewImage: normalizePreviewImage(version?.images?.[0]) ?? item.previewImage,
-    previewImages: normalizePreviewImages([
-      ...(Array.isArray(version?.images) ? version.images : []),
-      ...(Array.isArray(item.previewImages) ? item.previewImages : []),
-      item.previewImage,
-    ]),
+    previewImages,
   }
 }
 

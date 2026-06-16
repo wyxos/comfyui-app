@@ -1,4 +1,4 @@
-import { safeTrim } from './shared.mjs'
+import { normalizeNsfwLevel, safeTrim } from './shared.mjs'
 
 function mediaTypeForPreview(source) {
   return safeTrim(source?.mediaType ?? source?.type) || null
@@ -52,11 +52,9 @@ function serializeDownloadPreviewPath(download, source, index) {
   }
 
   const preview = { url, mediaType: mediaTypeForPreview(source) }
-  if (source?.nsfw !== undefined && source?.nsfw !== null) {
-    preview.nsfw = source.nsfw
-  }
-  if (safeTrim(source?.nsfwLevel)) {
-    preview.nsfwLevel = safeTrim(source.nsfwLevel)
+  const nsfwLevel = normalizeNsfwLevel(source?.nsfwLevel)
+  if (nsfwLevel !== null) {
+    preview.nsfwLevel = nsfwLevel
   }
 
   return preview
@@ -72,11 +70,9 @@ function serializeSidecarPreviewPath(source, index, type, modelName) {
   }
 
   const preview = { url, mediaType: mediaTypeForPreview(source) }
-  if (source?.nsfw !== undefined && source?.nsfw !== null) {
-    preview.nsfw = source.nsfw
-  }
-  if (safeTrim(source?.nsfwLevel)) {
-    preview.nsfwLevel = safeTrim(source.nsfwLevel)
+  const nsfwLevel = normalizeNsfwLevel(source?.nsfwLevel)
+  if (nsfwLevel !== null) {
+    preview.nsfwLevel = nsfwLevel
   }
 
   return preview

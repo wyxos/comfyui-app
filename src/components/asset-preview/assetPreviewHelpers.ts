@@ -178,30 +178,9 @@ export function isImageNsfw(_model: CivitaiModel | null, image: NsfwMediaSource)
   return imageNsfwDetectedValue(image) === true
 }
 
-function nsfwFlagDetectedValue(value: unknown): boolean | null {
-  if (typeof value === 'boolean') {
-    return value
-  }
-
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value > 0 : null
-  }
-
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase()
-    if (!normalized) {
-      return null
-    }
-
-    return !['false', '0', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized)
-  }
-
-  return null
-}
-
 function nsfwLevelDetectedValue(value: unknown): boolean | null {
   if (typeof value === 'number') {
-    return Number.isFinite(value) ? value >= 4 : null
+    return Number.isFinite(value) ? value > 4 : null
   }
 
   if (typeof value !== 'string') {
@@ -215,7 +194,7 @@ function nsfwLevelDetectedValue(value: unknown): boolean | null {
 
   const numericLevel = Number(normalized)
   if (Number.isFinite(numericLevel)) {
-    return numericLevel >= 4
+    return numericLevel > 4
   }
 
   return ![
@@ -235,18 +214,22 @@ function nsfwLevelDetectedValue(value: unknown): boolean | null {
 }
 
 export function imageNsfwDetectedValue(image: NsfwMediaSource): boolean | null {
-  const levelDetected = nsfwLevelDetectedValue(image?.nsfwLevel)
-  const flagDetected = nsfwFlagDetectedValue(image?.nsfw)
+  return nsfwLevelDetectedValue(image?.nsfwLevel)
+}
 
-  if (levelDetected === true || flagDetected === true) {
-    return true
+function imagesNsfwDetectedValue(images: Array<NsfwMediaSource> | null | undefined) {
+  let hasCurrentSafeImage = false
+  for (const image of images ?? []) {
+    const detected = imageNsfwDetectedValue(image)
+    if (detected === true) {
+      return true
+    }
+    if (detected === false) {
+      hasCurrentSafeImage = true
+    }
   }
 
-  if (levelDetected !== null) {
-    return levelDetected
-  }
-
-  return flagDetected
+  return hasCurrentSafeImage ? false : null
 }
 
 export function modelHasNsfwContent(
@@ -254,10 +237,7 @@ export function modelHasNsfwContent(
     modelVersions?: Array<{ images?: Array<Pick<CivitaiImage, 'nsfw' | 'nsfwLevel'>> }>
   },
 ) {
-  return model.nsfw === true
-    || (model.modelVersions ?? []).some((version) =>
-      (version.images ?? []).some((image) => isImageNsfw(null, image)),
-    )
+  return imagesNsfwDetectedValue((model.modelVersions ?? []).flatMap((version) => version.images ?? [])) === true
 }
 
 export function civitaiModelWebUrl(
@@ -277,10 +257,6 @@ export function imageNsfwLabel(model: CivitaiModel | null, image: CivitaiImage |
   const imageDetected = imageNsfwDetectedValue(image)
   if (imageDetected === false) {
     return 'No'
-  }
-
-  if (typeof image?.nsfw === 'string' && image.nsfw.trim()) {
-    return image.nsfw
   }
 
   return 'Unknown'

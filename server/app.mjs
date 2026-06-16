@@ -13,6 +13,7 @@ import {
   handleLoraList,
   handlePutModelMetadata,
 } from './handlers/core.mjs'
+import { handleCivitaiModelPreviews } from './handlers/civitai-model-previews.mjs'
 import {
   handleClearDownloads,
   handleDownloadAction,
@@ -158,6 +159,10 @@ export function createCompanionServer({ connectWebSocket = true, devAssetOrigin 
 
   if (url.pathname === '/api/civitai/models' && request.method === 'GET') {
     return handleCivitaiModelsProxy(url, response, request)
+  }
+
+  if (url.pathname === '/api/civitai/model-previews' && request.method === 'GET') {
+    return handleCivitaiModelPreviews(url, response, request)
   }
 
   if (url.pathname === '/api/civitai/images' && request.method === 'GET') {

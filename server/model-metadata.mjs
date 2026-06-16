@@ -11,7 +11,13 @@ import {
 } from './model-metadata-normalizers.mjs'
 import { resolveModelPath } from './model-paths.mjs'
 import { readJsonFileIfExists } from './model-trigger-words.mjs'
-import { normalizeOptionalBoolean, safeTrim } from './shared.mjs'
+import {
+  imageListNsfwLevelDetectedValue,
+  normalizeNsfwLevel,
+  normalizeOptionalBoolean,
+  normalizePlainObject,
+  safeTrim,
+} from './shared.mjs'
 
 const pendingEnrichment = new Set()
 
@@ -141,8 +147,22 @@ export function normalizeModelCompatibilityMetadata(payload, options = {}) {
 
   const version = getVersionPayload(payload)
   const model = payload.model && typeof payload.model === 'object' ? payload.model : payload
+  const currentSafetyImages = [
+    ...(Array.isArray(payload.images) ? payload.images : []),
+    ...(Array.isArray(payload.previewImages) ? payload.previewImages : []),
+    ...(
+      Array.isArray(payload.modelVersions)
+        ? payload.modelVersions.flatMap((candidate) => Array.isArray(candidate?.images) ? candidate.images : [])
+        : []
+    ),
+    ...(
+      Array.isArray(model.modelVersions)
+        ? model.modelVersions.flatMap((candidate) => Array.isArray(candidate?.images) ? candidate.images : [])
+        : []
+    ),
+  ]
   const baseModel = safeTrim(payload.baseModel ?? version.baseModel ?? payload.metadata?.baseModel)
-  const modelNsfw = normalizeOptionalBoolean(payload.modelNsfw ?? payload.nsfw ?? model.nsfw ?? payload.modelMetadata?.nsfw)
+  const modelNsfw = imageListNsfwLevelDetectedValue(currentSafetyImages)
   const modelNsfwOverride = normalizeOptionalBoolean(payload.modelNsfwOverride ?? payload.localModelNsfw ?? payload.metadata?.modelNsfwOverride) ?? (payload.source === 'manual' && modelNsfw !== null ? modelNsfw : null)
   const imageSafetyOverrides = normalizeImageSafetyOverrides(
     payload.imageSafetyOverrides ?? payload.metadata?.imageSafetyOverrides,
@@ -209,10 +229,12 @@ function civitaiVersionToSidecar(payload, fallback = {}) {
   const primaryFile = Array.isArray(payload?.files)
     ? payload.files.find((file) => file?.primary) ?? payload.files[0]
     : null
-  const modelNsfw = normalizeOptionalBoolean(payload?.model?.nsfw ?? payload?.modelNsfw ?? payload?.nsfw ?? fallback.modelNsfw)
+  const previewImages = normalizeCivitaiPreviewImages(payload?.images)
+  const modelNsfw = imageListNsfwLevelDetectedValue(previewImages)
   const modelId = payload?.modelId ?? payload?.model?.id ?? fallback.modelId
   const modelName = payload?.model?.name ?? fallback.modelName
   const modelType = payload?.model?.type ?? fallback.modelType
+  const modelSafetyMetadata = { id: modelId, name: modelName, type: modelType, nsfw: modelNsfw, safetySchemaVersion: 2 }
 
   return {
     source: 'civitai',
@@ -220,12 +242,8 @@ function civitaiVersionToSidecar(payload, fallback = {}) {
     modelName,
     modelType,
     modelNsfw,
-    model: {
-      id: modelId,
-      name: modelName,
-      type: modelType,
-      nsfw: modelNsfw,
-    },
+    model: modelSafetyMetadata,
+    modelMetadata: modelSafetyMetadata,
     versionId: payload?.id ?? fallback.versionId,
     versionName: payload?.name ?? fallback.versionName,
     baseModel: payload?.baseModel ?? fallback.baseModel,
@@ -234,7 +252,26 @@ function civitaiVersionToSidecar(payload, fallback = {}) {
     fileName: primaryFile?.name ?? fallback.fileName,
     hashes: primaryFile?.hashes ?? fallback.hashes ?? {},
     files: payload?.files ?? [],
+    previewImage: previewImages[0] ?? null,
+    previewImages,
   }
+}
+
+function normalizeCivitaiPreviewImages(images) {
+  return (Array.isArray(images) ? images : [])
+    .filter((image) => safeTrim(image?.url))
+    .map((image) => {
+      const item = normalizePlainObject(image)
+      return {
+        id: item.id ?? null,
+        url: safeTrim(item.url),
+        width: typeof item.width === 'number' ? item.width : null,
+        height: typeof item.height === 'number' ? item.height : null,
+        hash: safeTrim(item.hash),
+        type: safeTrim(item.type),
+        nsfwLevel: normalizeNsfwLevel(item.nsfwLevel),
+      }
+    })
 }
 
 export async function fetchCivitaiVersionMetadata({ versionId, hashes = {}, fetchImpl = fetch } = {}) {

@@ -248,7 +248,14 @@ describe('server helper exports', () => {
 
   it('normalizes Civitai metadata and classifies LoRA compatibility', () => {
     const checkpoint = normalizeModelCompatibilityMetadata(
-      { modelId: 1, versionId: 2, modelType: 'Checkpoint', modelNsfw: false, baseModel: 'Pony' },
+      {
+        modelId: 1,
+        versionId: 2,
+        modelType: 'Checkpoint',
+        modelNsfw: false,
+        baseModel: 'Pony',
+        previewImages: [{ nsfwLevel: 1 }],
+      },
       { modelType: 'Checkpoint', source: 'sidecar' },
     )
     const compatibleLora = normalizeModelCompatibilityMetadata(
@@ -258,6 +265,14 @@ describe('server helper exports', () => {
     const incompatibleLora = normalizeModelCompatibilityMetadata(
       { modelType: 'LORA', baseModel: 'Anima' },
       { modelType: 'LORA', source: 'sidecar' },
+    )
+    const levelFourCheckpoint = normalizeModelCompatibilityMetadata(
+      { modelType: 'Checkpoint', previewImages: [{ nsfwLevel: 4 }] },
+      { modelType: 'Checkpoint', source: 'sidecar' },
+    )
+    const levelEightCheckpoint = normalizeModelCompatibilityMetadata(
+      { modelType: 'Checkpoint', previewImages: [{ nsfwLevel: 8 }] },
+      { modelType: 'Checkpoint', source: 'sidecar' },
     )
     const sameArchitectureLora = normalizeModelCompatibilityMetadata(
       { modelType: 'LORA', baseModel: 'Illustrious' },
@@ -291,6 +306,8 @@ describe('server helper exports', () => {
 
     expect(normalizeBaseModelKey('SDXL 1.0')).toBe('sdxl')
     expect(checkpoint.modelNsfw).toBe(false)
+    expect(levelFourCheckpoint.modelNsfw).toBe(false)
+    expect(levelEightCheckpoint.modelNsfw).toBe(true)
     expect(compatibleLora.trainedWords).toEqual(['detail boost'])
     expect(classifyLoraCompatibility(checkpoint, compatibleLora)).toBe('compatible')
     expect(classifyLoraCompatibility(checkpoint, sameArchitectureLora)).toBe('warning')
@@ -352,6 +369,7 @@ describe('server helper exports', () => {
           baseModel: 'Pony',
           trainedWords: ['detail boost'],
           model: { id: 101, name: 'Detail LoRA', type: 'LORA', nsfw: true },
+          images: [{ id: 401, url: 'https://image.test/safe.png', nsfw: true, nsfwLevel: 1 }],
           files: [{ id: 301, name: 'detail.safetensors', primary: true, hashes: { SHA256: 'abc' } }],
         }),
         { status: 200 },
@@ -361,8 +379,9 @@ describe('server helper exports', () => {
     await expect(fetchCivitaiVersionMetadata({ versionId: 201, fetchImpl: fetchById as typeof fetch })).resolves.toMatchObject({
       modelId: 101,
       versionId: 201,
-      modelNsfw: true,
-      model: expect.objectContaining({ nsfw: true }),
+      modelNsfw: false,
+      model: expect.objectContaining({ nsfw: false }),
+      previewImages: [expect.objectContaining({ nsfwLevel: 1 })],
       baseModel: 'Pony',
       trainedWords: ['detail boost'],
       hashes: { SHA256: 'abc' },

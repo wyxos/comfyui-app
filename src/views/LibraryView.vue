@@ -27,6 +27,7 @@ import {
   type LibraryModelItem,
 } from './library/libraryModelHelpers'
 import { useHiddenLibraryModels } from './library/useHiddenLibraryModels'
+import { useLibraryPreviewBackfills } from './library/useLibraryPreviewBackfills'
 import { useLibraryRouteFilters } from './library/useLibraryRouteFilters'
 import { useLibrarySafetyOverrides } from './library/useLibrarySafetyOverrides'
 
@@ -90,6 +91,10 @@ const {
   refreshHiddenModels,
   restoreHiddenModelId,
 } = useHiddenLibraryModels()
+const {
+  loadMissingLibraryPreviewBackfills,
+  withPreviewBackfill,
+} = useLibraryPreviewBackfills()
 
 const downloadedModels = computed<LibraryModelItem[]>(() => {
   return completedDownloads.value
@@ -178,7 +183,7 @@ const filteredModels = computed(() => {
 const pageCount = computed(() => Math.max(1, Math.ceil(filteredModels.value.length / PAGE_SIZE)))
 const pageStart = computed(() => (currentPage.value - 1) * PAGE_SIZE)
 const pageEnd = computed(() => pageStart.value + PAGE_SIZE)
-const pagedModels = computed(() => filteredModels.value.slice(pageStart.value, pageEnd.value))
+const pagedModels = computed(() => filteredModels.value.slice(pageStart.value, pageEnd.value).map(withPreviewBackfill))
 const visibleRangeLabel = computed(() => {
   if (!filteredModels.value.length) {
     return '0 of 0'
@@ -228,6 +233,10 @@ watch(baseModelOptions, (options) => {
 watch(pageCount, (nextPageCount) => {
   currentPage.value = Math.min(currentPage.value, nextPageCount)
 })
+
+watch(pagedModels, (items) => {
+  void loadMissingLibraryPreviewBackfills(items)
+}, { immediate: true })
 
 watch(controlNetModels, () => {
   if (selectedModel.value?.itemKind !== 'controlnet') {

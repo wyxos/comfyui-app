@@ -86,7 +86,6 @@ export function atlasItemFor(image: CivitaiImage, model: CivitaiModel, version: 
     id: numericCivitaiId(image.id),
     url: image.url,
     type: isVideoPreview(image) ? 'video' : 'image',
-    nsfw: image.nsfw,
     nsfwLevel: image.nsfwLevel,
     width: image.width,
     height: image.height,

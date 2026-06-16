@@ -37,14 +37,9 @@ function watchedPreviewPath(image: Record<string, unknown> | null | undefined) {
     : typeof image?.type === 'string'
       ? image.type
       : null
-  const nsfw = typeof image?.nsfw === 'boolean' || typeof image?.nsfw === 'string'
-    ? image.nsfw
-    : null
-
   return {
     url,
     mediaType,
-    nsfw,
     nsfwLevel: typeof image?.nsfwLevel === 'string' || typeof image?.nsfwLevel === 'number' ? image.nsfwLevel : null,
   }
 }
@@ -66,7 +61,7 @@ function watchedPreviewPaths(item: WatchedAssetDownloadItem) {
 }
 
 function previewPathForDownload(item: DownloadViewRowItem | null | undefined) {
-  return item?.previewPaths?.find((preview) => preview.url) ?? null
+  return item?.previewPaths?.find((preview) => preview.url) ?? watchedPreviewPath(item?.previewImage) ?? null
 }
 
 export function previewHasNsfw(item: DownloadViewRowItem | null | undefined) {
@@ -89,6 +84,7 @@ export function watchedDownloadToRowItem(item: WatchedAssetDownloadItem): Downlo
     baseModel: item.baseModel,
     fileId: item.fileId,
     fileName: item.fileName,
+    previewImage: item.previewImage,
     previewUrl: previewUrl || null,
     previewPaths,
     targetPath: item.lastStatus || 'Waiting for Civitai',
@@ -99,7 +95,15 @@ export function watchedDownloadToRowItem(item: WatchedAssetDownloadItem): Downlo
 }
 
 export function itemHasNsfw(item: DownloadViewRowItem) {
-  return isNsfwValue(item.modelNsfwOverride ?? item.modelMetadata?.modelNsfwOverride ?? item.modelNsfw ?? item.modelMetadata?.nsfw)
+  const override = item.modelNsfwOverride ?? item.modelMetadata?.modelNsfwOverride
+  if (override !== null && override !== undefined) {
+    return isNsfwValue(override)
+  }
+
+  return [
+    watchedPreviewPath(item.previewImage),
+    ...(item.previewPaths ?? []),
+  ].some((preview) => imageNsfwDetectedValue(preview) === true)
 }
 
 export function isNsfwValue(value: unknown) {

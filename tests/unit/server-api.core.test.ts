@@ -357,6 +357,7 @@ describe('companion server API routes', () => {
         downloadItem('detailBoost', 'complete', {
           modelNsfw: true,
           modelMetadata: { nsfw: true, type: 'LORA' },
+          previewImage: { url: 'https://image.test/detailBoost.png', nsfwLevel: 8 },
           targetPath: join(server.loraDir, 'detailBoost.safetensors'),
         }),
         downloadItem('waiIllustriousSDXL_v160', 'complete', {
@@ -365,6 +366,7 @@ describe('companion server API routes', () => {
           modelType: 'Checkpoint',
           modelNsfw: true,
           modelMetadata: { nsfw: true, type: 'Checkpoint' },
+          previewImage: { url: 'https://image.test/wai.png', nsfwLevel: 8 },
           fileName: 'waiIllustriousSDXL_v160.safetensors',
           targetPath: join(server.checkpointDir, 'waiIllustriousSDXL_v160.safetensors'),
         }),

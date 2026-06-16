@@ -13,7 +13,7 @@ import LibraryModelCard from '../../src/views/library/LibraryModelCard.vue'
 import type { LibraryPreviewPath } from '../../src/views/library/libraryModelHelpers'
 
 describe('NSFW blur content', () => {
-  it('blurs the Assets card title but not a safe preview image when only the model is NSFW', () => {
+  it('does not blur the Assets card title when only legacy model safety is NSFW', () => {
     const model = {
       id: 101,
       name: 'NSFW asset card',
@@ -57,7 +57,7 @@ describe('NSFW blur content', () => {
       modelVersionLabel: () => 'v1',
       creatorLabel: () => 'previewer',
       favoriteCountFor: () => 0,
-      modelHasNsfw: () => true,
+      modelHasNsfw: () => false,
       formatFileSize: () => '1 MB',
       versionsForModel: () => model.modelVersions,
       primaryFileForVersion: () => model.modelVersions[0].files[0],
@@ -92,10 +92,10 @@ describe('NSFW blur content', () => {
     const wrapper = mount(Harness)
 
     expect(wrapper.get('img[alt="NSFW asset card thumbnail"]').classes()).not.toContain('blur-sm')
-    expect(wrapper.get('[data-asset-card-title-link]').classes()).toContain('blur-sm')
+    expect(wrapper.get('[data-asset-card-title-link]').classes()).not.toContain('blur-sm')
   })
 
-  it('blurs the Assets card preview image but not the title when only the preview media is NSFW', () => {
+  it('blurs the Assets card preview image from current nsfwLevel metadata', () => {
     const model = {
       id: 102,
       name: 'Safe asset card',
@@ -107,7 +107,7 @@ describe('NSFW blur content', () => {
         {
           id: 202,
           name: 'v1',
-          images: [{ url: 'https://example.test/nsfw.jpg', type: 'image', nsfw: true }],
+          images: [{ url: 'https://example.test/nsfw.jpg', type: 'image', nsfw: true, nsfwLevel: 8 }],
           files: [{ id: 302, name: 'model.safetensors', type: 'Model', primary: true }],
         },
       ],
@@ -139,7 +139,7 @@ describe('NSFW blur content', () => {
       modelVersionLabel: () => 'v1',
       creatorLabel: () => 'previewer',
       favoriteCountFor: () => 0,
-      modelHasNsfw: () => true,
+      modelHasNsfw: () => false,
       formatFileSize: () => '1 MB',
       versionsForModel: () => model.modelVersions,
       primaryFileForVersion: () => model.modelVersions[0].files[0],
@@ -177,7 +177,7 @@ describe('NSFW blur content', () => {
     expect(wrapper.get('[data-asset-card-title-link]').classes()).not.toContain('blur-sm')
   })
 
-  it('blurs the Assets card preview image when Civitai sends numeric nsfwLevel metadata', () => {
+  it('does not blur the Assets card preview image when Civitai sends nsfwLevel 4 metadata', () => {
     const model = {
       id: 103,
       name: 'Numeric nsfwLevel asset card',
@@ -255,11 +255,11 @@ describe('NSFW blur content', () => {
 
     const wrapper = mount(Harness)
 
-    expect(wrapper.get('img[alt="Numeric nsfwLevel asset card thumbnail"]').classes()).toContain('blur-sm')
+    expect(wrapper.get('img[alt="Numeric nsfwLevel asset card thumbnail"]').classes()).not.toContain('blur-sm')
     expect(wrapper.get('[data-asset-card-title-link]').classes()).not.toContain('blur-sm')
   })
 
-  it('blurs the Library card title but not a safe preview image when only the model is NSFW', () => {
+  it('does not blur the Library card title when only legacy model safety is NSFW', () => {
     const wrapper = mount(LibraryModelCard, {
       props: {
         blurNsfwContent: true,
@@ -268,7 +268,7 @@ describe('NSFW blur content', () => {
           itemKind: 'checkpoint',
           librarySource: 'downloaded',
           modelId: 1,
-          modelName: 'NSFW library card',
+          modelName: 'Legacy safety library card',
           modelType: 'Checkpoint',
           modelNsfw: true,
           modelMetadata: { nsfw: true },
@@ -276,17 +276,18 @@ describe('NSFW blur content', () => {
           versionName: 'v1',
           fileName: 'library.safetensors',
           previewUrl: '/library-preview.png',
-          previewPaths: [{ url: '/library-preview.png', mediaType: 'image', nsfw: false }] as LibraryPreviewPath[],
+          previewPaths: [{ url: '/library-preview.png', mediaType: 'image', nsfw: true, nsfwLevel: 1 }] as LibraryPreviewPath[],
           updatedAt: 10,
         },
       },
     })
 
-    expect(wrapper.get('img[alt="NSFW library card preview"]').classes()).not.toContain('blur-sm')
-    expect(wrapper.get('[data-library-card-title]').classes()).toContain('blur-sm')
+    expect(wrapper.get('img[alt="Legacy safety library card preview"]').classes()).not.toContain('blur-sm')
+    expect(wrapper.get('[data-library-card-title]').classes()).not.toContain('blur-sm')
+    expect(wrapper.text()).not.toContain('NSFW')
   })
 
-  it('blurs the Home picker preview image but not the title when only the preview media is NSFW', () => {
+  it('does not blur the Home picker preview image from legacy preview safety alone', () => {
     const wrapper = mount(HomeAssetPickerCard, {
       props: {
         blurNsfwContent: true,
@@ -303,7 +304,7 @@ describe('NSFW blur content', () => {
       },
     })
 
-    expect(wrapper.get('img[alt="Safe picker card preview"]').classes()).toContain('blur-sm')
+    expect(wrapper.get('img[alt="Safe picker card preview"]').classes()).not.toContain('blur-sm')
     expect(wrapper.get('[data-asset-picker-title]').classes()).not.toContain('blur-sm')
   })
 })

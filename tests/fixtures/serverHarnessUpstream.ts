@@ -65,7 +65,27 @@ function createDefaultUpstreamState(): UpstreamState {
           id: 101,
           name: 'Mock Detail LoRA',
           type: 'LORA',
-          modelVersions: [{ id: 201, name: 'v1', files: [] }],
+          modelVersions: [
+            {
+              id: 201,
+              name: 'v1',
+              files: [],
+              images: [
+                {
+                  id: 401,
+                  url: 'https://image.test/detail-preview.png',
+                  type: 'image',
+                  mediaType: 'image',
+                  nsfw: false,
+                  nsfwLevel: 1,
+                  width: 512,
+                  height: 768,
+                  hash: 'preview-hash',
+                  meta: { prompt: 'sample prompt' },
+                },
+              ],
+            },
+          ],
         },
       ],
       metadata: { totalItems: 1, totalPages: 1 },

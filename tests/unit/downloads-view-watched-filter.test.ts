@@ -286,7 +286,7 @@ describe('DownloadsView watched filter', () => {
         targetPath: 'C:\\models\\checkpoints\\nsfw.safetensors',
         progressPercent: 100,
         previewUrl: '/api/civitai/downloads/nsfw-complete-download/preview',
-        previewPaths: [{ url: '/api/civitai/downloads/nsfw-complete-download/preview', mediaType: 'image', nsfw: 'Soft' }],
+        previewPaths: [{ url: '/api/civitai/downloads/nsfw-complete-download/preview', mediaType: 'image', nsfwLevel: 8 }],
         updatedAt: 20,
       },
     ])
@@ -299,7 +299,7 @@ describe('DownloadsView watched filter', () => {
             name: 'Safe checkpoint',
             type: 'Checkpoint',
             nsfw: false,
-            modelVersions: [{ id: 4, name: 'v1', images: [{ url: 'https://example.test/nsfw-preview.png', nsfw: 'Soft' }] }],
+            modelVersions: [{ id: 4, name: 'v1', images: [{ url: 'https://example.test/nsfw-preview.png', nsfwLevel: 8 }] }],
           }],
         }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } })
       }
@@ -335,7 +335,7 @@ describe('DownloadsView watched filter', () => {
 
     expect(wrapper.get('img[alt="Safe checkpoint preview"]').classes()).toContain('blur-sm')
     expect(wrapper.get('[data-download-title-button]').classes()).not.toContain('blur-sm')
-    expect(wrapper.get('[data-download-title-civitai-link]').attributes('href')).toBe('https://civitai.com/models/3?modelVersionId=4')
+    expect(wrapper.get('[data-download-title-civitai-link]').attributes('href')).toBe('https://civitai.red/models/3?modelVersionId=4')
 
     await wrapper.get('[aria-label="Open Safe checkpoint preview"]').trigger('click')
     await flushPromises()

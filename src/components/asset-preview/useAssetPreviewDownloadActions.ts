@@ -98,12 +98,10 @@ export function useAssetPreviewDownloadActions(options: { autoStart?: boolean } 
         modelId: model.id,
         modelName: model.name,
         modelType: model.type,
-        modelNsfw: model.nsfw ?? null,
         modelMetadata: {
           id: model.id,
           name: model.name,
           type: model.type,
-          nsfw: model.nsfw ?? null,
           creator: model.creator ?? null,
           stats: model.stats ?? null,
         },

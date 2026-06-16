@@ -38,6 +38,7 @@ export type AssetDownloadItem = {
   totalBytes?: number | null
   progressPercent?: number | null
   previewUrl?: string | null
+  previewImage?: Record<string, unknown> | null
   previewPaths?: Array<{
     url?: string | null
     mediaType?: 'image' | 'video' | string | null

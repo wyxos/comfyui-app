@@ -67,14 +67,16 @@ function normalizeWatchedDownloadBody(body) {
     throw invalidWatchError('unsupported-file-type', 'Only primary model files can be watched for download.')
   }
 
+  const previewImage = normalizePreviewImage(body?.previewImage)
+  const previewImages = normalizePreviewImages(body?.previewImages)
   const modelMetadata = normalizeDownloadModelMetadata(body?.modelMetadata ?? body?.model, {
     modelId,
     modelName: body?.modelName,
     modelType,
-    modelNsfw: body?.modelNsfw ?? body?.nsfw,
     creator: body?.creator,
     stats: body?.stats,
     tags: body?.tags,
+    previewImages: [previewImage, ...previewImages].filter(Boolean),
   })
 
   return {
@@ -91,8 +93,8 @@ function normalizeWatchedDownloadBody(body) {
     fileId: file.id,
     fileName,
     trainedWords: Array.isArray(body?.trainedWords) ? body.trainedWords.filter((word) => typeof word === 'string') : [],
-    previewImage: normalizePreviewImage(body?.previewImage),
-    previewImages: normalizePreviewImages(body?.previewImages),
+    previewImage,
+    previewImages,
   }
 }
 

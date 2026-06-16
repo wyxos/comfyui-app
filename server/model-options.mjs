@@ -1,6 +1,6 @@
 import { basename, extname } from 'node:path'
 import { civitaiDownloads, supportedPreviewExtensions, supportedVideoExtensions } from './config.mjs'
-import { normalizeOptionalBoolean, safeTrim } from './shared.mjs'
+import { imageListNsfwLevelDetectedValue, safeTrim } from './shared.mjs'
 import { statFileIfExists } from './downloads/metadata.mjs'
 import { downloadsLoaded, readDownloadsState } from './downloads/state.mjs'
 import { getComfyCheckpointDir, getComfyControlNetDir, getComfyLoraDir, resolveModelPath } from './model-paths.mjs'
@@ -109,7 +109,11 @@ function downloadHasModelType(download, modelType) {
 }
 
 function downloadModelNsfw(download) {
-  return normalizeOptionalBoolean(download?.modelNsfw ?? download?.modelMetadata?.nsfw ?? download?.model?.nsfw)
+  return imageListNsfwLevelDetectedValue([
+    download?.previewImage,
+    ...(Array.isArray(download?.previewImages) ? download.previewImages : []),
+    ...(Array.isArray(download?.previewPaths) ? download.previewPaths : []),
+  ].filter(Boolean))
 }
 
 function mergeStringList(primary = [], fallback = []) {

@@ -1,7 +1,13 @@
 import { readdir, stat, unlink } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import { supportedPreviewExtensions } from '../config.mjs'
-import { normalizeOptionalBoolean, normalizePlainObject, safeTrim } from '../shared.mjs'
+import {
+  imageListNsfwLevelDetectedValue,
+  normalizeNsfwLevel,
+  normalizeOptionalBoolean,
+  normalizePlainObject,
+  safeTrim,
+} from '../shared.mjs'
 import { getStoredCivitaiApiKey } from '../settings.mjs'
 import { scheduleDownloadsPersist } from './state.mjs'
 import { verifyCivitaiDownloadHash } from './transfer.mjs'
@@ -108,6 +114,11 @@ export function buildDownloadSidecarPayload(download) {
     modelName: download.modelName,
     modelType: download.modelType,
     modelNsfw: download.modelNsfw,
+    previewImages: [
+      download.previewImage,
+      ...(Array.isArray(download.previewImages) ? download.previewImages : []),
+      ...(Array.isArray(download.previewPaths) ? download.previewPaths : []),
+    ].filter(Boolean),
   })
 
   return {
@@ -140,12 +151,23 @@ export function normalizeDownloadModelMetadata(rawModel, fallback = {}) {
   const creator = normalizePlainObject(model.creator ?? fallback.creator)
   const stats = normalizePlainObject(model.stats ?? fallback.stats)
   const imageSafetyOverrides = normalizePlainObject(model.imageSafetyOverrides ?? fallback.imageSafetyOverrides)
+  const images = [
+    ...(Array.isArray(model.images) ? model.images : []),
+    ...(Array.isArray(model.previewImages) ? model.previewImages : []),
+    ...(Array.isArray(fallback.previewImages) ? fallback.previewImages : []),
+    ...(
+      Array.isArray(model.modelVersions)
+        ? model.modelVersions.flatMap((version) => Array.isArray(version?.images) ? version.images : [])
+        : []
+    ),
+  ]
 
   return {
     id: normalizeNumericField(model.id ?? fallback.modelId ?? fallback.id, null),
     name: safeTrim(model.name ?? fallback.modelName ?? fallback.name),
     type: safeTrim(model.type ?? fallback.modelType ?? fallback.type),
-    nsfw: normalizeOptionalBoolean(model.nsfw ?? fallback.modelNsfw ?? fallback.nsfw),
+    nsfw: imageListNsfwLevelDetectedValue(images),
+    safetySchemaVersion: 2,
     modelNsfwOverride: normalizeOptionalBoolean(model.modelNsfwOverride ?? fallback.modelNsfwOverride),
     imageSafetyOverrides,
     creator: creator.username ? { username: safeTrim(creator.username) } : null,
@@ -155,25 +177,48 @@ export function normalizeDownloadModelMetadata(rawModel, fallback = {}) {
 }
 
 export function applyDownloadModelMetadata(download, payload) {
+  const payloadPreviewImage = normalizePreviewImage(payload?.previewImage)
+  const payloadPreviewImages = normalizePreviewImages([
+    ...(Array.isArray(payload?.previewImages) ? payload.previewImages : []),
+    payloadPreviewImage,
+  ])
   const modelMetadata = normalizeDownloadModelMetadata(payload?.modelMetadata ?? payload?.model, {
     modelId: payload?.modelId ?? download.modelId,
     modelName: payload?.modelName ?? download.modelName,
     modelType: payload?.modelType ?? download.modelType,
-    modelNsfw: payload?.modelNsfw ?? payload?.nsfw ?? download.modelNsfw,
     modelNsfwOverride: payload?.modelNsfwOverride ?? download.modelNsfwOverride ?? download.modelMetadata?.modelNsfwOverride,
     imageSafetyOverrides: payload?.imageSafetyOverrides ?? download.imageSafetyOverrides ?? download.modelMetadata?.imageSafetyOverrides,
     tags: payload?.tags ?? download.modelMetadata?.tags,
+    previewImages: [
+      ...payloadPreviewImages,
+      ...(Array.isArray(payload?.model?.images) ? payload.model.images : []),
+      ...(Array.isArray(download.previewImages) ? download.previewImages : []),
+    ],
   })
 
   download.modelMetadata = modelMetadata
   download.modelNsfw = modelMetadata.nsfw
   download.modelNsfwOverride = modelMetadata.modelNsfwOverride
   download.imageSafetyOverrides = modelMetadata.imageSafetyOverrides
+  if (payloadPreviewImage) {
+    download.previewImage = payloadPreviewImage
+  }
+  if (payloadPreviewImages.length) {
+    download.previewImages = normalizePreviewImages([
+      ...payloadPreviewImages,
+      ...(Array.isArray(download.previewImages) ? download.previewImages : []),
+    ])
+  }
   return download
 }
 
 export function hasDownloadModelNsfwMetadata(download) {
-  return normalizeOptionalBoolean(download?.modelNsfw ?? download?.modelMetadata?.nsfw ?? download?.model?.nsfw) !== null
+  return download?.modelMetadata?.safetySchemaVersion === 2 ||
+    imageListNsfwLevelDetectedValue([
+      download?.previewImage,
+      ...(Array.isArray(download?.previewImages) ? download.previewImages : []),
+      ...(Array.isArray(download?.previewPaths) ? download.previewPaths : []),
+    ].filter(Boolean)) !== null
 }
 
 async function readDownloadSidecarPayload(download) {
@@ -201,7 +246,7 @@ export async function refreshDownloadModelMetadata(download, { force = false } =
   const sidecarPayload = await readDownloadSidecarPayload(download)
   if (
     sidecarPayload &&
-    normalizeOptionalBoolean(sidecarPayload.modelNsfw ?? sidecarPayload.model?.nsfw ?? sidecarPayload.modelMetadata?.nsfw) !== null
+    hasDownloadModelNsfwMetadata(sidecarPayload)
   ) {
     applyDownloadModelMetadata(download, sidecarPayload)
     return true
@@ -277,8 +322,7 @@ export function normalizePreviewImage(rawImage) {
     height: normalizeNumericField(image.height, null),
     hash: safeTrim(image.hash),
     type: safeTrim(image.type),
-    nsfw: image.nsfw,
-    nsfwLevel: safeTrim(image.nsfwLevel),
+    nsfwLevel: normalizeNsfwLevel(image.nsfwLevel),
     meta: normalizePlainObject(image.meta),
     postId: image.postId ?? null,
     username: safeTrim(image.username),

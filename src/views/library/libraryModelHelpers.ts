@@ -27,10 +27,15 @@ export type LibraryItemKind = Exclude<LibraryTypeFilter, 'all'>
 export type LibrarySource = 'downloaded' | 'watched' | 'hidden' | 'controlnet'
 export type LibrarySourceFilter = (typeof sourceFilters)[number]['value']
 export type LibraryPreviewPath = {
+  id?: string | number | null
   url?: string | null
+  type?: 'image' | 'video' | string | null
   mediaType?: 'image' | 'video' | string | null
   nsfw?: string | boolean | null
   nsfwLevel?: string | number | null
+  width?: number | null
+  height?: number | null
+  hash?: string | null
 }
 export type ControlNetLibraryItem = {
   id: string
@@ -175,8 +180,31 @@ export function primaryPreviewPath(item: LibraryModelItem) {
   return item.previewPaths?.find((preview) => preview.url) ?? null
 }
 
+function previewImagePathForItem(item: LibraryModelItem) {
+  if (!('previewImage' in item)) {
+    return null
+  }
+
+  return watchedPreviewPathFromImage(item.previewImage)
+}
+
+function previewSafetyPathsForItem(item: LibraryModelItem) {
+  return [
+    previewImagePathForItem(item),
+    ...(item.previewPaths ?? []),
+  ].filter((preview): preview is LibraryPreviewPath => Boolean(preview))
+}
+
+function previewSafetyPathsForDownload(item: AssetDownloadItem | WatchedAssetDownloadItem) {
+  const previewPaths = 'previewPaths' in item && Array.isArray(item.previewPaths) ? item.previewPaths : []
+  return [
+    'previewImage' in item ? watchedPreviewPathFromImage(item.previewImage) : null,
+    ...previewPaths,
+  ].filter((preview): preview is LibraryPreviewPath => Boolean(preview))
+}
+
 export function previewFor(item: LibraryModelItem) {
-  return item.previewUrl ?? primaryPreviewPath(item)?.url ?? ''
+  return item.previewUrl ?? primaryPreviewPath(item)?.url ?? previewImagePathForItem(item)?.url ?? ''
 }
 
 export function isVideoPreview(item: LibraryModelItem) {
@@ -185,7 +213,22 @@ export function isVideoPreview(item: LibraryModelItem) {
 }
 
 export function previewHasNsfw(item: LibraryModelItem) {
-  return imageNsfwDetectedValue(primaryPreviewPath(item)) === true
+  return imageNsfwDetectedValue(primaryPreviewPath(item) ?? previewImagePathForItem(item)) === true
+}
+
+function previewPathsNsfwDetectedValue(previewPaths: LibraryPreviewPath[] | null | undefined) {
+  let hasCurrentSafePreview = false
+  for (const preview of previewPaths ?? []) {
+    const detected = imageNsfwDetectedValue(preview)
+    if (detected === true) {
+      return true
+    }
+    if (detected === false) {
+      hasCurrentSafePreview = true
+    }
+  }
+
+  return hasCurrentSafePreview ? false : null
 }
 
 export function normalizeSafetyValue(value: unknown): boolean | null {
@@ -232,7 +275,7 @@ export function compatibilityForDownload(item: AssetDownloadItem | WatchedAssetD
     modelName: item.modelName,
     versionName: item.versionName,
     modelType: item.modelType,
-    modelNsfw: modelNsfwOverride ?? normalizeSafetyValue(item.modelNsfw ?? metadata.nsfw),
+    modelNsfw: previewPathsNsfwDetectedValue(previewSafetyPathsForDownload(item)),
     modelNsfwOverride,
     imageSafetyOverrides: imageSafetyOverrides as ModelCompatibilityMetadata['imageSafetyOverrides'],
     baseModel: item.baseModel ?? '',
@@ -244,15 +287,7 @@ export function modelHasNsfw(item: LibraryModelItem) {
     return item.compatibility.modelNsfwOverride === true
   }
 
-  if (item.compatibility?.modelNsfw !== null && item.compatibility?.modelNsfw !== undefined) {
-    return item.compatibility.modelNsfw === true
-  }
-
-  if ('modelNsfw' in item) {
-    return normalizeSafetyValue(item.modelNsfw ?? metadataRecordFor(item).nsfw) === true
-  }
-
-  return false
+  return previewPathsNsfwDetectedValue(previewSafetyPathsForItem(item)) === true
 }
 
 export function controlNetBaseModelLabel(compatibility: ModelCompatibilityMetadata | null | undefined) {
@@ -275,14 +310,9 @@ function watchedPreviewPathFromImage(image: Record<string, unknown> | null | und
     : typeof image?.type === 'string'
       ? image.type
       : null
-  const nsfw = typeof image?.nsfw === 'boolean' || typeof image?.nsfw === 'string'
-    ? image.nsfw
-    : null
-
   return {
     url,
     mediaType,
-    nsfw,
     nsfwLevel: typeof image?.nsfwLevel === 'string' || typeof image?.nsfwLevel === 'number' ? image.nsfwLevel : null,
   }
 }
@@ -319,10 +349,9 @@ export function hiddenLibraryItemForModel(model: CivitaiModel): HiddenLibraryIte
   const file = primaryFileForVersion(version)
   const previewPaths = version
     ? imagesForVersion(version).map((image) => ({
-        url: image.url,
-        mediaType: image.mediaType ?? image.type ?? null,
-        nsfw: image.nsfw ?? null,
-        nsfwLevel: image.nsfwLevel ?? null,
+      url: image.url,
+      mediaType: image.mediaType ?? image.type ?? null,
+      nsfwLevel: image.nsfwLevel ?? null,
       }))
     : []
 
@@ -347,7 +376,7 @@ export function hiddenLibraryItemForModel(model: CivitaiModel): HiddenLibraryIte
       modelName: model.name,
       versionName: version?.name ?? undefined,
       modelType: model.type,
-      modelNsfw: model.nsfw ?? null,
+      modelNsfw: previewPathsNsfwDetectedValue(previewPaths),
       modelNsfwOverride: null,
       imageSafetyOverrides: {},
       baseModel: version?.baseModel ?? '',

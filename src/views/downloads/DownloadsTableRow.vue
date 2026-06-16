@@ -106,28 +106,12 @@ function previewFor(item: DownloadTableRowItem) {
 }
 
 function isVideoPreview(item: DownloadTableRowItem) {
-  return item.previewPaths?.some((preview) => preview.url === previewFor(item) && preview.mediaType === 'video') ?? false
-}
-
-function isNsfwValue(value: unknown) {
-  if (typeof value === 'boolean') {
-    return value
-  }
-
-  if (typeof value === 'number') {
-    return value > 0
-  }
-
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase()
-    return Boolean(normalized && !['false', '0', 'no', 'n', 'none', 'safe', 'not detected', 'not_detected'].includes(normalized))
-  }
-
-  return false
-}
-
-function itemHasNsfw(item: DownloadTableRowItem) {
-  return isNsfwValue(item.modelNsfwOverride ?? item.modelMetadata?.modelNsfwOverride ?? item.modelNsfw ?? item.modelMetadata?.nsfw)
+  const previewUrl = previewFor(item)
+  const previewImage = item.previewImage as { url?: unknown; mediaType?: unknown; type?: unknown } | null | undefined
+  return (item.previewPaths?.some((preview) => preview.url === previewUrl && preview.mediaType === 'video') ?? false) ||
+    (typeof previewImage?.url === 'string' &&
+      previewImage.url === previewUrl &&
+      (previewImage.mediaType === 'video' || previewImage.type === 'video'))
 }
 
 function shouldBlurPreview(item: DownloadTableRowItem) {
@@ -135,7 +119,8 @@ function shouldBlurPreview(item: DownloadTableRowItem) {
 }
 
 function shouldBlurText(item: DownloadTableRowItem) {
-  return props.blurNsfwPreview && itemHasNsfw(item)
+  return props.blurNsfwPreview &&
+    (item.modelNsfwOverride === true || item.modelMetadata?.modelNsfwOverride === true)
 }
 
 function formatFileSize(item: DownloadTableRowItem) {
@@ -220,7 +205,17 @@ function civitaiModelUrl(item: DownloadTableRowItem) {
   }
 
   const query = params.toString()
-  const url = civitaiModelWebUrl({ id: item.modelId, nsfw: itemHasNsfw(item), modelVersions: [] })
+  const previewImage = item.previewImage as { nsfwLevel?: unknown } | null | undefined
+  const safetyImages = [
+    typeof previewImage?.nsfwLevel === 'string' || typeof previewImage?.nsfwLevel === 'number'
+      ? { nsfwLevel: previewImage.nsfwLevel }
+      : null,
+    ...(item.previewPaths ?? []).map((preview) => ({ nsfwLevel: preview.nsfwLevel ?? null })),
+  ].filter((image): image is { nsfwLevel: string | number | null } => Boolean(image))
+  const url = civitaiModelWebUrl({
+    id: item.modelId,
+    modelVersions: [{ images: safetyImages }],
+  })
   return `${url}${query ? `?${query}` : ''}`
 }
 

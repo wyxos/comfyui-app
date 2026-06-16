@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { civitaiDownloads, configDir, downloadsPath, downloadsPersistRenameAttempts, downloadsPersistRenameDelayMs } from '../config.mjs'
-import { delay, safeTrim } from '../shared.mjs'
+import { delay, normalizeNsfwLevel, safeTrim } from '../shared.mjs'
 import { queueDownloadsSnapshotBroadcast } from './events.mjs'
 import { safeUnlink } from './metadata.mjs'
 
@@ -203,8 +203,7 @@ export function serializeDownloadPreview(image) {
     height: image.height ?? null,
     hash: safeTrim(image.hash),
     type: safeTrim(image.type),
-    nsfw: image.nsfw ?? null,
-    nsfwLevel: safeTrim(image.nsfwLevel),
+    nsfwLevel: normalizeNsfwLevel(image.nsfwLevel),
     postId: image.postId ?? null,
     username: safeTrim(image.username),
     modelVersionIds: Array.isArray(image.modelVersionIds) ? image.modelVersionIds : [],

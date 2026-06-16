@@ -316,6 +316,7 @@ describe('companion server API routes', () => {
           },
           versionId: 201,
           versionName: 'v1',
+          previewImage: { url: 'https://image.test/newDetail.png', nsfwLevel: 8 },
           file: {
             id: 301,
             name: 'newDetail.safetensors',
