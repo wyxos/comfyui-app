@@ -215,6 +215,7 @@ export type GenerationOptionsResponse = {
   schedulers?: string[]
   clipNames?: string[]
   vaeNames?: string[]
+  upscaleModels?: string[]
   defaults?: GenerationOptionDefaults
   message?: string
 }
@@ -310,6 +311,19 @@ export type JobResponse = {
   scheduler?: string | null
   clipName?: string | null
   vaeName?: string | null
+  clipSkip?: number | null
+  hires?: {
+    enabled: boolean
+    upscale: number | null
+    width: number | null
+    height: number | null
+    steps: number | null
+    cfg: number | null
+    denoise: number | null
+    upscaler: string | null
+    samplerName: string | null
+    scheduler: string | null
+  } | null
   loras?: Array<{ name: string; strength: number }>
   inputImageName?: string | null
   inputImageDisplayName?: string | null
@@ -450,6 +464,17 @@ export type PersistedFormState = {
   scheduler?: string
   clipName?: string
   vaeName?: string
+  clipSkip?: string
+  hiresEnabled?: boolean
+  hiresUpscale?: string
+  hiresWidth?: string
+  hiresHeight?: string
+  hiresSteps?: string
+  hiresCfg?: string
+  hiresDenoise?: string
+  hiresUpscaler?: string
+  hiresSamplerName?: string
+  hiresScheduler?: string
   imageDenoise: string
   maintainAspectRatio?: boolean
   useInputImage: boolean

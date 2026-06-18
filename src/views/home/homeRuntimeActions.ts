@@ -1,19 +1,9 @@
-import {
-  createEmptyPromptSections,
-  createEmptyPromptSectionsDrafts,
-} from './homeConstants'
+import { createEmptyPromptSections, createEmptyPromptSectionsDrafts } from './homeConstants'
 import type { HomePreviewComputed } from './homePreviewComputed'
 import type { HomeSelectionComputed } from './homeSelectionComputed'
 import type { HomeState } from './homeState'
 import type { HomeStatusComputed } from './homeStatusComputed'
-import type {
-  CheckpointResponse,
-  ControlNetResponse,
-  GenerationOptionsResponse,
-  JobResponse,
-  LoraResponse,
-  LoraSelection,
-} from './homeTypes'
+import type { CheckpointResponse, ControlNetResponse, GenerationOptionsResponse, JobResponse, LoraResponse, LoraSelection } from './homeTypes'
 
 type HomeRuntimeActionDeps = {
   apiJson: <T>(path: string, init?: RequestInit & { timeoutMs?: number }) => Promise<T>
@@ -52,6 +42,7 @@ const {
   cfg,
   clipName,
   clipNameOptions,
+  clipSkip,
   checkpoints,
   controlNetLoadingError,
   controlNetPreprocessors,
@@ -67,6 +58,16 @@ const {
   generationOptionDefaults,
   generationOptionsError,
   height,
+  hiresCfg,
+  hiresDenoise,
+  hiresEnabled,
+  hiresHeight,
+  hiresSamplerName,
+  hiresScheduler,
+  hiresSteps,
+  hiresUpscale,
+  hiresUpscaler,
+  hiresWidth,
   imageDenoise,
   inputImageBackgroundColor,
   inputImageUploadError,
@@ -104,6 +105,7 @@ const {
   statusLine,
   submissionError,
   useInputImage,
+  upscaleModelOptions,
   vaeName,
   vaeNameOptions,
   maintainAspectRatio,
@@ -192,6 +194,17 @@ function resetForm() {
   scheduler.value = ''
   clipName.value = ''
   vaeName.value = ''
+  clipSkip.value = ''
+  hiresEnabled.value = false
+  hiresUpscale.value = ''
+  hiresWidth.value = ''
+  hiresHeight.value = ''
+  hiresSteps.value = ''
+  hiresCfg.value = ''
+  hiresDenoise.value = ''
+  hiresUpscaler.value = ''
+  hiresSamplerName.value = ''
+  hiresScheduler.value = ''
   imageDenoise.value = ''
   maintainAspectRatio.value = false
   lockedAspectRatio.value = null
@@ -449,6 +462,7 @@ async function loadGenerationOptions() {
     schedulerOptions.value = payload.schedulers ?? []
     clipNameOptions.value = payload.clipNames ?? []
     vaeNameOptions.value = payload.vaeNames ?? []
+    upscaleModelOptions.value = payload.upscaleModels ?? []
     generationOptionDefaults.value = payload.defaults ?? {}
   } catch (error) {
     generationOptionsError.value =

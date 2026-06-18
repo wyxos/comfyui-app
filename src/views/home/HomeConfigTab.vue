@@ -10,6 +10,7 @@ import {
 import UiSelect from '../../components/ui/UiSelect.vue'
 import UiSlider from '../../components/ui/UiSlider.vue'
 import UiTooltip from '../../components/ui/UiTooltip.vue'
+import HomeReplayConfigSection from './HomeReplayConfigSection.vue'
 import { useProvidedHomeView } from './homeViewContext'
 
 const {
@@ -393,6 +394,8 @@ function buildConfigSelectOptions(defaultValue: string, options: string[]) {
         />
       </label>
     </div>
+
+    <HomeReplayConfigSection />
 
     <p
       v-if="generationOptionsError"

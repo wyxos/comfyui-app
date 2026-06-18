@@ -56,10 +56,22 @@ const samplerName = ref('')
 const scheduler = ref('')
 const clipName = ref('')
 const vaeName = ref('')
+const clipSkip = ref('')
+const hiresEnabled = ref(false)
+const hiresUpscale = ref('')
+const hiresWidth = ref('')
+const hiresHeight = ref('')
+const hiresSteps = ref('')
+const hiresCfg = ref('')
+const hiresDenoise = ref('')
+const hiresUpscaler = ref('')
+const hiresSamplerName = ref('')
+const hiresScheduler = ref('')
 const samplerOptions = ref<string[]>([])
 const schedulerOptions = ref<string[]>([])
 const clipNameOptions = ref<string[]>([])
 const vaeNameOptions = ref<string[]>([])
+const upscaleModelOptions = ref<string[]>([])
 const generationOptionDefaults = ref<GenerationOptionDefaults>({})
 const loadingGenerationOptions = ref(true)
 const generationOptionsError = ref('')
@@ -125,6 +137,7 @@ const errorMessage = ref('')
 const submissionError = ref('')
 const metadataPasteNotice = ref('')
 const metadataPasteError = ref('')
+const metadataReplayWarnings = ref<string[]>([])
 const isPastingMetadata = ref(false)
 const isSubmittingGenerate = ref(false)
 const isCancellingJob = ref(false)
@@ -172,10 +185,22 @@ return {
   scheduler,
   clipName,
   vaeName,
+  clipSkip,
+  hiresEnabled,
+  hiresUpscale,
+  hiresWidth,
+  hiresHeight,
+  hiresSteps,
+  hiresCfg,
+  hiresDenoise,
+  hiresUpscaler,
+  hiresSamplerName,
+  hiresScheduler,
   samplerOptions,
   schedulerOptions,
   clipNameOptions,
   vaeNameOptions,
+  upscaleModelOptions,
   generationOptionDefaults,
   loadingGenerationOptions,
   generationOptionsError,
@@ -234,6 +259,7 @@ return {
   submissionError,
   metadataPasteNotice,
   metadataPasteError,
+  metadataReplayWarnings,
   isPastingMetadata,
   isSubmittingGenerate,
   isCancellingJob,

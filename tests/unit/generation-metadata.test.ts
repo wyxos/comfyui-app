@@ -39,6 +39,67 @@ describe('generation metadata mapping', () => {
     })
   })
 
+  it('extracts A1111 hires replay, schedule type, clip skip, and model verification fields', () => {
+    const fields = extractGenerationMetadataFields(
+      {
+        prompt: '1girl, blue hair',
+        negativePrompt: 'bad quality',
+        seed: 424011486,
+        steps: 30,
+        cfgScale: 7,
+        sampler: 'Euler a',
+        width: 1024,
+        height: 1344,
+        'Schedule type': 'Automatic',
+        'Denoising strength': 0.5,
+        'Hires upscale': 2,
+        'Hires steps': 20,
+        'Hires CFG Scale': 4.5,
+        'Hires upscaler': 'RealESRGAN_x4plus_anime_6B',
+        clipSkip: 2,
+        VAE: 'sdxl_vae',
+        'VAE hash': 'a1b2c3',
+        Model: 'WAI-Nsfw-Illustrious-17',
+        'Model hash': 'f116b0c78f',
+      },
+      {
+        samplerOptions,
+        schedulerOptions,
+        vaeOptions: ['sdxl_vae.safetensors'],
+        upscaleModelOptions: ['RealESRGAN_x4plus_anime_6B.pth'],
+      },
+    )
+
+    expect(fields).toMatchObject({
+      prompt: '1girl, blue hair',
+      negativePrompt: 'bad quality',
+      seed: '424011486',
+      steps: '30',
+      cfg: '7',
+      samplerName: 'euler_ancestral',
+      scheduler: 'normal',
+      imageDenoise: '0.5',
+      width: '1024',
+      height: '1344',
+      clipSkip: '2',
+      vaeName: 'sdxl_vae.safetensors',
+      hiresEnabled: true,
+      hiresUpscale: '2',
+      hiresWidth: '2048',
+      hiresHeight: '2688',
+      hiresSteps: '20',
+      hiresCfg: '4.5',
+      hiresDenoise: '0.5',
+      hiresUpscaler: 'RealESRGAN_x4plus_anime_6B.pth',
+      hiresScheduler: 'normal',
+      modelName: 'WAI-Nsfw-Illustrious-17',
+      modelHash: 'f116b0c78f',
+      vaeHash: 'a1b2c3',
+      sourceVaeName: 'sdxl_vae',
+      sourceHiresUpscaler: 'RealESRGAN_x4plus_anime_6B',
+    })
+  })
+
   it('round-trips copied metadata payloads for form paste', () => {
     const copied = serializeGenerationMetadataClipboard(
       {

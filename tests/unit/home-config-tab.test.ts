@@ -58,6 +58,7 @@ function mountConfigTab(options: { hasAnimaCheckpointSelected?: boolean } = {}) 
     attachTo: document.body,
     global: {
       stubs: {
+        HomeReplayConfigSection: true,
         UiSlider: true,
         UiTooltip: defineComponent({
           props: {

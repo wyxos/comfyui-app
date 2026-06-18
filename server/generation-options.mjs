@@ -32,10 +32,11 @@ async function fetchObjectInfo(nodeName) {
 }
 
 export async function buildGenerationOptions() {
-  const [samplerInfo, clipInfo, vaeInfo] = await Promise.all([
+  const [samplerInfo, clipInfo, vaeInfo, upscaleInfo] = await Promise.all([
     fetchObjectInfo('KSampler'),
     fetchObjectInfo('CLIPLoader'),
     fetchObjectInfo('VAELoader'),
+    fetchObjectInfo('UpscaleModelLoader'),
   ])
   const samplerFallbacks = [samplerProfiles.sdxl.samplerName, samplerProfiles.anima.samplerName]
   const schedulerFallbacks = [samplerProfiles.sdxl.scheduler, samplerProfiles.anima.scheduler]
@@ -46,6 +47,7 @@ export async function buildGenerationOptions() {
     schedulers: dedupeOptions(requiredOptionList(samplerInfo, 'KSampler', 'scheduler'), schedulerFallbacks),
     clipNames: dedupeOptions(requiredOptionList(clipInfo, 'CLIPLoader', 'clip_name'), [animaAssets.clipName]),
     vaeNames: dedupeOptions(requiredOptionList(vaeInfo, 'VAELoader', 'vae_name'), [animaAssets.vaeName]),
+    upscaleModels: dedupeOptions(requiredOptionList(upscaleInfo, 'UpscaleModelLoader', 'model_name')),
     defaults: {
       sdxl: {
         samplerName: samplerProfiles.sdxl.samplerName,

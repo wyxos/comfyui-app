@@ -37,6 +37,17 @@ const {
   batchPreviewMode,
   cfg,
   clipName,
+  clipSkip,
+  hiresCfg,
+  hiresDenoise,
+  hiresEnabled,
+  hiresHeight,
+  hiresSamplerName,
+  hiresScheduler,
+  hiresSteps,
+  hiresUpscale,
+  hiresUpscaler,
+  hiresWidth,
   imageDenoise,
   isCancellingJob,
   isSubmittingGenerate,
@@ -198,6 +209,60 @@ async function generate() {
     const trimmedVaeName = coerceTrimmedFieldString(vaeName.value)
     if (trimmedVaeName) {
       payloadBody.vaeName = trimmedVaeName
+    }
+
+    const trimmedClipSkip = coerceTrimmedFieldString(clipSkip.value)
+    if (trimmedClipSkip) {
+      payloadBody.clipSkip = Number.parseInt(trimmedClipSkip, 10)
+    }
+
+    if (hiresEnabled.value) {
+      payloadBody.hiresEnabled = true
+
+      const trimmedHiresUpscale = coerceTrimmedFieldString(hiresUpscale.value)
+      if (trimmedHiresUpscale) {
+        payloadBody.hiresUpscale = Number.parseFloat(trimmedHiresUpscale)
+      }
+
+      const trimmedHiresWidth = coerceTrimmedFieldString(hiresWidth.value)
+      if (trimmedHiresWidth) {
+        payloadBody.hiresWidth = Number.parseInt(trimmedHiresWidth, 10)
+      }
+
+      const trimmedHiresHeight = coerceTrimmedFieldString(hiresHeight.value)
+      if (trimmedHiresHeight) {
+        payloadBody.hiresHeight = Number.parseInt(trimmedHiresHeight, 10)
+      }
+
+      const trimmedHiresSteps = coerceTrimmedFieldString(hiresSteps.value)
+      if (trimmedHiresSteps) {
+        payloadBody.hiresSteps = Number.parseInt(trimmedHiresSteps, 10)
+      }
+
+      const trimmedHiresCfg = coerceTrimmedFieldString(hiresCfg.value)
+      if (trimmedHiresCfg) {
+        payloadBody.hiresCfg = Number.parseFloat(trimmedHiresCfg)
+      }
+
+      const trimmedHiresDenoise = coerceTrimmedFieldString(hiresDenoise.value)
+      if (trimmedHiresDenoise) {
+        payloadBody.hiresDenoise = Number.parseFloat(trimmedHiresDenoise)
+      }
+
+      const trimmedHiresUpscaler = coerceTrimmedFieldString(hiresUpscaler.value)
+      if (trimmedHiresUpscaler) {
+        payloadBody.hiresUpscaler = trimmedHiresUpscaler
+      }
+
+      const trimmedHiresSamplerName = coerceTrimmedFieldString(hiresSamplerName.value)
+      if (trimmedHiresSamplerName) {
+        payloadBody.hiresSamplerName = trimmedHiresSamplerName
+      }
+
+      const trimmedHiresScheduler = coerceTrimmedFieldString(hiresScheduler.value)
+      if (trimmedHiresScheduler) {
+        payloadBody.hiresScheduler = trimmedHiresScheduler
+      }
     }
 
     if (shouldUseInputImage.value && uploadedInputImageName.value) {

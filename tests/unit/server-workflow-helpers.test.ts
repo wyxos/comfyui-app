@@ -84,6 +84,89 @@ describe('server workflow helpers', () => {
     ).toBe('%year%-%month%-%day%/img2img/animapencilxl')
   })
 
+  it('builds SDXL replay graphs with CLIP skip, VAE override, and hires pass', () => {
+    const sdxl = buildWorkflow({
+      promptVariants: buildRequestedPromptVariants('a portrait', ''),
+      negativePrompt: 'blur',
+      checkpoint: 'waiIllustriousSDXL_v170.safetensors',
+      checkpointFamily: 'sdxl',
+      loras: [],
+      width: 1024,
+      height: 1344,
+      steps: 30,
+      cfg: 7,
+      denoise: 0.5,
+      seed: 424011486,
+      samplerName: 'euler_ancestral',
+      scheduler: 'normal',
+      clipSkip: 2,
+      vaeName: 'sdxl_vae.safetensors',
+      hires: {
+        enabled: true,
+        upscale: 2,
+        width: 2048,
+        height: 2688,
+        steps: 20,
+        cfg: 4.5,
+        denoise: 0.5,
+        upscaler: 'RealESRGAN_x4plus_anime_6B.pth',
+        samplerName: 'euler_ancestral',
+        scheduler: 'normal',
+      },
+      inputImageName: '',
+    })
+
+    const entries = workflowEntries(sdxl.prompt)
+    const clipSkipNode = entries.find(([, node]) => node.class_type === 'CLIPSetLastLayer')
+    const vaeNode = entries.find(([, node]) => node.class_type === 'VAELoader')
+    const upscaleModelNode = entries.find(([, node]) => node.class_type === 'UpscaleModelLoader')
+    const imageUpscaleNode = entries.find(([, node]) => node.class_type === 'ImageUpscaleWithModel')
+    const hiresScaleNode = entries.find(([, node]) =>
+      node.class_type === 'ImageScale' && node.inputs?.image?.[0] === imageUpscaleNode?.[0],
+    )
+    const hiresEncodeNode = entries.find(([, node]) =>
+      node.class_type === 'VAEEncode' && node.inputs?.pixels?.[0] === hiresScaleNode?.[0],
+    )
+    const samplerNodes = entries.filter(([, node]) => node.class_type === 'KSampler')
+    const [baseSampler, hiresSampler] = samplerNodes
+    const hiresDecodeNode = entries.find(([, node]) =>
+      node.class_type === 'VAEDecode' && node.inputs?.samples?.[0] === hiresSampler?.[0],
+    )
+    const saveNode = entries.find(([, node]) => node.class_type === 'SaveImage')
+
+    expect(sdxl.clipSkip).toBe(2)
+    expect(sdxl.vaeName).toBe('sdxl_vae.safetensors')
+    expect(sdxl.hires).toMatchObject({
+      width: 2048,
+      height: 2688,
+      steps: 20,
+      cfg: 4.5,
+      denoise: 0.5,
+      upscaler: 'RealESRGAN_x4plus_anime_6B.pth',
+    })
+    expect(clipSkipNode?.[1].inputs).toMatchObject({ stop_at_clip_layer: -2 })
+    expect(vaeNode?.[1].inputs.vae_name).toBe('sdxl_vae.safetensors')
+    expect(upscaleModelNode?.[1].inputs.model_name).toBe('RealESRGAN_x4plus_anime_6B.pth')
+    expect(imageUpscaleNode?.[1].inputs.upscale_model).toEqual([upscaleModelNode?.[0], 0])
+    expect(hiresScaleNode?.[1].inputs).toMatchObject({ width: 2048, height: 2688, crop: 'disabled' })
+    expect(baseSampler?.[1].inputs).toMatchObject({
+      steps: 30,
+      cfg: 7,
+      sampler_name: 'euler_ancestral',
+      scheduler: 'normal',
+      denoise: 1,
+    })
+    expect(hiresSampler?.[1].inputs).toMatchObject({
+      steps: 20,
+      cfg: 4.5,
+      sampler_name: 'euler_ancestral',
+      scheduler: 'normal',
+      denoise: 0.5,
+      latent_image: [hiresEncodeNode?.[0], 0],
+    })
+    expect(saveNode?.[1].inputs.images).toEqual([hiresDecodeNode?.[0], 0])
+  })
+
   it('routes Anima control images through the LLLite model patch node', () => {
     const promptVariants = buildRequestedPromptVariants('a portrait', '')
     const anima = buildWorkflow({

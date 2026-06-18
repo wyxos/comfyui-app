@@ -61,9 +61,20 @@ const {
   aspectRatioScale,
   cfg,
   clipName,
+  clipSkip,
   defaultLoraStrength,
   flattenInputImageBackground,
   height,
+  hiresCfg,
+  hiresDenoise,
+  hiresEnabled,
+  hiresHeight,
+  hiresSamplerName,
+  hiresScheduler,
+  hiresSteps,
+  hiresUpscale,
+  hiresUpscaler,
+  hiresWidth,
   imageDenoise,
   inputImageBackgroundColor,
   maintainAspectRatio,
@@ -240,6 +251,17 @@ function readPersistedFormState(): Partial<PersistedFormState> {
       scheduler: typeof parsed.scheduler === 'string' ? parsed.scheduler : '',
       clipName: typeof parsed.clipName === 'string' ? parsed.clipName : '',
       vaeName: typeof parsed.vaeName === 'string' ? parsed.vaeName : '',
+      clipSkip: typeof parsed.clipSkip === 'string' ? parsed.clipSkip : '',
+      hiresEnabled: typeof parsed.hiresEnabled === 'boolean' ? parsed.hiresEnabled : false,
+      hiresUpscale: typeof parsed.hiresUpscale === 'string' ? parsed.hiresUpscale : '',
+      hiresWidth: typeof parsed.hiresWidth === 'string' ? parsed.hiresWidth : '',
+      hiresHeight: typeof parsed.hiresHeight === 'string' ? parsed.hiresHeight : '',
+      hiresSteps: typeof parsed.hiresSteps === 'string' ? parsed.hiresSteps : '',
+      hiresCfg: typeof parsed.hiresCfg === 'string' ? parsed.hiresCfg : '',
+      hiresDenoise: typeof parsed.hiresDenoise === 'string' ? parsed.hiresDenoise : '',
+      hiresUpscaler: typeof parsed.hiresUpscaler === 'string' ? parsed.hiresUpscaler : '',
+      hiresSamplerName: typeof parsed.hiresSamplerName === 'string' ? parsed.hiresSamplerName : '',
+      hiresScheduler: typeof parsed.hiresScheduler === 'string' ? parsed.hiresScheduler : '',
       imageDenoise: typeof parsed.imageDenoise === 'string' ? parsed.imageDenoise : '',
       maintainAspectRatio:
         typeof parsed.maintainAspectRatio === 'boolean' ? parsed.maintainAspectRatio : false,
@@ -311,6 +333,17 @@ function persistFormState() {
     scheduler: coerceFieldString(scheduler.value),
     clipName: coerceFieldString(clipName.value),
     vaeName: coerceFieldString(vaeName.value),
+    clipSkip: coerceFieldString(clipSkip.value),
+    hiresEnabled: hiresEnabled.value,
+    hiresUpscale: coerceFieldString(hiresUpscale.value),
+    hiresWidth: coerceFieldString(hiresWidth.value),
+    hiresHeight: coerceFieldString(hiresHeight.value),
+    hiresSteps: coerceFieldString(hiresSteps.value),
+    hiresCfg: coerceFieldString(hiresCfg.value),
+    hiresDenoise: coerceFieldString(hiresDenoise.value),
+    hiresUpscaler: coerceFieldString(hiresUpscaler.value),
+    hiresSamplerName: coerceFieldString(hiresSamplerName.value),
+    hiresScheduler: coerceFieldString(hiresScheduler.value),
     imageDenoise: coerceFieldString(imageDenoise.value),
     maintainAspectRatio: maintainAspectRatio.value,
     flattenInputImageBackground: flattenInputImageBackground.value,
@@ -364,6 +397,17 @@ function restoreFormState() {
   scheduler.value = persisted.scheduler ?? ''
   clipName.value = persisted.clipName ?? ''
   vaeName.value = persisted.vaeName ?? ''
+  clipSkip.value = persisted.clipSkip ?? ''
+  hiresEnabled.value = Boolean(persisted.hiresEnabled)
+  hiresUpscale.value = persisted.hiresUpscale ?? ''
+  hiresWidth.value = persisted.hiresWidth ?? ''
+  hiresHeight.value = persisted.hiresHeight ?? ''
+  hiresSteps.value = persisted.hiresSteps ?? ''
+  hiresCfg.value = persisted.hiresCfg ?? ''
+  hiresDenoise.value = persisted.hiresDenoise ?? ''
+  hiresUpscaler.value = persisted.hiresUpscaler ?? ''
+  hiresSamplerName.value = persisted.hiresSamplerName ?? ''
+  hiresScheduler.value = persisted.hiresScheduler ?? ''
   imageDenoise.value = persisted.imageDenoise ?? ''
   maintainAspectRatio.value = Boolean(persisted.maintainAspectRatio)
   aspectRatioScale.value = '0'

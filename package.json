@@ -11,6 +11,8 @@
     "extension:dev": "vite build --config extension/vite.config.ts --watch",
     "extension:package": "npm run extension:build && node scripts/package-extension.mjs",
     "extension:package:local": "npm run extension:package -- --bump=codex",
+    "atlas:favorite-downloaded": "node scripts/atlas-favorite-downloaded-assets.mjs",
+    "atlas:favorite-downloaded:dry-run": "node scripts/atlas-favorite-downloaded-assets.mjs --dry-run",
     "civitai:archive:backfill": "node scripts/backfill-civitai-archives.mjs",
     "civitai:archive:backfill:dry-run": "node scripts/backfill-civitai-archives.mjs --dry-run",
     "civitai:archive:backfill:missing-media": "node scripts/backfill-civitai-archives.mjs --missing-media-only",

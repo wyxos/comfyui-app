@@ -171,6 +171,8 @@ export async function serializeJob(job) {
     scheduler: typeof job.scheduler === 'string' ? job.scheduler : null,
     clipName: typeof job.clipName === 'string' ? job.clipName : null,
     vaeName: typeof job.vaeName === 'string' ? job.vaeName : null,
+    clipSkip: typeof job.clipSkip === 'number' ? job.clipSkip : null,
+    hires: job.hires && typeof job.hires === 'object' ? job.hires : null,
     seed: typeof job.seed === 'number' ? job.seed : null,
     inputImageName: typeof job.inputImageName === 'string' ? job.inputImageName : null,
     inputImageDisplayName:

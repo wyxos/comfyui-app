@@ -21,10 +21,21 @@ const {
   cfg,
   clipName,
   clipNameOptions,
+  clipSkip,
   checkpoints,
   controlNetPreprocessors,
   controlNets,
   height,
+  hiresCfg,
+  hiresDenoise,
+  hiresEnabled,
+  hiresHeight,
+  hiresSamplerName,
+  hiresScheduler,
+  hiresSteps,
+  hiresUpscale,
+  hiresUpscaler,
+  hiresWidth,
   imageDenoise,
   inputImageUploadError,
   flattenInputImageBackground,
@@ -54,6 +65,7 @@ const {
   submissionError,
   uploadedInputImageName,
   useInputImage,
+  upscaleModelOptions,
   vaeName,
   vaeNameOptions,
   generationOptionDefaults,
@@ -225,6 +237,15 @@ const clipNameSelectOptions = computed(() =>
 const vaeNameSelectOptions = computed(() =>
   selectedOptionList(vaeNameOptions.value, vaeName.value, vaeNamePlaceholder.value),
 )
+const hiresSamplerSelectOptions = computed(() =>
+  selectedOptionList(samplerOptions.value, hiresSamplerName.value, samplerPlaceholder.value),
+)
+const hiresSchedulerSelectOptions = computed(() =>
+  selectedOptionList(schedulerOptions.value, hiresScheduler.value, schedulerPlaceholder.value),
+)
+const upscaleModelSelectOptions = computed(() =>
+  selectedOptionList(upscaleModelOptions.value, hiresUpscaler.value),
+)
 const hasAnimaCheckpointSelected = computed(() =>
   selectedCheckpointEntries.value.some((checkpoint) => checkpoint.family === 'anima'),
 )
@@ -292,6 +313,17 @@ const canResetForm = computed(() => {
       scheduler.value ||
       clipName.value ||
       vaeName.value ||
+      clipSkip.value ||
+      hiresEnabled.value ||
+      hiresUpscale.value ||
+      hiresWidth.value ||
+      hiresHeight.value ||
+      hiresSteps.value ||
+      hiresCfg.value ||
+      hiresDenoise.value ||
+      hiresUpscaler.value ||
+      hiresSamplerName.value ||
+      hiresScheduler.value ||
       imageDenoise.value ||
       maintainAspectRatio.value ||
       useInputImage.value ||
@@ -336,6 +368,9 @@ return {
   schedulerSelectOptions,
   clipNameSelectOptions,
   vaeNameSelectOptions,
+  hiresSamplerSelectOptions,
+  hiresSchedulerSelectOptions,
+  upscaleModelSelectOptions,
   hasAnimaCheckpointSelected,
   stepsPlaceholder,
   imageDenoisePlaceholder,

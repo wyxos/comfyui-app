@@ -14,6 +14,7 @@ const {
   submissionError,
   metadataPasteNotice,
   metadataPasteError,
+  metadataReplayWarnings,
   isPastingMetadata,
   isSubmittingGenerate,
   isCancellingJob,
@@ -93,6 +94,17 @@ const {
       >
         {{ metadataPasteError || metadataPasteNotice }}
       </p>
+      <ul
+        v-if="metadataReplayWarnings.length"
+        class="mb-3 space-y-1 text-xs font-semibold leading-5 text-amber-300"
+      >
+        <li
+          v-for="warning in metadataReplayWarnings"
+          :key="warning"
+        >
+          {{ warning }}
+        </li>
+      </ul>
 
       <div class="flex flex-wrap items-center gap-2">
         <button

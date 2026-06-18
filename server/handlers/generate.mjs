@@ -42,6 +42,22 @@ export async function handleGenerate(request, response) {
   const scheduler = body instanceof FormData ? body.get('scheduler') : body.scheduler
   const clipName = body instanceof FormData ? body.get('clipName') : body.clipName
   const vaeName = body instanceof FormData ? body.get('vaeName') : body.vaeName
+  const clipSkip = body instanceof FormData ? body.get('clipSkip') : body.clipSkip
+  const hiresEnabled = body instanceof FormData
+    ? body.get('hiresEnabled') === 'true' || body.get('hiresEnabled') === '1'
+    : body.hiresEnabled === true
+  const hires = {
+    enabled: hiresEnabled,
+    upscale: body instanceof FormData ? body.get('hiresUpscale') : body.hiresUpscale,
+    width: body instanceof FormData ? body.get('hiresWidth') : body.hiresWidth,
+    height: body instanceof FormData ? body.get('hiresHeight') : body.hiresHeight,
+    steps: body instanceof FormData ? body.get('hiresSteps') : body.hiresSteps,
+    cfg: body instanceof FormData ? body.get('hiresCfg') : body.hiresCfg,
+    denoise: body instanceof FormData ? body.get('hiresDenoise') : body.hiresDenoise,
+    upscaler: body instanceof FormData ? body.get('hiresUpscaler') : body.hiresUpscaler,
+    samplerName: body instanceof FormData ? body.get('hiresSamplerName') : body.hiresSamplerName,
+    scheduler: body instanceof FormData ? body.get('hiresScheduler') : body.hiresScheduler,
+  }
   const storedInputImageName = safeTrim(
     body instanceof FormData ? body.get('inputImageName') : body.inputImageName,
   )
@@ -259,6 +275,8 @@ export async function handleGenerate(request, response) {
         scheduler: normalizedScheduler,
         clipName: normalizedClipName,
         vaeName: normalizedVaeName,
+        clipSkip: normalizedClipSkip,
+        hires: normalizedHires,
         seed: normalizedSeed,
       } = buildWorkflow({
         promptVariants: checkpointPromptVariants,
@@ -274,6 +292,8 @@ export async function handleGenerate(request, response) {
         scheduler,
         clipName,
         vaeName,
+        clipSkip,
+        hires,
         seed,
         inputImageName,
         controlNets,
@@ -327,6 +347,8 @@ export async function handleGenerate(request, response) {
         scheduler: normalizedScheduler,
         clipName: normalizedClipName,
         vaeName: normalizedVaeName,
+        clipSkip: normalizedClipSkip,
+        hires: normalizedHires,
         seed: normalizedSeed,
         inputImageName,
         inputImageDisplayName,
