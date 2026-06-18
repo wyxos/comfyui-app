@@ -87,16 +87,17 @@ function titleStatus(status: string) {
 const downloadProgress = computed(() => {
   const download = props.status?.download
   const downloaded = props.status?.downloaded === true || Boolean(props.status?.downloaded_at || download?.downloaded_at)
-  const status = typeof download?.status === 'string' && download.status.trim()
+  const rawStatus = typeof download?.status === 'string' && download.status.trim()
     ? download.status.trim()
-    : downloaded ? 'complete' : ''
+    : ''
+  const status = downloaded ? 'complete' : rawStatus
   const percent = normalizedProgressPercent(download?.progress_percent)
   const hasDownloadState = Boolean(download?.requested || status || percent !== null || downloaded)
   if (!hasDownloadState) {
     return null
   }
 
-  const value = percent ?? (downloaded || status === 'complete' || status === 'completed' ? 100 : 0)
+  const value = downloaded ? 100 : percent ?? (status === 'complete' || status === 'completed' ? 100 : 0)
   return {
     label: titleStatus(status || 'queued'),
     value,

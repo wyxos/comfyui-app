@@ -50,4 +50,26 @@ describe('AssetPreviewAtlasReactionWidget', () => {
     expect(progress.text()).toContain('Downloading')
     expect(progress.text()).toContain('42%')
   })
+
+  it('shows completed progress when the file is downloaded even if a stale transfer failed', () => {
+    const wrapper = mount(AssetPreviewAtlasReactionWidget, {
+      props: {
+        status: {
+          exists: true,
+          downloaded: true,
+          downloaded_at: '2026-06-18T05:00:00Z',
+          download: {
+            requested: true,
+            status: 'failed',
+            progress_percent: 0,
+            downloaded_at: '2026-06-18T05:00:00Z',
+          },
+        },
+      },
+    })
+
+    const progress = wrapper.get('[data-test="asset-preview-atlas-download-progress"]')
+    expect(progress.attributes('aria-valuenow')).toBe('100')
+    expect(progress.text()).toContain('Complete · 100%')
+  })
 })

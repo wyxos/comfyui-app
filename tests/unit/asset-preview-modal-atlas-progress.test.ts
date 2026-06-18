@@ -110,6 +110,7 @@ function statusResponse() {
 describe('AssetPreviewModal Atlas reaction progress', () => {
   afterEach(() => {
     FakeWebSocket.instances = []
+    vi.useRealTimers()
     vi.unstubAllGlobals()
   })
 
@@ -223,5 +224,62 @@ describe('AssetPreviewModal Atlas reaction progress', () => {
     const progress = wrapper.get('[data-test="asset-preview-atlas-download-progress"]')
     expect(progress.attributes('aria-valuenow')).toBe('48')
     expect(progress.text()).toContain('Downloading · 48%')
+  })
+
+  it('polls Atlas status after reacting when Reverb is not available', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), 'http://127.0.0.1')
+      if (url.pathname === '/api/settings/app') {
+        return atlasSettingsResponse()
+      }
+      if (url.pathname === '/api/atlas/civitai/status') {
+        const statusCalls = fetchMock.mock.calls.filter((call) => String(call[0]) === '/api/atlas/civitai/status').length
+        return new Response(JSON.stringify({
+          ok: true,
+          configured: true,
+          items: [{
+            request_id: 'civitai:800',
+            exists: statusCalls > 1,
+            file_id: statusCalls > 1 ? 88 : null,
+            downloaded: statusCalls > 1,
+            downloaded_at: statusCalls > 1 ? '2026-06-18T05:00:00Z' : null,
+            filtered: false,
+            download: statusCalls > 1
+              ? { requested: true, transfer_id: 55, status: 'failed', progress_percent: 0, downloaded_at: '2026-06-18T05:00:00Z' }
+              : null,
+          }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.pathname === '/api/atlas/civitai/reactions') {
+        return new Response(JSON.stringify({
+          configured: true,
+          file: {
+            id: 88,
+            source_id: '800',
+            url: 'https://atlas.test/files/version-original.jpg',
+            referrer_url: 'https://civitai.com/models/101?modelVersionId=201',
+          },
+          reaction: { type: 'like' },
+          download: { requested: true, transfer_id: 55, status: 'queued', progress_percent: 0 },
+          reverb: { enabled: false },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ items: [] }), { status: 200 })
+    })
+
+    const wrapper = await mountModal(fetchMock)
+    vi.useFakeTimers()
+    await wrapper.get('button[aria-label="Like in Atlas"]').trigger('click')
+    await flushPromises()
+
+    expect(FakeWebSocket.instances).toHaveLength(0)
+    expect(wrapper.get('[data-test="asset-preview-atlas-download-progress"]').text()).toContain('Queued · 0%')
+
+    await vi.advanceTimersByTimeAsync(2500)
+    await flushPromises()
+
+    const progress = wrapper.get('[data-test="asset-preview-atlas-download-progress"]')
+    expect(progress.attributes('aria-valuenow')).toBe('100')
+    expect(progress.text()).toContain('Complete · 100%')
   })
 })

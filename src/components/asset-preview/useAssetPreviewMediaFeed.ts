@@ -61,7 +61,12 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
   let feedToken = 0
   let feedRetryCursor = ''
   const { stopAtlasDownloadProgress, updateSharedImageStatus, watchAtlasDownloadProgress } =
-    useAssetPreviewAtlasStatusUpdates({ feedImages, versionAtlasStatuses, selectedVersion: options.selectedVersion })
+    useAssetPreviewAtlasStatusUpdates({
+      feedImages,
+      versionAtlasStatuses,
+      selectedVersion: options.selectedVersion,
+      refreshAtlasStatuses: (images, signal) => fetchAtlasStatuses(images, signal, false),
+    })
 
   const versionSlides = computed<PreviewSlide[]>(() => {
     if (!options.open.value) {
