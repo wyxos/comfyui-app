@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { ChevronLeft, ChevronRight, LoaderCircle, X } from 'lucide-vue-next'
 
 import AssetPreviewAtlasReactionWidget from './AssetPreviewAtlasReactionWidget.vue'
+import AssetPreviewFloatingMetadataAction from './AssetPreviewFloatingMetadataAction.vue'
+import AssetPreviewImageMetadataSidebar from './AssetPreviewImageMetadataSidebar.vue'
 import AssetPreviewMediaStrip from './AssetPreviewMediaStrip.vue'
 import AssetPreviewSidebar from './AssetPreviewSidebar.vue'
 import type { AssetPreviewModalProps } from './assetPreviewTypes'
@@ -118,7 +121,6 @@ const {
   shouldRenderModal,
   hasDownloadActions,
   close,
-  loadActiveImageDetails,
   openAtlasModelTab,
   selectVersion,
   showPreviousImage,
@@ -142,6 +144,21 @@ const {
   deleteVersionDownload,
   imageDimensions,
 } = useAssetPreviewModal(props, () => emit('close'))
+
+const activeMediaHasDimensions = computed(() => {
+  const width = activeImage.value?.width
+  const height = activeImage.value?.height
+  return typeof width === 'number' && width > 0 && typeof height === 'number' && height > 0
+})
+const activeMediaFrameStyle = computed(() => {
+  if (!activeMediaHasDimensions.value) {
+    return {}
+  }
+
+  return {
+    aspectRatio: `${activeImage.value?.width} / ${activeImage.value?.height}`,
+  }
+})
 
 function canReactToActiveAtlasImage() {
   const image = activeSlide.value?.image
@@ -248,7 +265,7 @@ function shouldBlurActiveMedia() {
 <template>
   <div
     v-if="shouldRenderModal"
-    class="fixed inset-0 z-50 grid bg-background/96 text-foreground backdrop-blur-sm lg:grid-cols-[4fr_1fr]"
+    class="fixed inset-0 z-50 grid grid-rows-[minmax(0,1fr)_minmax(0,45vh)] bg-background/96 text-foreground backdrop-blur-sm lg:grid-cols-[minmax(0,1fr)_minmax(38rem,44rem)] lg:grid-rows-none"
     role="dialog"
     aria-modal="true"
     :aria-label="`${modalTitle} image preview`"
@@ -315,22 +332,34 @@ function shouldBlurActiveMedia() {
           @contextmenu="handleMainMediaContextMenu"
           @auxclick="handleMainMediaAuxClick"
         >
-          <div class="min-h-0 w-full flex-1">
-            <UiPreloadedMedia
-              :src="displayedImageUrl"
-              :is-video="Boolean(activeSlide?.isVideo)"
-              :alt="`${modalTitle} preview image`"
-              label=""
-              :media-class="shouldBlurActiveMedia() ? 'max-h-full max-w-full scale-105 object-contain blur-2xl' : 'max-h-full max-w-full object-contain'"
-              loading-class="hidden"
-              controls
-              autoplay
-              loop
-              playsinline
-              preload="auto"
-              @ready="handleModalMediaReady"
-              @error="handleModalMediaReady"
-            />
+          <div class="relative flex min-h-0 w-full flex-1 items-center justify-center">
+            <div
+              class="relative h-full max-h-full max-w-full"
+              :class="activeMediaHasDimensions ? '' : 'w-full'"
+              :style="activeMediaFrameStyle"
+            >
+              <UiPreloadedMedia
+                :src="displayedImageUrl"
+                :is-video="Boolean(activeSlide?.isVideo)"
+                :alt="`${modalTitle} preview image`"
+                label=""
+                :media-class="shouldBlurActiveMedia() ? 'max-h-full max-w-full scale-105 object-contain blur-2xl' : 'max-h-full max-w-full object-contain'"
+                loading-class="hidden"
+                controls
+                autoplay
+                loop
+                playsinline
+                preload="auto"
+                @ready="handleModalMediaReady"
+                @error="handleModalMediaReady"
+              />
+              <AssetPreviewFloatingMetadataAction
+                :loading="imageMetaLoading"
+                :metadata-source="activeImageMetaSource"
+                :apply-generation-metadata="props.applyGenerationMetadata"
+                @applied="close"
+              />
+            </div>
           </div>
           <AssetPreviewAtlasReactionWidget
             v-if="canShowActiveAtlasWidget()"
@@ -372,83 +401,92 @@ function shouldBlurActiveMedia() {
       />
     </section>
 
-    <AssetPreviewSidebar
-      :kind-label="props.kindLabel"
-      :modal-title="modalTitle"
-      :modal-subtitle="modalSubtitle"
-      :model-type-label="modelTypeLabel"
-      :model-identifier="modelIdentifier"
-      :version-identifier="versionIdentifier"
-      :file-identifier="fileIdentifier"
-      :civitai-model="civitaiModel ?? null"
-      :civitai-error="civitaiError"
-      :civitai-model-url="civitaiModelUrl"
-      :atlas-configured="atlasConfigured"
-      :atlas-open-error="atlasOpenError"
-      :atlas-opening="atlasOpening"
-      :selected-version="selectedVersion"
-      :model-versions="modelVersions"
-      :has-download-actions="hasDownloadActions"
-      :queuing-download-key="props.queuingDownloadKey"
-      :editable-compatibility="props.editableCompatibility"
-      :editable-safety="props.editableSafety"
-      :saving-compatibility="props.savingCompatibility"
-      :saving-safety="props.savingSafety"
-      :saving-image-safety="props.savingImageSafety"
-      :compatibility="props.compatibility"
-      :compatibility-error="props.compatibilityError"
-      :safety-error="props.safetyError"
-      :image-safety-error="props.imageSafetyError"
-      :active-trigger-words="activeTriggerWords"
-      :active-primary-file="activePrimaryFile"
-      :preview-slides="previewSlides"
-      :feed-slides="feedSlides"
-      :active-image-index="activeImageIndex"
-      :active-slide="activeSlide"
-      :active-image="activeImage"
-      :active-image-safety-key="activeImageSafetyKey"
-      :active-image-detected-nsfw="activeImageDetectedNsfw"
-      :active-image-nsfw-override="activeImageNsfwOverride"
-      :active-image-safety-label="activeImageSafetyLabel"
-      :image-meta-loading="imageMetaLoading"
-      :image-meta-error="imageMetaError"
-      :active-image-meta="activeImageMeta"
-      :normalized-image-meta-rows="normalizedImageMetaRows"
-      :active-image-meta-source="activeImageMetaSource"
-      :blur-nsfw-media-level="props.blurNsfwMediaLevel"
-      :feed-loading="feedLoading"
-      :feed-loading-more="feedLoadingMore"
-      :feed-error="feedError"
-      :atlas-base-url="atlasBaseUrl"
-      :atlas-action-error="atlasActionError"
-      :atlas-delete-pending-key="atlasDeletePendingKey"
-      :atlas-reaction-pending-key="atlasReactionPendingKey"
-      :atlas-reaction-pending-type="atlasReactionPendingType"
-      :can-load-more-feed="canLoadMoreFeed"
-      :apply-generation-metadata="props.applyGenerationMetadata"
-      :repair-download-previews="props.repairDownloadPreviews"
-      :download-for-version="downloadForVersion"
-      :download-status-label="downloadStatusLabel"
-      :model-download-key="modelDownloadKey"
-      :can-queue-version="canQueueVersion"
-      :can-delete-version-download="canDeleteVersionDownload"
-      :version-download-button-label="versionDownloadButtonLabel"
-      :image-dimensions="imageDimensions"
-      @save-compatibility="emit('save-compatibility', $event)"
-      @save-safety="emit('save-safety', $event)"
-      @save-image-safety="emit('save-image-safety', $event)"
-      @select-version="selectVersion"
-      @queue-download="queueVersionDownload"
-      @delete-download="deleteVersionDownload"
-      @select-preview="selectPreviewImage"
-      @select-feed-preview="selectFeedImage"
-      @load-more-feed="loadMoreFeed"
-      @retry-feed="retryFeed"
-      @atlas-react-feed-preview="reactToFeedImage"
-      @atlas-delete-feed-preview="deleteFeedAtlasImage"
-      @open-atlas-model="openAtlasModelTab"
-      @request-image-metadata="loadActiveImageDetails"
-      @close="close"
-    />
+    <div
+      class="min-h-0 grid overflow-hidden border-t border-border bg-card sm:grid-cols-2 lg:border-l lg:border-t-0"
+      data-test="asset-preview-side-sheets"
+    >
+      <AssetPreviewSidebar
+        :kind-label="props.kindLabel"
+        :modal-title="modalTitle"
+        :modal-subtitle="modalSubtitle"
+        :model-type-label="modelTypeLabel"
+        :model-identifier="modelIdentifier"
+        :version-identifier="versionIdentifier"
+        :file-identifier="fileIdentifier"
+        :civitai-model="civitaiModel ?? null"
+        :civitai-error="civitaiError"
+        :civitai-model-url="civitaiModelUrl"
+        :atlas-configured="atlasConfigured"
+        :atlas-open-error="atlasOpenError"
+        :atlas-opening="atlasOpening"
+        :selected-version="selectedVersion"
+        :model-versions="modelVersions"
+        :has-download-actions="hasDownloadActions"
+        :queuing-download-key="props.queuingDownloadKey"
+        :editable-compatibility="props.editableCompatibility"
+        :editable-safety="props.editableSafety"
+        :saving-compatibility="props.savingCompatibility"
+        :saving-safety="props.savingSafety"
+        :compatibility="props.compatibility"
+        :compatibility-error="props.compatibilityError"
+        :safety-error="props.safetyError"
+        :active-trigger-words="activeTriggerWords"
+        :active-primary-file="activePrimaryFile"
+        :preview-slides="previewSlides"
+        :feed-slides="feedSlides"
+        :active-slide="activeSlide"
+        :blur-nsfw-media-level="props.blurNsfwMediaLevel"
+        :feed-loading="feedLoading"
+        :feed-loading-more="feedLoadingMore"
+        :feed-error="feedError"
+        :atlas-base-url="atlasBaseUrl"
+        :atlas-action-error="atlasActionError"
+        :atlas-delete-pending-key="atlasDeletePendingKey"
+        :atlas-reaction-pending-key="atlasReactionPendingKey"
+        :atlas-reaction-pending-type="atlasReactionPendingType"
+        :can-load-more-feed="canLoadMoreFeed"
+        :repair-download-previews="props.repairDownloadPreviews"
+        :download-for-version="downloadForVersion"
+        :download-status-label="downloadStatusLabel"
+        :model-download-key="modelDownloadKey"
+        :can-queue-version="canQueueVersion"
+        :can-delete-version-download="canDeleteVersionDownload"
+        :version-download-button-label="versionDownloadButtonLabel"
+        @save-compatibility="emit('save-compatibility', $event)"
+        @save-safety="emit('save-safety', $event)"
+        @select-version="selectVersion"
+        @queue-download="queueVersionDownload"
+        @delete-download="deleteVersionDownload"
+        @select-feed-preview="selectFeedImage"
+        @load-more-feed="loadMoreFeed"
+        @retry-feed="retryFeed"
+        @atlas-react-feed-preview="reactToFeedImage"
+        @atlas-delete-feed-preview="deleteFeedAtlasImage"
+        @open-atlas-model="openAtlasModelTab"
+      />
+
+      <AssetPreviewImageMetadataSidebar
+        :active-image-index="activeImageIndex"
+        :active-slide="activeSlide"
+        :active-image="activeImage"
+        :active-image-safety-key="activeImageSafetyKey"
+        :active-image-detected-nsfw="activeImageDetectedNsfw"
+        :active-image-nsfw-override="activeImageNsfwOverride"
+        :active-image-safety-label="activeImageSafetyLabel"
+        :preview-slides="previewSlides"
+        :editable-safety="props.editableSafety"
+        :saving-image-safety="props.savingImageSafety"
+        :image-safety-error="props.imageSafetyError"
+        :image-meta-loading="imageMetaLoading"
+        :image-meta-error="imageMetaError"
+        :active-image-meta="activeImageMeta"
+        :normalized-image-meta-rows="normalizedImageMetaRows"
+        :active-image-meta-source="activeImageMetaSource"
+        :apply-generation-metadata="props.applyGenerationMetadata"
+        :image-dimensions="imageDimensions"
+        @save-image-safety="emit('save-image-safety', $event)"
+        @applied="close"
+      />
+    </div>
   </div>
 </template>

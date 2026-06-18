@@ -104,13 +104,11 @@ describe('AssetPreviewModal offline archive browser flow', () => {
     })
     expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/api/civitai/images?'), expect.anything())
 
-    const mediaButton = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Show image and video details')
-    mediaButton?.click()
     await vi.waitFor(() => {
       expect(host.textContent).toContain('Offline archive')
     })
 
-    const applyButton = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('Apply metadata'))
+    const applyButton = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Apply metadata')
     expect(applyButton).toBeDefined()
     applyButton?.click()
     await vi.waitFor(() => {

@@ -143,17 +143,12 @@ describe('AssetPreviewModal offline archive fallback', () => {
     expect(wrapper.text()).toContain('Archived Detail LoRA')
     expect(wrapper.text()).toContain('offline-creator')
 
-    await wrapper.get('button[aria-label="Show image and video details"]').trigger('click')
-    await flushPromises()
-
     expect(wrapper.text()).toContain('Offline archive')
     expect(wrapper.text()).toContain('offline archive prompt')
     expect(wrapper.text()).toContain('offline archive negative')
     expect(wrapper.text()).not.toContain('Civitai returned 404')
 
-    const applyButton = wrapper.findAll('button').find((button) => button.text().includes('Apply metadata'))
-    expect(applyButton).toBeTruthy()
-    await applyButton?.trigger('click')
+    await wrapper.get('button[aria-label="Apply metadata"]').trigger('click')
 
     expect(applyGenerationMetadata).toHaveBeenCalledWith(expect.objectContaining({
       prompt: 'offline archive prompt',

@@ -4,14 +4,10 @@ import { computed, ref, watch } from 'vue'
 
 import {
   formatNumber,
-  imageDimensions as formatImageDimensions,
-  mediaExtensionFromUrl,
 } from './assetPreviewHelpers'
 import AssetPreviewCompatibilityEditor from './AssetPreviewCompatibilityEditor.vue'
 import AssetPreviewFeedPanel from './AssetPreviewFeedPanel.vue'
 import AssetPreviewFileDetails from './AssetPreviewFileDetails.vue'
-import AssetPreviewImageMetadataSection from './AssetPreviewImageMetadataSection.vue'
-import AssetPreviewImageSafetyEditor from './AssetPreviewImageSafetyEditor.vue'
 import AssetPreviewPreviewRepairAction from './AssetPreviewPreviewRepairAction.vue'
 import AssetPreviewSafetyEditor from './AssetPreviewSafetyEditor.vue'
 import AssetPreviewVersionList from './AssetPreviewVersionList.vue'
@@ -21,12 +17,11 @@ import type {
   CivitaiModel,
   CivitaiModelFile,
   CivitaiModelVersion,
-  NormalizedMetaRow,
   PreviewSlide,
 } from './assetPreviewTypes'
 import UiTooltip from '../ui/UiTooltip.vue'
 
-type SidebarTab = 'model' | 'media' | 'feed'
+type SidebarTab = 'model' | 'feed'
 
 const props = defineProps<{
   kindLabel: string
@@ -50,7 +45,6 @@ const props = defineProps<{
   editableSafety: boolean
   savingCompatibility: boolean
   savingSafety: boolean
-  savingImageSafety: boolean
   compatibility: {
     compatibleBaseModels?: string[]
     modelNsfw?: boolean | null
@@ -62,23 +56,11 @@ const props = defineProps<{
   } | null
   compatibilityError: string
   safetyError: string
-  imageSafetyError: string
   activeTriggerWords: string[]
   activePrimaryFile: CivitaiModelFile | null
   previewSlides: PreviewSlide[]
   feedSlides: PreviewSlide[]
-  activeImageIndex: number
   activeSlide: PreviewSlide | null
-  activeImage: PreviewSlide['image']
-  activeImageSafetyKey: string
-  activeImageDetectedNsfw: boolean | null
-  activeImageNsfwOverride: boolean | null
-  activeImageSafetyLabel: string
-  imageMetaLoading: boolean
-  imageMetaError: string
-  activeImageMeta: string
-  normalizedImageMetaRows: NormalizedMetaRow[]
-  activeImageMetaSource: Record<string, unknown> | null
   blurNsfwMediaLevel?: 4 | 8 | 16 | 32 | null
   feedLoading: boolean
   feedLoadingMore: boolean
@@ -89,7 +71,6 @@ const props = defineProps<{
   atlasReactionPendingKey: string
   atlasReactionPendingType: AtlasReactionType | null
   canLoadMoreFeed: boolean
-  applyGenerationMetadata?: (metadata: Record<string, unknown>) => void | Promise<void>
   repairDownloadPreviews?: (download: AssetPreviewDownload) => void | Promise<void>
   downloadForVersion: (version: CivitaiModelVersion | null | undefined) => AssetPreviewDownload | null
   downloadStatusLabel: (download: AssetPreviewDownload | null) => string
@@ -97,25 +78,20 @@ const props = defineProps<{
   canQueueVersion: (version: CivitaiModelVersion) => boolean
   canDeleteVersionDownload: (version: CivitaiModelVersion) => boolean
   versionDownloadButtonLabel: (version: CivitaiModelVersion) => string
-  imageDimensions: typeof formatImageDimensions
 }>()
 
 const emit = defineEmits<{
   'save-compatibility': [payload: { compatibleBaseModels: string[]; controlType: string; loaderType: string }]
   'save-safety': [payload: { modelNsfw: boolean | null; modelNsfwOverride: boolean | null }]
-  'save-image-safety': [payload: { imageKey: string; imageNsfw: boolean | null; imageNsfwOverride: boolean | null }]
   'select-version': [version: CivitaiModelVersion]
   'queue-download': [version: CivitaiModelVersion]
   'delete-download': [version: CivitaiModelVersion]
-  'select-preview': [index: number]
   'select-feed-preview': [index: number]
   'load-more-feed': []
   'retry-feed': []
   'atlas-react-feed-preview': [index: number, type?: AtlasReactionType]
   'atlas-delete-feed-preview': [index: number]
   'open-atlas-model': []
-  'request-image-metadata': []
-  close: []
 }>()
 
 const activeTab = ref<SidebarTab>('model')
@@ -134,7 +110,6 @@ const creatorAssetsRoute = computed(() => {
     ? { name: 'assets', query: { username: creatorUsername.value } }
     : null
 })
-const hasActiveImage = computed(() => Boolean(props.activeImage))
 
 watch(
   () => props.selectedVersion?.id ?? null,
@@ -143,16 +118,6 @@ watch(
       activeTab.value = 'model'
     }
   },
-)
-
-watch(
-  () => [activeTab.value, props.activeImage?.id ?? null] as const,
-  ([tab]) => {
-    if (tab === 'media') {
-      emit('request-image-metadata')
-    }
-  },
-  { flush: 'post' },
 )
 
 function tabClasses(tab: SidebarTab) {
@@ -164,26 +129,13 @@ function tabClasses(tab: SidebarTab) {
   ]
 }
 
-function mediaKindLabel(slide: PreviewSlide) {
-  if (slide.isVideo) {
-    return 'Video'
-  }
-
-  return mediaExtensionFromUrl(slide.url) === 'gif' ? 'GIF' : 'Image'
-}
-
-function mediaSourceLabel(slide: PreviewSlide | null) {
-  if (slide?.source === 'archive') {
-    return 'Offline archive'
-  }
-
-  return slide?.source === 'civitai' ? 'Civitai API' : 'Local preview file'
-}
-
 </script>
 
 <template>
-  <aside class="min-h-0 overflow-y-auto border-l border-border bg-card p-5">
+  <aside
+    class="min-h-0 overflow-y-auto bg-card p-5"
+    data-test="asset-preview-model-sidebar"
+  >
     <div class="space-y-5">
       <section class="space-y-3">
         <div class="min-w-0">
@@ -253,12 +205,9 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
         </p>
       </section>
 
-      <nav class="grid grid-cols-3 rounded-md border border-border bg-background p-1">
+      <nav class="grid grid-cols-2 rounded-md border border-border bg-background p-1">
         <button type="button" :class="tabClasses('model')" aria-label="Show model details" @click="activeTab = 'model'">
           Model
-        </button>
-        <button type="button" :class="tabClasses('media')" aria-label="Show image and video details" @click="activeTab = 'media'">
-          Image/Video
         </button>
         <button type="button" :class="tabClasses('feed')" aria-label="Show feed" @click="activeTab = 'feed'">
           Feed
@@ -385,88 +334,6 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
           v-if="activePrimaryFile"
           :file="activePrimaryFile"
           :fallback-file-name="activePrimaryFile?.name ?? null"
-        />
-
-        <AssetPreviewImageMetadataSection
-          :loading="imageMetaLoading"
-          :error="imageMetaError"
-          :metadata-text="activeImageMeta"
-          :rows="normalizedImageMetaRows"
-          :metadata-source="activeImageMetaSource"
-          :apply-generation-metadata="applyGenerationMetadata"
-          @applied="emit('close')"
-        />
-      </div>
-
-      <div v-else-if="activeTab === 'media'" class="space-y-6">
-        <section class="space-y-3">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">Selected image</p>
-            <p class="mt-2 text-sm font-semibold text-card-foreground">
-              {{ previewSlides.length ? `${activeImageIndex + 1} of ${previewSlides.length}` : 'No image selected' }}
-            </p>
-          </div>
-
-          <dl
-            class="overflow-hidden rounded-md border border-border bg-background text-sm divide-y divide-border/70"
-            data-test="asset-preview-media-detail-group"
-          >
-            <div class="px-3 py-2.5">
-              <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Source</dt>
-              <dd class="mt-1 font-semibold text-card-foreground">
-                {{ mediaSourceLabel(activeSlide) }}
-              </dd>
-            </div>
-            <div class="px-3 py-2.5">
-              <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Type</dt>
-              <dd class="mt-1 font-semibold text-card-foreground">
-                {{ activeSlide ? mediaKindLabel(activeSlide) : 'Unknown' }}
-              </dd>
-            </div>
-            <div class="px-3 py-2.5">
-              <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Dimensions</dt>
-              <dd class="mt-1 font-semibold text-card-foreground">{{ imageDimensions(activeImage) }}</dd>
-            </div>
-            <div class="px-3 py-2.5">
-              <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">NSFW level</dt>
-              <dd class="mt-1 font-semibold text-card-foreground">{{ activeImageSafetyLabel }}</dd>
-            </div>
-            <div
-              v-if="activeImage?.id"
-              class="px-3 py-2.5"
-            >
-              <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Image ID</dt>
-              <dd class="mt-1 break-all font-mono text-xs text-card-foreground">{{ activeImage.id }}</dd>
-            </div>
-            <div
-              v-if="activeImage?.hash"
-              class="px-3 py-2.5"
-            >
-              <dt class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Hash</dt>
-              <dd class="mt-1 break-all font-mono text-xs text-card-foreground">{{ activeImage.hash }}</dd>
-            </div>
-          </dl>
-        </section>
-
-        <AssetPreviewImageSafetyEditor
-          :editable="editableSafety"
-          :image-key="activeImageSafetyKey"
-          :detected-nsfw="activeImageDetectedNsfw"
-          :override-nsfw="activeImageNsfwOverride"
-          :error="imageSafetyError"
-          :saving="savingImageSafety"
-          @save="emit('save-image-safety', $event)"
-        />
-
-        <AssetPreviewImageMetadataSection
-          :loading="imageMetaLoading"
-          :error="imageMetaError"
-          :metadata-text="activeImageMeta"
-          :rows="normalizedImageMetaRows"
-          :metadata-source="activeImageMetaSource"
-          :show-empty="hasActiveImage"
-          :apply-generation-metadata="applyGenerationMetadata"
-          @applied="emit('close')"
         />
       </div>
 

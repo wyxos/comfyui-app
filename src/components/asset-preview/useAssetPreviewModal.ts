@@ -279,20 +279,6 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     }
   }
 
-  function loadActiveImageDetails() {
-    const imageId = activeImage.value?.id
-    if (
-      imageId === undefined ||
-      imageId === null ||
-      imageDetails.value[String(imageId)] ||
-      activeSlide.value?.source === 'archive'
-    ) {
-      return
-    }
-
-    void fetchImageDetails(imageId)
-  }
-
   function setInitialVersion(model: CivitaiModel | null | undefined) {
     const sortedVersions = sortModelVersions(model?.modelVersions ?? [])
     const versionFromProps = sortedVersions.find((version) => version.id === normalizedVersionId.value)
@@ -400,6 +386,10 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
       ) {
         return
       }
+
+      if (!imageDetails.value[String(imageId)]) {
+        void fetchImageDetails(imageId)
+      }
     },
     { immediate: true },
   )
@@ -460,7 +450,6 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     shouldRenderModal,
     hasDownloadActions,
     close,
-    loadActiveImageDetails,
     openAtlasModelTab,
     selectVersion,
     showPreviousImage,

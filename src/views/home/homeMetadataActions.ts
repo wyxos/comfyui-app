@@ -1,8 +1,11 @@
+import { toast } from 'vue-sonner'
+
 import { createEmptyPromptSections, createEmptyPromptSectionsDrafts } from './homeConstants'
 import type { HomeState } from './homeState'
 import type { GenerationMetadataFields, GenerationMetadataOptions } from '../../lib/generationMetadata'
 import {
   extractGenerationMetadataFields,
+  findUnsupportedGenerationMetadataFields,
   parseGenerationMetadataClipboard,
 } from '../../lib/generationMetadata'
 import { splitPromptDraft } from './homeValueHelpers'
@@ -37,6 +40,29 @@ function normalizeModelName(value: string | undefined) {
         .replace(/\.(safetensors|ckpt|pt|pth|bin)$/i, '')
         .replace(/[^a-z0-9]+/g, '')
     : ''
+}
+
+function parseClipboardMetadataSource(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null
+  } catch {
+    return null
+  }
+}
+
+function notifyReplayWarnings(warnings: string[]) {
+  if (!warnings.length) {
+    return
+  }
+
+  toast.warning('Metadata applied with replay warnings.', {
+    description: warnings.length === 1
+      ? warnings[0]
+      : `${warnings.length} replay warnings need review.`,
+  })
 }
 
 export function createHomeMetadataActions(state: HomeState) {
@@ -175,6 +201,22 @@ function buildReplayWarnings(fields: GenerationMetadataFields) {
   return warnings
 }
 
+function buildUnsupportedMetadataWarnings(meta: Record<string, unknown> | null | undefined) {
+  return findUnsupportedGenerationMetadataFields(meta).map((field) =>
+    `${field.label} ${field.value} was not applied. ${field.reason}`,
+  )
+}
+
+function buildAllReplayWarnings(
+  fields: GenerationMetadataFields,
+  meta: Record<string, unknown> | null | undefined,
+) {
+  return [
+    ...buildReplayWarnings(fields),
+    ...buildUnsupportedMetadataWarnings(meta),
+  ]
+}
+
 function applyGenerationMetadata(fields: GenerationMetadataFields) {
   if (fields.prompt) {
     prompt.value = fields.prompt
@@ -231,10 +273,11 @@ function applyGenerationMetadataFromSource(meta: Record<string, unknown> | null 
 
   clearMetadataReplayFields()
   applyGenerationMetadata(fields)
-  metadataReplayWarnings.value = buildReplayWarnings(fields)
+  metadataReplayWarnings.value = buildAllReplayWarnings(fields, meta)
   metadataPasteNotice.value = metadataReplayWarnings.value.length
     ? 'Metadata applied with replay warnings.'
     : 'Metadata applied.'
+  notifyReplayWarnings(metadataReplayWarnings.value)
 }
 
 async function pasteGenerationMetadataFromClipboard() {
@@ -255,17 +298,19 @@ async function pasteGenerationMetadataFromClipboard() {
       vaeOptions: vaeNameOptions.value,
       upscaleModelOptions: upscaleModelOptions.value,
     }
-    const fields = parseGenerationMetadataClipboard(await readText.call(navigator.clipboard), options)
+    const clipboardText = await readText.call(navigator.clipboard)
+    const fields = parseGenerationMetadataClipboard(clipboardText, options)
     if (!hasMetadataFields(fields)) {
       throw new Error('Clipboard did not contain recognized generation metadata.')
     }
 
     clearMetadataReplayFields()
     applyGenerationMetadata(fields)
-    metadataReplayWarnings.value = buildReplayWarnings(fields)
+    metadataReplayWarnings.value = buildAllReplayWarnings(fields, parseClipboardMetadataSource(clipboardText))
     metadataPasteNotice.value = metadataReplayWarnings.value.length
       ? 'Metadata applied with replay warnings.'
       : 'Metadata applied.'
+    notifyReplayWarnings(metadataReplayWarnings.value)
   } catch (error) {
     metadataPasteError.value =
       error instanceof Error ? error.message : 'Could not paste generation metadata.'

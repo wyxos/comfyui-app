@@ -57,15 +57,13 @@ describe('AssetPreviewModal image metadata loading', () => {
     })
 
     await flushPromises()
-    await wrapper.get('button[aria-label="Show image and video details"]').trigger('click')
-    await flushPromises()
 
     expect(wrapper.text()).toContain('Metadata')
     expect(wrapper.text()).toContain('No prompt metadata found for this image.')
     expect(wrapper.text()).not.toContain('Source:')
   })
 
-  it('loads selected image metadata when the image and video tab opens', async () => {
+  it('loads selected image metadata in the image metadata sheet', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input), 'http://127.0.0.1')
       if (url.pathname === '/api/civitai/images' && url.searchParams.get('imageId') === '901') {
@@ -124,10 +122,6 @@ describe('AssetPreviewModal image metadata loading', () => {
     })
 
     await flushPromises()
-
-    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('imageId=901'), expect.anything())
-
-    await wrapper.get('button[aria-label="Show image and video details"]').trigger('click')
     await flushPromises()
 
     const imageDetailRequest = fetchMock.mock.calls

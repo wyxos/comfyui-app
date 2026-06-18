@@ -222,7 +222,6 @@ describe('AssetPreviewModal', () => {
     expect(document.body.textContent).toContain('Illustrious')
     expect(document.body.textContent).toContain('blue armor')
 
-    await document.body.querySelector('button[aria-label="Show image and video details"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await flushPromises()
 
     expect(document.body.textContent).toContain('image-detail prompt')
@@ -320,6 +319,8 @@ describe('AssetPreviewModal', () => {
     await nextTick()
 
     expect(wrapper.text()).toContain('Safety')
+    expect(wrapper.text()).toContain('NSFW override')
+    expect(wrapper.text()).not.toContain('Not flagged')
     await wrapper.get('button[aria-label="Mark NSFW"]').trigger('click')
 
     expect(wrapper.emitted('save-safety')).toEqual([
@@ -460,10 +461,6 @@ describe('AssetPreviewModal', () => {
     await nextTick()
 
     expect(document.body.textContent).toContain('3 / 3')
-
-    await document.body.querySelector('button[aria-label="Show image and video details"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await nextTick()
-
     expect(document.body.textContent).toContain('3 of 3')
   })
 

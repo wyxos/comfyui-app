@@ -12,6 +12,7 @@ const props = withDefaults(
     rows?: NormalizedMetaRow[]
     metadataSource?: Record<string, unknown> | null
     applyGenerationMetadata?: (metadata: Record<string, unknown>) => void | Promise<void>
+    showAction?: boolean
     showEmpty?: boolean
     emptyMessage?: string
   }>(),
@@ -22,6 +23,7 @@ const props = withDefaults(
     rows: () => [],
     metadataSource: null,
     applyGenerationMetadata: undefined,
+    showAction: true,
     showEmpty: false,
     emptyMessage: 'No prompt metadata found for this image.',
   },
@@ -77,7 +79,7 @@ async function handleMetadataAction() {
         Metadata
       </p>
       <button
-        v-if="metadataText"
+        v-if="showAction && metadataSource"
         type="button"
         class="inline-flex h-8 items-center gap-1.5 rounded-sm border border-border bg-card px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-card-foreground transition hover:border-secondary hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25"
         :disabled="isHandlingAction"

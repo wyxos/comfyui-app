@@ -35,6 +35,12 @@ export type GenerationMetadataOptions = {
   upscaleModelOptions?: string[]
 }
 
+export type UnsupportedGenerationMetadataField = {
+  label: string
+  value: string
+  reason: string
+}
+
 type StringGenerationMetadataField = Exclude<keyof GenerationMetadataFields, 'hiresEnabled'>
 
 type ClipboardPayload = {
@@ -46,6 +52,34 @@ type ClipboardPayload = {
 
 const clipboardSource = 'comfyui-companion'
 const clipboardKind = 'generation-metadata'
+
+const unsupportedGenerationMetadataFieldSpecs = [
+  {
+    label: 'RNG',
+    keys: ['RNG'],
+    reason: 'Companion does not expose an RNG control.',
+  },
+  {
+    label: 'Shift',
+    keys: ['Shift'],
+    reason: 'Companion does not expose a Shift control.',
+  },
+  {
+    label: 'Version',
+    keys: ['Version'],
+    reason: 'Version is source metadata, not a generation control.',
+  },
+  {
+    label: 'Module 1',
+    keys: ['Module 1'],
+    reason: 'Base modules are not mapped to Companion controls yet.',
+  },
+  {
+    label: 'Module 2',
+    keys: ['Module 2'],
+    reason: 'Base modules are not mapped to Companion controls yet.',
+  },
+]
 
 const samplerAliases = new Map([
   ['eulera', 'euler_ancestral'],
@@ -370,6 +404,25 @@ export function extractGenerationMetadataFields(
   options: GenerationMetadataOptions = {},
 ) {
   return isRecord(meta) ? normalizeFields(meta, options) : {}
+}
+
+export function findUnsupportedGenerationMetadataFields(
+  meta: Record<string, unknown> | null | undefined,
+) {
+  if (!isRecord(meta)) {
+    return []
+  }
+
+  return unsupportedGenerationMetadataFieldSpecs.flatMap<UnsupportedGenerationMetadataField>((field) => {
+    const value = firstValue(meta, field.keys)
+    return value
+      ? [{
+          label: field.label,
+          value,
+          reason: field.reason,
+        }]
+      : []
+  })
 }
 
 export function serializeGenerationMetadataClipboard(

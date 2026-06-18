@@ -124,7 +124,7 @@ describe('AssetPreviewModal actions', () => {
 
     expect(repairDownloadPreviews).toHaveBeenCalledWith(download)
 
-    await wrapper.get('button[aria-label="Show image and video details"]').trigger('click')
+    await wrapper.get('button[aria-label="Show feed"]').trigger('click')
 
     expect(wrapper.find('button[aria-label="Backfill previews for model.safetensors"]').exists()).toBe(false)
   })
@@ -156,7 +156,6 @@ describe('AssetPreviewModal actions', () => {
       },
     })
 
-    await wrapper.get('button[aria-label="Show image and video details"]').trigger('click')
     expect(wrapper.text()).toContain('Image safety')
     await wrapper.get('button[aria-label="Mark image NSFW"]').trigger('click')
     expect(wrapper.find('button[aria-label="Save image safety override"]').exists()).toBe(false)

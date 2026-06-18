@@ -191,8 +191,6 @@ describe('AssetPreviewModal carousel and feed', () => {
 
     await stripButtons[1]?.trigger('click')
     await nextTick()
-    await wrapper.get('button[aria-label="Show image and video details"]').trigger('click')
-    await nextTick()
 
     expect(wrapper.text()).toContain('2 / 3')
     expect(wrapper.text()).toContain('2 of 3')

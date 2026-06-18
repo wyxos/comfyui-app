@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { LoaderCircle } from 'lucide-vue-next'
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
@@ -25,7 +25,7 @@ const props = withDefaults(
     error: '',
     saving: false,
     title: 'Safety',
-    overrideLabel: 'Local override',
+    overrideLabel: 'NSFW override',
     groupLabel: 'Safety override',
     saveLabel: 'Save',
     saveAriaLabel: 'Save safety override',
@@ -48,16 +48,6 @@ const safetyMode = ref<SafetyMode>('detected')
 const suppressNextSave = ref(false)
 const saveRequested = ref(false)
 const saveToastShown = ref(false)
-const detectedLabel = computed(() => {
-  if (props.modelNsfw === true) {
-    return 'Detected as NSFW'
-  }
-  if (props.modelNsfw === false) {
-    return 'Not flagged'
-  }
-  return 'Unknown'
-})
-
 function syncSafetyDraft() {
   const nextMode = props.modelNsfwOverride === true
     ? 'nsfw'
@@ -159,7 +149,6 @@ watch(
     <div class="flex items-start justify-between gap-3">
       <div>
         <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">{{ title }}</p>
-        <p class="mt-1 text-xs text-muted-foreground">{{ detectedLabel }}</p>
       </div>
       <span
         v-if="saving"

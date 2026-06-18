@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   extractGenerationMetadataFields,
+  findUnsupportedGenerationMetadataFields,
   parseGenerationMetadataClipboard,
   serializeGenerationMetadataClipboard,
 } from '../../src/lib/generationMetadata'
@@ -117,5 +118,57 @@ describe('generation metadata mapping', () => {
       samplerName: 'euler_ancestral',
       scheduler: 'normal',
     })
+  })
+
+  it('keeps supported qwen-style fields and reports unsupported replay fields', () => {
+    const meta = {
+      RNG: 'CPU',
+      Model: 'WAI-anima-01',
+      Shift: '3',
+      width: 1024,
+      height: 1344,
+      Version: 'neo',
+      'Module 1': 'qwen_image_vae',
+      'Module 2': 'qwen_3_06b_base',
+      'Model hash': '195ff3c7a5',
+      'Schedule type': 'Normal',
+      clipSkip: 2,
+    }
+
+    expect(extractGenerationMetadataFields(meta, { schedulerOptions })).toMatchObject({
+      width: '1024',
+      height: '1344',
+      scheduler: 'normal',
+      clipSkip: '2',
+      modelName: 'WAI-anima-01',
+      modelHash: '195ff3c7a5',
+    })
+    expect(findUnsupportedGenerationMetadataFields(meta)).toEqual([
+      {
+        label: 'RNG',
+        value: 'CPU',
+        reason: 'Companion does not expose an RNG control.',
+      },
+      {
+        label: 'Shift',
+        value: '3',
+        reason: 'Companion does not expose a Shift control.',
+      },
+      {
+        label: 'Version',
+        value: 'neo',
+        reason: 'Version is source metadata, not a generation control.',
+      },
+      {
+        label: 'Module 1',
+        value: 'qwen_image_vae',
+        reason: 'Base modules are not mapped to Companion controls yet.',
+      },
+      {
+        label: 'Module 2',
+        value: 'qwen_3_06b_base',
+        reason: 'Base modules are not mapped to Companion controls yet.',
+      },
+    ])
   })
 })

@@ -45,7 +45,7 @@ function saveImageSafety(payload: { modelNsfw: boolean | null; modelNsfwOverride
   <AssetPreviewSafetyEditor
     v-if="editable && imageKey"
     title="Image safety"
-    override-label="Image override"
+    override-label="NSFW override"
     group-label="Image safety override"
     save-aria-label="Save image safety override"
     original-aria-label="Use original image safety metadata"
