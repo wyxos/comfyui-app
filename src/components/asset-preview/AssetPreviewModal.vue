@@ -86,6 +86,7 @@ const {
   atlasBaseUrl,
   atlasDeletePendingKey,
   atlasReactionPendingKey,
+  atlasReactionPendingType,
   atlasConfigured,
   atlasOpenError,
   atlasOpening,
@@ -147,11 +148,21 @@ function canReactToActiveAtlasImage() {
   return atlasConfigured.value && Boolean(image?.url && image.id) && !isActiveAtlasStatusLoading()
 }
 
+function canShowActiveAtlasWidget() {
+  const image = activeSlide.value?.image
+  return atlasConfigured.value && Boolean(image?.url && image.id)
+}
+
 function isActiveAtlasStatusLoading() {
   const image = activeSlide.value?.image
   return atlasConfigured.value &&
     Boolean(image?.url && image.id) &&
-    versionAtlasStatusesLoading.value
+    (versionAtlasStatusesLoading.value || !activeAtlasStatusKnown())
+}
+
+function activeAtlasStatusKnown() {
+  const image = activeSlide.value?.image
+  return Boolean(image && Object.prototype.hasOwnProperty.call(image, 'atlasStatus'))
 }
 
 function activeAtlasStatus() {
@@ -161,6 +172,10 @@ function activeAtlasStatus() {
 function activeAtlasPending() {
   const image = activeSlide.value?.image
   return image ? atlasReactionPendingKey.value === atlasMediaKey(image) : false
+}
+
+function activeAtlasPendingReactionType() {
+  return activeAtlasPending() ? atlasReactionPendingType.value : null
 }
 
 function activeAtlasDeleting() {
@@ -318,25 +333,18 @@ function shouldBlurActiveMedia() {
             />
           </div>
           <AssetPreviewAtlasReactionWidget
-            v-if="canReactToActiveAtlasImage()"
+            v-if="canShowActiveAtlasWidget()"
             data-test="asset-preview-main-atlas-reactions"
             class="relative z-30"
             :status="activeAtlasStatus()"
+            :checking="isActiveAtlasStatusLoading()"
             :pending="activeAtlasPending()"
+            :pending-reaction-type="activeAtlasPendingReactionType()"
             :deleting="activeAtlasDeleting()"
             :atlas-file-url="activeAtlasFileUrl()"
             @react="handleActiveAtlasReaction"
             @delete="handleActiveAtlasDelete"
           />
-          <div
-            v-else-if="isActiveAtlasStatusLoading()"
-            data-test="asset-preview-main-atlas-loading"
-            class="relative z-30 inline-flex items-center rounded-md border border-border bg-card/95 px-3 py-2 text-xs font-semibold text-muted-foreground shadow-sm"
-            aria-live="polite"
-          >
-            <LoaderCircle class="mr-2 h-4 w-4 animate-spin text-secondary" />
-            Checking Atlas...
-          </div>
         </div>
         <div
           v-else-if="!civitaiLoading"
@@ -415,6 +423,7 @@ function shouldBlurActiveMedia() {
       :atlas-action-error="atlasActionError"
       :atlas-delete-pending-key="atlasDeletePendingKey"
       :atlas-reaction-pending-key="atlasReactionPendingKey"
+      :atlas-reaction-pending-type="atlasReactionPendingType"
       :can-load-more-feed="canLoadMoreFeed"
       :apply-generation-metadata="props.applyGenerationMetadata"
       :repair-download-previews="props.repairDownloadPreviews"

@@ -144,8 +144,21 @@ function mergedPreviewPaths(item: LibraryModelItem, previews: LibraryPreviewPath
 
 export function useLibraryPreviewBackfills() {
   const previewBackfills = ref<Record<string, LibraryPreviewPath[]>>({})
-  const pendingPreviewBackfillKeys = new Set<string>()
+  const pendingPreviewBackfillKeys = ref<Record<string, true>>({})
   const failedPreviewBackfillKeys = new Set<string>()
+
+  function setPreviewBackfillPending(keys: string[], pending: boolean) {
+    const nextPendingKeys = { ...pendingPreviewBackfillKeys.value }
+    for (const key of keys) {
+      if (pending) {
+        nextPendingKeys[key] = true
+      } else {
+        delete nextPendingKeys[key]
+      }
+    }
+
+    pendingPreviewBackfillKeys.value = nextPendingKeys
+  }
 
   function withPreviewBackfill(item: LibraryModelItem): LibraryModelItem {
     if (item.librarySource !== 'downloaded' && item.librarySource !== 'watched') {
@@ -155,14 +168,16 @@ export function useLibraryPreviewBackfills() {
     const key = previewBackfillKeyFor(item)
     const previews = key ? previewBackfills.value[key] : null
     const previewUrl = previewFor(item) || (previews?.find((preview) => preview.url)?.url ?? null)
+    const pendingWithoutPreview = Boolean(key && pendingPreviewBackfillKeys.value[key] && !previewFor(item))
     if (!previewUrl || !previews?.length) {
-      return item
+      return pendingWithoutPreview ? { ...item, previewBackfillPending: true } : item
     }
 
     return {
       ...item,
       previewUrl,
       previewPaths: mergedPreviewPaths(item, previews),
+      previewBackfillPending: false,
     }
   }
 
@@ -176,7 +191,7 @@ export function useLibraryPreviewBackfills() {
       key &&
       previewNeedsBackfill(item) &&
       !previewBackfills.value[key]?.length &&
-      !pendingPreviewBackfillKeys.has(key) &&
+      !pendingPreviewBackfillKeys.value[key] &&
       !failedPreviewBackfillKeys.has(key),
     )
   }
@@ -202,7 +217,7 @@ export function useLibraryPreviewBackfills() {
     }
 
     const keys = Array.from(requestedItems.keys())
-    keys.forEach((key) => pendingPreviewBackfillKeys.add(key))
+    setPreviewBackfillPending(keys, true)
 
     try {
       const modelIds = Array.from(new Set(Array.from(requestedItems.values()).map((item) => item.modelId)))
@@ -245,7 +260,7 @@ export function useLibraryPreviewBackfills() {
     } catch {
       keys.forEach((key) => failedPreviewBackfillKeys.add(key))
     } finally {
-      keys.forEach((key) => pendingPreviewBackfillKeys.delete(key))
+      setPreviewBackfillPending(keys, false)
     }
   }
 

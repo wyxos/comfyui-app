@@ -34,6 +34,7 @@ function canSendToAtlas(image: CivitaiImage) {
 export function useAssetPreviewAtlasMediaActions(options: UseAssetPreviewAtlasMediaActionsOptions) {
   const atlasActionError = ref('')
   const atlasReactionPendingKey = ref('')
+  const atlasReactionPendingType = ref<AtlasReactionType | null>(null)
   const atlasDeletePendingKey = ref('')
   const atlasConfigured = ref(false)
 
@@ -73,9 +74,6 @@ export function useAssetPreviewAtlasMediaActions(options: UseAssetPreviewAtlasMe
           .filter((item) => typeof item.request_id === 'string')
           .map((item) => [item.request_id as string, item]),
       )
-      if (!statuses.size) {
-        return images
-      }
 
       const withStatuses = images.map((image) => ({
         ...image,
@@ -103,6 +101,7 @@ export function useAssetPreviewAtlasMediaActions(options: UseAssetPreviewAtlasMe
 
     const key = atlasMediaKey(image)
     atlasReactionPendingKey.value = key
+    atlasReactionPendingType.value = type
     atlasActionError.value = ''
 
     try {
@@ -127,6 +126,7 @@ export function useAssetPreviewAtlasMediaActions(options: UseAssetPreviewAtlasMe
       return {
         key,
         status: statusFromReactionPayload(image.atlasStatus, payload, type),
+        reverb: payload?.reverb ?? null,
       }
     } catch (caughtError) {
       atlasActionError.value = caughtError instanceof Error ? caughtError.message : 'Atlas reaction failed.'
@@ -134,6 +134,7 @@ export function useAssetPreviewAtlasMediaActions(options: UseAssetPreviewAtlasMe
     } finally {
       if (atlasReactionPendingKey.value === key) {
         atlasReactionPendingKey.value = ''
+        atlasReactionPendingType.value = null
       }
     }
   }
@@ -185,6 +186,7 @@ export function useAssetPreviewAtlasMediaActions(options: UseAssetPreviewAtlasMe
     atlasConfigured,
     atlasDeletePendingKey,
     atlasReactionPendingKey,
+    atlasReactionPendingType,
     deleteAtlasFile,
     fetchAtlasStatuses,
     reactToAtlasImage,

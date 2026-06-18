@@ -224,6 +224,107 @@ describe('LibraryView preview backfill', () => {
     expect(preview.classes().join(' ')).toContain('blur-sm')
   })
 
+  it('backfills extra card previews when the local preview already has current safety metadata', async () => {
+    const now = Date.now()
+    const downloads = ref([
+      {
+        id: 'downloaded-with-one-local-preview',
+        state: 'complete',
+        modelId: 840754,
+        modelName: 'Downloaded Multi Preview LoRA',
+        modelType: 'LORA',
+        modelNsfw: false,
+        modelMetadata: { nsfw: false },
+        versionId: 1365544,
+        versionName: 'v1',
+        fileId: 1268893,
+        fileName: 'downloaded_multi_preview.safetensors',
+        baseModel: 'Illustrious',
+        targetPath: 'C:\\models\\loras\\downloaded_multi_preview.safetensors',
+        finishedAt: now,
+        updatedAt: now,
+        previewUrl: '/api/civitai/downloads/downloaded-with-one-local-preview/preview',
+        previewImage: {
+          id: 55527152,
+          url: 'https://image.civitai.com/mock/original=true/55527152.jpeg',
+          mediaType: 'image',
+          nsfwLevel: 1,
+        },
+        previewPaths: [
+          {
+            id: 55527152,
+            url: '/api/civitai/downloads/downloaded-with-one-local-preview/previews/0',
+            mediaType: 'image',
+            nsfwLevel: null,
+          },
+        ],
+      },
+    ])
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), 'http://companion.test')
+
+      if (url.pathname === '/api/settings/app') {
+        return jsonResponse({ ok: true, includeNsfw: true, blurNsfwModels: true, blurNsfwMediaLevel: 4 })
+      }
+
+      if (url.pathname === '/api/controlnets') {
+        return jsonResponse({ ok: true, controlNets: [] })
+      }
+
+      if (url.pathname === '/api/civitai/model-previews') {
+        return jsonResponse({
+          ok: true,
+          items: [
+            {
+              modelId: 840754,
+              versionId: 1365544,
+              previews: [
+                { id: 55527152, url: 'https://image.civitai.com/mock/original=true/55527152.jpeg', mediaType: 'image', nsfwLevel: 1 },
+                { id: 55527184, url: 'https://image.civitai.com/mock/original=true/55527184.jpeg', mediaType: 'image', nsfwLevel: 8 },
+              ],
+            },
+          ],
+        })
+      }
+
+      return jsonResponse({ ok: false, message: `Unhandled ${url.pathname}` }, 500)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    vi.doMock('../../src/composables/useAssetDownloads', () => ({
+      useAssetDownloads: () => ({
+        downloads,
+        watchedDownloads: ref([]),
+        activeDownloads: computed(() => []),
+        completedDownloads: computed(() => downloads.value.filter((item) => item.state === 'complete')),
+        loading: ref(false),
+        error: ref(''),
+        refreshDownloads: vi.fn(),
+        refreshWatchedDownloads: vi.fn(),
+      }),
+    }))
+
+    const router = createAppRouter(createMemoryHistory())
+    await router.push('/library')
+    await router.isReady()
+    const { default: LibraryView } = await import('../../src/views/LibraryView.vue')
+    const wrapper = mount(LibraryView, {
+      global: {
+        plugins: [router],
+      },
+    })
+    await flushPromises()
+    await flushPromises()
+
+    const previewCall = fetchMock.mock.calls
+      .map(([input]) => new URL(String(input), 'http://companion.test'))
+      .find((url) => url.pathname === '/api/civitai/model-previews')
+    expect(previewCall?.searchParams.get('modelIds')).toBe('840754')
+    expect(previewCall?.searchParams.get('versionIds')).toBe('1365544')
+    expect(wrapper.get('img[alt="Downloaded Multi Preview LoRA preview"]').attributes('src')).toBe('/api/civitai/downloads/downloaded-with-one-local-preview/preview')
+    expect(wrapper.text()).toContain('1 / 2')
+  })
+
   it('filters downloaded cards after backfilled preview safety marks them NSFW', async () => {
     const now = Date.now()
     const downloads = ref([

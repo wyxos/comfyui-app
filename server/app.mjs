@@ -42,6 +42,7 @@ import {
   handlePutCivitaiSettings,
 } from './handlers/settings.mjs'
 import {
+  handleAtlasBroadcastAuth,
   handleAtlasFileDelete,
   handleAtlasCivitaiFeed,
   handleAtlasCivitaiOpenModel,
@@ -105,7 +106,33 @@ async function proxyDevAsset(devAssetOrigin, request, response) {
   }
 }
 
-export function createCompanionServer({ connectWebSocket = true, devAssetOrigin = null } = {}) {
+function serveDevAssetMiddleware(devAssetMiddleware, request, response) {
+  devAssetMiddleware(request, response, (error) => {
+    if (response.writableEnded) {
+      return
+    }
+
+    if (error) {
+      return sendError(
+        response,
+        500,
+        'dev-asset-middleware-failed',
+        'Frontend dev middleware failed.',
+        error instanceof Error ? { message: error.message } : null,
+      )
+    }
+
+    response.writeHead(404)
+    response.end('Not found')
+  })
+}
+
+export function createCompanionServer({
+  connectWebSocket = true,
+  devAssetOrigin = null,
+  devAssetMiddleware = null,
+  destroyUnknownUpgrades = true,
+} = {}) {
   const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', `http://${request.headers.host ?? `${host}:${port}`}`)
 
@@ -175,6 +202,10 @@ export function createCompanionServer({ connectWebSocket = true, devAssetOrigin 
 
   if (url.pathname === '/api/atlas/civitai/reactions' && request.method === 'POST') {
     return handleAtlasCivitaiReaction(request, response)
+  }
+
+  if (url.pathname === '/api/atlas/broadcasting/auth' && request.method === 'POST') {
+    return handleAtlasBroadcastAuth(request, response)
   }
 
   if (url.pathname === '/api/atlas/civitai/feed' && request.method === 'POST') {
@@ -324,6 +355,10 @@ export function createCompanionServer({ connectWebSocket = true, devAssetOrigin 
     return sendError(response, 404, 'route-not-found', `No API route matched ${request.method} ${url.pathname}`)
   }
 
+  if (devAssetMiddleware) {
+    return serveDevAssetMiddleware(devAssetMiddleware, request, response)
+  }
+
   if (devAssetOrigin) {
     return proxyDevAsset(devAssetOrigin, request, response)
   }
@@ -351,7 +386,7 @@ export function createCompanionServer({ connectWebSocket = true, devAssetOrigin 
     server.once('listening', connectComfySocket)
   }
 
-  installDownloadsEventSocket(server)
+  installDownloadsEventSocket(server, { destroyUnknownUpgrades })
 
   return server
 }

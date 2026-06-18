@@ -54,4 +54,68 @@ describe('companion server Atlas feed proxy', () => {
     })
     expect(server.calls.some((call) => call.url.origin === 'https://atlas.test')).toBe(false)
   })
+
+  it('forwards private Reverb channel auth through Atlas', async () => {
+    const server = await setupHarness()
+    await server.json('PUT', '/api/settings/app', {
+      includeNsfw: true,
+      blurNsfwModels: false,
+      blurNsfwMediaLevel: null,
+      atlasUrl: 'atlas.test',
+      atlasApiKey: 'atlas-secret-1234',
+    })
+
+    await expect(server.json('POST', '/api/atlas/broadcasting/auth', {
+      socket_id: '123.456',
+      channel_name: 'private-extension-downloads.test',
+    })).resolves.toMatchObject({
+      payload: expect.objectContaining({
+        configured: true,
+        auth: 'atlas-key:signature',
+      }),
+    })
+
+    const authCall = server.calls.find((call) =>
+      call.url.origin === 'https://atlas.test' && call.url.pathname === '/api/extension/broadcasting/auth',
+    )
+    expect(authCall?.headers.get('x-atlas-api-key')).toBe('atlas-secret-1234')
+    expect(authCall?.body).toMatchObject({
+      socket_id: '123.456',
+      channel_name: 'private-extension-downloads.test',
+    })
+  })
+
+  it('opens Atlas model tabs with the Companion browse defaults', async () => {
+    const server = await setupHarness()
+    await server.json('PUT', '/api/settings/app', {
+      includeNsfw: true,
+      blurNsfwModels: false,
+      blurNsfwMediaLevel: null,
+      atlasUrl: 'atlas.test',
+      atlasApiKey: 'atlas-secret-1234',
+    })
+
+    await expect(server.json('POST', '/api/atlas/civitai/open-model', {
+      modelId: 101,
+      modelVersionId: 201,
+      nsfw: true,
+    })).resolves.toMatchObject({
+      payload: expect.objectContaining({
+        configured: true,
+        tab: expect.objectContaining({ id: 601 }),
+      }),
+    })
+
+    const openModelCall = server.calls.find((call) =>
+      call.url.origin === 'https://atlas.test' && call.url.pathname === '/api/extension/browse-tabs/civitai-model',
+    )
+    expect(openModelCall?.body).toMatchObject({
+      model_id: 101,
+      model_version_id: 201,
+      nsfw: true,
+      type: 'all',
+      sort: 'Newest',
+      period: 'AllTime',
+    })
+  })
 })

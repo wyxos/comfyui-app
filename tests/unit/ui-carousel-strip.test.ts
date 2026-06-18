@@ -100,4 +100,28 @@ describe('UiCarousel strip layout', () => {
     expect(emblaApi.scrollTo).toHaveBeenCalledWith(5)
     expect(emblaApi.scrollNext).not.toHaveBeenCalled()
   })
+
+  it('keeps the visible five thumbnails stable until the active item enters the next group', async () => {
+    const { default: AssetPreviewMediaStrip } = await import('../../src/components/asset-preview/AssetPreviewMediaStrip.vue')
+    const wrapper = mount(AssetPreviewMediaStrip, {
+      props: {
+        activeIndex: 0,
+        slides: Array.from({ length: 13 }, (_, index) => ({
+          key: `preview-${index}`,
+          url: `https://example.test/preview-${index}.jpg`,
+          image: { url: `https://example.test/preview-${index}.jpg` },
+          isVideo: false,
+          source: 'civitai' as const,
+        })),
+      },
+    })
+
+    vi.clearAllMocks()
+
+    await wrapper.setProps({ activeIndex: 3 })
+    expect(emblaApi.scrollTo).not.toHaveBeenCalledWith(3, true)
+
+    await wrapper.setProps({ activeIndex: 5 })
+    expect(emblaApi.scrollTo).toHaveBeenCalledWith(5, true)
+  })
 })

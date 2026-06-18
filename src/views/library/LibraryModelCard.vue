@@ -1,16 +1,24 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import {
+  ChevronLeft,
+  ChevronRight,
   Eye,
   FileDown,
 } from 'lucide-vue-next'
+import {
+  imageMatchesNsfwBlurLevel,
+  imageNsfwDetectedValue,
+  isVideoUrl,
+} from '../../components/asset-preview/assetPreviewHelpers'
 import UiPreviewCard from '../../components/ui/UiPreviewCard.vue'
 import {
-  isVideoPreview,
   modelHasNsfw,
   modelTypeLabel,
   previewMatchesNsfwBlurLevel,
   previewFor,
   type LibraryModelItem,
+  type LibraryPreviewPath,
 } from './libraryModelHelpers'
 
 const props = withDefaults(defineProps<{
@@ -27,7 +35,69 @@ defineEmits<{
   restore: [item: LibraryModelItem]
 }>()
 
+const cardPreviewIndexes = ref<Record<string, number>>({})
+
+function previewPathsForItem(item: LibraryModelItem): LibraryPreviewPath[] {
+  const paths = (item.previewPaths ?? []).filter((preview) => Boolean(preview.url))
+  if (paths.length) {
+    const previewUrl = previewFor(item)
+    return previewUrl ? [{ ...paths[0], url: previewUrl }, ...paths.slice(1)] : paths
+  }
+
+  const fallbackPreviewUrl = previewFor(item)
+  return fallbackPreviewUrl
+    ? [{ url: fallbackPreviewUrl, mediaType: isVideoUrl(fallbackPreviewUrl) ? 'video' : 'image' }]
+    : []
+}
+
+function previewCount() {
+  return previewPathsForItem(props.item).length
+}
+
+function activePreviewIndex() {
+  const total = previewCount()
+  if (total < 1) {
+    return 0
+  }
+
+  const key = String(props.item.id)
+  const index = cardPreviewIndexes.value[key] ?? 0
+  return ((index % total) + total) % total
+}
+
+function activePreviewPath() {
+  return previewPathsForItem(props.item)[activePreviewIndex()] ?? null
+}
+
+function activePreviewUrl() {
+  return activePreviewPath()?.url ?? previewFor(props.item)
+}
+
+function isActiveVideoPreview() {
+  const preview = activePreviewPath()
+  return preview
+    ? preview.mediaType === 'video' || preview.type === 'video' || isVideoUrl(preview.url)
+    : false
+}
+
+function showPreviewImage(step: number) {
+  if (previewCount() < 2) {
+    return
+  }
+
+  const key = String(props.item.id)
+  cardPreviewIndexes.value = {
+    ...cardPreviewIndexes.value,
+    [key]: activePreviewIndex() + step,
+  }
+}
+
 function shouldBlurNsfwPreview() {
+  const preview = activePreviewPath()
+  if (imageNsfwDetectedValue(preview) !== null) {
+    return imageMatchesNsfwBlurLevel(preview, props.blurNsfwMediaLevel)
+  }
+
   return previewMatchesNsfwBlurLevel(props.item, props.blurNsfwMediaLevel)
 }
 
@@ -38,15 +108,17 @@ function shouldBlurNsfwTitle() {
 
 <template>
   <UiPreviewCard
-    :tag="item.librarySource === 'hidden' ? 'article' : 'button'"
+    tag="article"
     :aria-label="`Open ${item.modelName} preview`"
-    :preview-url="previewFor(item)"
-    :is-video-preview="isVideoPreview(item)"
+    :preview-url="activePreviewUrl()"
+    :is-video-preview="isActiveVideoPreview()"
     :preview-label="`${item.modelName} preview`"
     :title="item.modelName"
     min-height-class="min-h-[20rem]"
     media-class="h-64"
     :media-content-class="shouldBlurNsfwPreview() ? 'scale-110 blur-sm saturate-50' : ''"
+    :loading="item.previewBackfillPending === true"
+    loading-label="Loading preview image..."
     @click="item.librarySource === 'hidden' ? undefined : $emit('open', item)"
   >
     <template #placeholder>
@@ -57,6 +129,38 @@ function shouldBlurNsfwTitle() {
     </template>
 
     <template #media-overlay>
+      <div
+        v-if="previewCount() > 1"
+        class="pointer-events-none absolute inset-x-3 top-1/2 z-20 flex -translate-y-1/2 items-center justify-between"
+      >
+        <button
+          class="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-primary-foreground/10 bg-primary/72 text-primary-foreground shadow-sm backdrop-blur-sm transition hover:bg-secondary hover:text-secondary-foreground focus:outline-none focus:ring-2 focus:ring-ring/35"
+          type="button"
+          :aria-label="`Previous preview image for ${item.modelName}`"
+          data-library-card-preview-previous
+          @click.stop.prevent="showPreviewImage(-1)"
+        >
+          <ChevronLeft class="h-4 w-4" />
+        </button>
+        <button
+          class="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-primary-foreground/10 bg-primary/72 text-primary-foreground shadow-sm backdrop-blur-sm transition hover:bg-secondary hover:text-secondary-foreground focus:outline-none focus:ring-2 focus:ring-ring/35"
+          type="button"
+          :aria-label="`Next preview image for ${item.modelName}`"
+          data-library-card-preview-next
+          @click.stop.prevent="showPreviewImage(1)"
+        >
+          <ChevronRight class="h-4 w-4" />
+        </button>
+      </div>
+
+      <span
+        v-if="previewCount() > 1"
+        class="pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-md border border-primary-foreground/10 bg-primary/82 px-2 py-1 text-[11px] font-semibold text-primary-foreground shadow-sm backdrop-blur-sm"
+        data-library-card-preview-count
+      >
+        {{ activePreviewIndex() + 1 }} / {{ previewCount() }}
+      </span>
+
       <div class="absolute right-3 top-3 flex flex-wrap justify-end gap-2">
         <span
           v-if="item.librarySource === 'watched'"

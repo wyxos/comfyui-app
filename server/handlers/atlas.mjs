@@ -102,6 +102,15 @@ export async function handleAtlasCivitaiReaction(request, response) {
   return proxyAtlasRequest(response, '/api/extension/civitai/reactions', body)
 }
 
+export async function handleAtlasBroadcastAuth(request, response) {
+  const body = await readBody(request, response)
+  if (body === null) {
+    return
+  }
+
+  return proxyAtlasRequest(response, '/api/extension/broadcasting/auth', body)
+}
+
 export async function handleAtlasCivitaiFeed(request, response) {
   const body = await readBody(request, response)
   if (body === null) {
@@ -146,6 +155,9 @@ export async function handleAtlasCivitaiOpenModel(request, response) {
   const modelVersionId = Number.parseInt(String(body.modelVersionId ?? body.model_version_id ?? ''), 10)
   const payload = {
     model_id: modelId,
+    type: 'all',
+    sort: 'Newest',
+    period: 'AllTime',
     ...(Number.isSafeInteger(modelVersionId) && modelVersionId > 0 ? { model_version_id: modelVersionId } : {}),
     ...(body.nsfw === true ? { nsfw: true } : {}),
   }

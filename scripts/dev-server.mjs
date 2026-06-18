@@ -1,72 +1,88 @@
-import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { createServer as createViteServer } from 'vite'
 
 import { appRoot, host, port, refreshConfigFromEnv } from '../server/config.mjs'
 import { startCompanionServer } from '../server/app.mjs'
 
 refreshConfigFromEnv()
 
-const devHost = process.env.COMFY_COMPANION_DEV_HOST ?? host
-const devOriginHost = devHost === '0.0.0.0' ? '127.0.0.1' : devHost
-const frontendPort = Number.parseInt(
-  process.env.COMFY_COMPANION_DEV_FRONTEND_PORT ?? String(port === 3210 ? 3211 : port + 1),
-  10,
-)
-const viteCliPath = join(appRoot, 'node_modules', 'vite', 'bin', 'vite.js')
-
-if (!existsSync(viteCliPath)) {
-  console.error('Vite was not found. Run npm install before starting dev mode.')
-  process.exit(1)
-}
-
-const viteProcess = spawn(
-  process.execPath,
-  [viteCliPath, '--host', devHost, '--port', String(frontendPort), '--strictPort'],
-  {
-    cwd: appRoot,
-    env: process.env,
-    stdio: 'inherit',
-  },
-)
-const server = startCompanionServer({
-  devAssetOrigin: new URL(`http://${devOriginHost}:${frontendPort}/`),
-  connectWebSocket: process.env.COMFY_COMPANION_CONNECT_WEBSOCKET !== '0',
-})
+let viteServer = null
 let shuttingDown = false
 
-function shutdown(signal) {
-  if (shuttingDown) {
+function serveViteAssets(request, response, next) {
+  if (!viteServer) {
+    response.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' })
+    response.end('Frontend dev middleware is starting.')
     return
   }
 
-  shuttingDown = true
-  viteProcess.kill(signal)
-  server.close(() => {
-    process.exit(signal === 'SIGINT' ? 130 : 0)
-  })
+  viteServer.middlewares(request, response, next)
 }
 
-viteProcess.once('exit', (code, signal) => {
-  if (shuttingDown) {
-    return
-  }
-
-  shuttingDown = true
-  server.close(() => {
-    process.exit(code ?? (signal ? 1 : 0))
-  })
+const server = startCompanionServer({
+  destroyUnknownUpgrades: false,
+  devAssetMiddleware: serveViteAssets,
+  connectWebSocket: process.env.COMFY_COMPANION_CONNECT_WEBSOCKET !== '0',
 })
 
-server.once('error', (error) => {
+server.once('error', async (error) => {
   if (!shuttingDown) {
     shuttingDown = true
-    viteProcess.kill()
+    await closeViteServer()
   }
 
   console.error(error)
   process.exit(1)
 })
 
-process.once('SIGINT', () => shutdown('SIGINT'))
-process.once('SIGTERM', () => shutdown('SIGTERM'))
+try {
+  viteServer = await createViteServer({
+    root: appRoot,
+    appType: 'spa',
+    server: {
+      middlewareMode: { server },
+      hmr: { server },
+    },
+  })
+  console.log(`Comfy Companion dev assets mounted on http://${host}:${port}`)
+} catch (error) {
+  console.error(error)
+  server.close(() => process.exit(1))
+}
+
+async function closeViteServer() {
+  if (!viteServer) {
+    return
+  }
+
+  const serverToClose = viteServer
+  viteServer = null
+  await serverToClose.close()
+}
+
+function closeCompanionServer() {
+  if (!server.listening) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve) => {
+    server.close(() => resolve())
+  })
+}
+
+async function shutdown(signal) {
+  if (shuttingDown) {
+    return
+  }
+
+  shuttingDown = true
+  await closeViteServer()
+  await closeCompanionServer()
+  process.exit(signal === 'SIGINT' ? 130 : 0)
+}
+
+process.once('SIGINT', () => {
+  void shutdown('SIGINT')
+})
+process.once('SIGTERM', () => {
+  void shutdown('SIGTERM')
+})

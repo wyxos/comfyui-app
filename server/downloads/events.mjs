@@ -66,14 +66,16 @@ export function queueDownloadsSnapshotBroadcast({ immediate = false } = {}) {
   }, immediate ? 0 : broadcastDelayMs)
 }
 
-export function installDownloadsEventSocket(httpServer) {
+export function installDownloadsEventSocket(httpServer, { destroyUnknownUpgrades = true } = {}) {
   const socketServer = new WebSocketServer({ noServer: true })
   downloadEventServers.add(socketServer)
 
   httpServer.on('upgrade', (request, socket, head) => {
     const url = new URL(request.url ?? '/', `http://${request.headers.host ?? '127.0.0.1'}`)
     if (url.pathname !== downloadEventPath) {
-      socket.destroy()
+      if (destroyUnknownUpgrades) {
+        socket.destroy()
+      }
       return
     }
 

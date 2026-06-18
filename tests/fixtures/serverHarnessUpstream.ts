@@ -12,6 +12,7 @@ export type UpstreamState = {
   atlasStatus: unknown
   atlasFeed: unknown
   atlasReaction: unknown
+  atlasBroadcastAuth: unknown
   atlasOpenModel: unknown
   queue: unknown
   histories: Record<string, unknown>
@@ -117,6 +118,9 @@ function createDefaultUpstreamState(): UpstreamState {
       reaction: { type: 'love' },
       download: { requested: true },
     },
+    atlasBroadcastAuth: {
+      auth: 'atlas-key:signature',
+    },
     atlasOpenModel: {
       tab: {
         id: 601,
@@ -124,6 +128,9 @@ function createDefaultUpstreamState(): UpstreamState {
           service: 'civit-ai-images',
           modelId: 101,
           modelVersionId: 201,
+          type: 'all',
+          sort: 'Newest',
+          period: 'AllTime',
         },
       },
       browse_url: 'https://atlas.test/browse',

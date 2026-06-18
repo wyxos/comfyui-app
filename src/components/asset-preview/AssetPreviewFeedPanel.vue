@@ -25,6 +25,7 @@ const props = defineProps<{
   atlasActionError: string
   atlasDeletePendingKey: string
   atlasReactionPendingKey: string
+  atlasReactionPendingType: AtlasReactionType | null
   atlasConfigured: boolean
   canLoadMoreFeed: boolean
 }>()
@@ -85,8 +86,16 @@ function canReactInAtlas(slide: PreviewSlide) {
   return props.atlasConfigured && Boolean(slide.image?.url && slide.image.id)
 }
 
+function atlasStatusKnown(slide: PreviewSlide) {
+  return Boolean(slide.image && Object.prototype.hasOwnProperty.call(slide.image, 'atlasStatus'))
+}
+
 function isAtlasPending(slide: PreviewSlide) {
   return slide.image ? props.atlasReactionPendingKey === atlasMediaKey(slide.image) : false
+}
+
+function atlasPendingReactionType(slide: PreviewSlide) {
+  return isAtlasPending(slide) ? props.atlasReactionPendingType : null
 }
 
 function isAtlasDeletePending(slide: PreviewSlide) {
@@ -277,7 +286,9 @@ function handleFeedAuxClick(event: MouseEvent, slide: PreviewSlide) {
             data-test="asset-preview-feed-atlas-reactions"
             class="w-full"
             :status="slide.image?.atlasStatus ?? null"
+            :checking="!atlasStatusKnown(slide)"
             :pending="isAtlasPending(slide)"
+            :pending-reaction-type="atlasPendingReactionType(slide)"
             :deleting="isAtlasDeletePending(slide)"
             :atlas-file-url="atlasFileUrl(slide)"
             compact

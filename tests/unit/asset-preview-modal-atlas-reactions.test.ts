@@ -117,8 +117,9 @@ describe('AssetPreviewModal Atlas reactions', () => {
 
     const wrapper = await mountModal(fetchMock)
 
-    expect(wrapper.find('[data-test="asset-preview-main-atlas-reactions"]').exists()).toBe(false)
-    expect(wrapper.find('[data-test="asset-preview-main-atlas-loading"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="asset-preview-main-atlas-reactions"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="asset-preview-atlas-checking"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-test="asset-preview-atlas-reaction-button"]')).toHaveLength(0)
 
     resolveStatus?.(new Response(JSON.stringify({
       ok: true,
@@ -127,7 +128,7 @@ describe('AssetPreviewModal Atlas reactions', () => {
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     await flushPromises()
 
-    expect(wrapper.find('[data-test="asset-preview-main-atlas-loading"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="asset-preview-atlas-checking"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="asset-preview-main-atlas-reactions"]').exists()).toBe(true)
   })
 

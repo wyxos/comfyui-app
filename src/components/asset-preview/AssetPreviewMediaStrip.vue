@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { imageMatchesNsfwBlurLevel } from './assetPreviewHelpers'
 import type { PreviewSlide } from './assetPreviewTypes'
@@ -17,10 +17,33 @@ const emit = defineEmits<{
   select: [index: number]
 }>()
 
-const scrollIndex = computed(() => {
-  const lastFiveUpStart = Math.max(props.slides.length - 5, 0)
-  return Math.min(props.activeIndex, lastFiveUpStart)
-})
+const thumbnailPageSize = 5
+const visibleStartIndex = ref(0)
+const scrollIndex = computed(() => visibleStartIndex.value)
+
+function pageStartForIndex(index: number) {
+  return Math.max(0, Math.floor(index / thumbnailPageSize) * thumbnailPageSize)
+}
+
+watch(
+  () => props.activeIndex,
+  (activeIndex) => {
+    if (activeIndex < visibleStartIndex.value || activeIndex >= visibleStartIndex.value + thumbnailPageSize) {
+      visibleStartIndex.value = pageStartForIndex(activeIndex)
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.slides.length,
+  (count) => {
+    const lastPageStart = pageStartForIndex(Math.max(count - 1, 0))
+    if (visibleStartIndex.value > lastPageStart) {
+      visibleStartIndex.value = lastPageStart
+    }
+  },
+)
 
 function mediaClassFor(slide: PreviewSlide) {
   return imageMatchesNsfwBlurLevel(slide.image, props.blurNsfwMediaLevel)
@@ -43,6 +66,7 @@ function mediaClassFor(slide: PreviewSlide) {
         viewport-test-id="asset-preview-strip-viewport"
         aria-label="Preview media strip"
         item-class="basis-1/5 p-1 h-full"
+        @update:model-value="visibleStartIndex = pageStartForIndex($event)"
       >
         <template #item="{ item, index }">
           <button

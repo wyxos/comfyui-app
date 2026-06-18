@@ -38,7 +38,10 @@ export type LibraryPreviewPath = {
   height?: number | null
   hash?: string | null
 }
-export type ControlNetLibraryItem = {
+export type LibraryPreviewBackfillState = {
+  previewBackfillPending?: boolean
+}
+export type ControlNetLibraryItem = LibraryPreviewBackfillState & {
   id: string
   itemKind: 'controlnet'
   librarySource: 'controlnet'
@@ -56,19 +59,19 @@ export type ControlNetLibraryItem = {
   controlType: string
   loaderType: string
 }
-export type DownloadedLibraryItem = AssetDownloadItem & {
+export type DownloadedLibraryItem = AssetDownloadItem & LibraryPreviewBackfillState & {
   itemKind: 'checkpoint' | 'lora'
   librarySource: 'downloaded'
   compatibility?: ModelCompatibilityMetadata | null
 }
-export type WatchedLibraryItem = WatchedAssetDownloadItem & {
+export type WatchedLibraryItem = WatchedAssetDownloadItem & LibraryPreviewBackfillState & {
   itemKind: 'checkpoint' | 'lora'
   librarySource: 'watched'
   compatibility?: ModelCompatibilityMetadata | null
   previewUrl?: string | null
   previewPaths?: LibraryPreviewPath[]
 }
-export type HiddenLibraryItem = {
+export type HiddenLibraryItem = LibraryPreviewBackfillState & {
   id: string
   itemKind: 'checkpoint' | 'lora' | 'controlnet'
   librarySource: 'hidden'
@@ -103,6 +106,28 @@ export type ControlNetResponse = {
 }
 
 type ModelTypeLike = Pick<AssetDownloadItem | WatchedAssetDownloadItem, 'modelType'>
+
+function timestampValue(value: number | null | undefined) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+export function librarySortTimestamp(item: LibraryModelItem) {
+  if (item.librarySource === 'downloaded') {
+    return timestampValue(item.finishedAt) || timestampValue(item.updatedAt)
+  }
+
+  if (item.librarySource === 'watched') {
+    return timestampValue(item.createdAt) || timestampValue(item.updatedAt)
+  }
+
+  return timestampValue(item.updatedAt)
+}
+
+export function compareLibraryItemsByDownloadedAt(left: LibraryModelItem, right: LibraryModelItem) {
+  return librarySortTimestamp(right) - librarySortTimestamp(left) ||
+    timestampValue(right.updatedAt) - timestampValue(left.updatedAt) ||
+    left.modelName.localeCompare(right.modelName)
+}
 
 export function normalizedModelType(item: ModelTypeLike): LibraryItemKind | '' {
   const normalized = item.modelType.trim().toLowerCase()
@@ -263,7 +288,8 @@ export function previewHasCurrentSafetyMetadata(item: LibraryModelItem) {
 }
 
 export function previewNeedsBackfill(item: LibraryModelItem) {
-  return !previewFor(item) || !previewHasCurrentSafetyMetadata(item)
+  const previewPathCount = (item.previewPaths ?? []).filter((preview) => preview.url).length
+  return !previewFor(item) || !previewHasCurrentSafetyMetadata(item) || previewPathCount <= 1
 }
 
 export function previewMatchesNsfwBlurLevel(item: LibraryModelItem, blurLevel: 4 | 8 | 16 | 32 | null | undefined) {

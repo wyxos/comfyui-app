@@ -87,6 +87,7 @@ const props = defineProps<{
   atlasActionError: string
   atlasDeletePendingKey: string
   atlasReactionPendingKey: string
+  atlasReactionPendingType: AtlasReactionType | null
   canLoadMoreFeed: boolean
   applyGenerationMetadata?: (metadata: Record<string, unknown>) => void | Promise<void>
   repairDownloadPreviews?: (download: AssetPreviewDownload) => void | Promise<void>
@@ -483,6 +484,7 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
         :atlas-action-error="atlasActionError"
         :atlas-delete-pending-key="atlasDeletePendingKey"
         :atlas-reaction-pending-key="atlasReactionPendingKey"
+        :atlas-reaction-pending-type="atlasReactionPendingType"
         :atlas-configured="atlasConfigured"
         :can-load-more-feed="canLoadMoreFeed"
         @select-version="emit('select-version', $event)"

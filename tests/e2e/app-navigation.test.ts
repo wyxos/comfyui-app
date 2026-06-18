@@ -92,10 +92,13 @@ describe('companion app e2e flows', () => {
 
     await expect.element(screen.getByRole('heading', { name: 'Generation jobs' })).toBeVisible()
     await expect.element(screen.getByText('1-40 of 45')).toBeVisible()
-    const firstJobCard = document.querySelector<HTMLButtonElement>(
-      'button[aria-label="Open outputs for generation job job-prompt-01"]',
-    )
-    expect(firstJobCard).not.toBeNull()
+    let firstJobCard: HTMLButtonElement | null = null
+    await vi.waitFor(() => {
+      firstJobCard = document.querySelector<HTMLButtonElement>(
+        'button[aria-label="Open outputs for generation job job-prompt-01"]',
+      )
+      expect(firstJobCard).not.toBeNull()
+    })
     expect(firstJobCard?.className).toContain('flex-col')
     expect(firstJobCard?.querySelector('img')?.className).toContain('object-contain')
     expect(firstJobCard?.textContent).toContain('job-prompt-01')
@@ -162,10 +165,13 @@ describe('companion app e2e flows', () => {
     expect(document.querySelector('button[aria-label="Open outputs for generation job batch-job-1"]')).toBeNull()
     expect(document.querySelector('button[aria-label="Open outputs for generation job batch-job-2"]')).toBeNull()
 
-    const batchCard = document.querySelector<HTMLButtonElement>(
-      'button[aria-label="Open outputs for generation batch batch-1"]',
-    )
-    expect(batchCard).not.toBeNull()
+    let batchCard: HTMLButtonElement | null = null
+    await vi.waitFor(() => {
+      batchCard = document.querySelector<HTMLButtonElement>(
+        'button[aria-label="Open outputs for generation batch batch-1"]',
+      )
+      expect(batchCard).not.toBeNull()
+    })
     expect(batchCard?.textContent).toContain('2 outputs ready')
     expect(batchCard?.textContent).toContain('Batch batch-1')
 
@@ -278,7 +284,11 @@ describe('companion app e2e flows', () => {
     expect(document.querySelector('button[aria-label="Open asset downloads"]')).not.toBeNull()
     expect(document.querySelector('aside[aria-label="Asset downloads"]')).toBeNull()
     expect(document.querySelector('footer')?.className).not.toContain('lg:pr-[25rem]')
-    const firstLibraryCard = document.querySelector<HTMLButtonElement>('button[aria-label="Open Library model 01 preview"]')
+    let firstLibraryCard: HTMLElement | null = null
+    await vi.waitFor(() => {
+      firstLibraryCard = document.querySelector<HTMLElement>('[aria-label="Open Library model 01 preview"]')
+      expect(firstLibraryCard).not.toBeNull()
+    })
     expect(firstLibraryCard?.className).toContain('flex-col')
     expect(firstLibraryCard?.querySelector('img')?.className).toContain('object-contain')
     expect(firstLibraryCard?.textContent).not.toContain('library_model_01.safetensors')

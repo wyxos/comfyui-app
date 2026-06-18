@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertCircle, LoaderCircle } from 'lucide-vue-next'
+import { AlertCircle } from 'lucide-vue-next'
 import UiPaginatedCardGrid from '../../components/ui/UiPaginatedCardGrid.vue'
 import AssetResultCard from './AssetResultCard.vue'
 import { useProvidedAssetsView } from './assetsViewContext'
@@ -28,21 +28,7 @@ const {
 <template>
   <template v-if="hasRenderableState">
     <section
-      v-if="loading && !visibleModels.length"
-      data-assets-results-scroll
-      class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6"
-      aria-live="polite"
-    >
-      <div
-        class="flex h-full items-center justify-center rounded-md border border-border bg-card text-sm text-card-foreground"
-      >
-        <LoaderCircle class="mr-2 h-5 w-5 animate-spin text-secondary" />
-        Searching Civitai...
-      </div>
-    </section>
-
-    <section
-      v-else-if="error"
+      v-if="error"
       data-assets-results-scroll
       class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6"
       aria-live="polite"
@@ -63,7 +49,7 @@ const {
     </section>
 
     <section
-      v-else-if="searched && !visibleModels.length"
+      v-else-if="searched && !visibleModels.length && !loading"
       data-assets-results-scroll
       class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6"
       aria-live="polite"
@@ -95,9 +81,12 @@ const {
       :page-text="pageLabel || `Page ${currentPage}`"
       :can-go-previous="canGoPrevious"
       :can-go-next="canGoNext"
+      :loading="loading"
+      :transition-key="currentPage"
+      loading-label="Loading models..."
       previous-label="Previous Civitai models page"
       next-label="Next Civitai models page"
-      content-class="relative min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6"
+      content-class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6"
       grid-class="asset-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
       @go-to-page="goToPage"
     >
@@ -106,19 +95,6 @@ const {
         :key="model.id"
         :model="model"
       />
-
-      <template #overlay>
-        <div
-          v-if="loading && visibleModels.length"
-          class="absolute inset-0 z-20 flex items-start justify-center bg-background/45 pt-16 text-sm font-semibold text-foreground backdrop-blur-[1px]"
-          aria-live="polite"
-        >
-          <span class="inline-flex items-center rounded-md border border-border bg-card px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
-            <LoaderCircle class="mr-2 h-5 w-5 animate-spin text-secondary" />
-            Refreshing models...
-          </span>
-        </div>
-      </template>
     </UiPaginatedCardGrid>
   </template>
 </template>

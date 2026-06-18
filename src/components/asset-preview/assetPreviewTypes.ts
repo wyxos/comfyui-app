@@ -32,6 +32,8 @@ export type AtlasMediaStatus = {
   request_id?: string
   exists?: boolean
   file_id?: number | null
+  source_url?: string | null
+  referrer_url?: string | null
   downloaded?: boolean
   downloaded_at?: string | null
   blacklisted?: boolean

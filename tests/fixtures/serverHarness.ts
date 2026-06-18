@@ -297,6 +297,10 @@ export async function createServerHarness(options: HarnessOptions = {}) {
         return jsonResponse(upstream.atlasReaction)
       }
 
+      if (url.pathname === '/api/extension/broadcasting/auth' && method === 'POST') {
+        return jsonResponse(upstream.atlasBroadcastAuth)
+      }
+
       if (url.pathname === '/api/extension/browse-tabs/civitai-model' && method === 'POST') {
         return jsonResponse(upstream.atlasOpenModel)
       }

@@ -12,6 +12,7 @@ import {
   compatibilityForDownload,
   controlNetBaseModelLabel,
   controlNetDisplayName,
+  compareLibraryItemsByDownloadedAt,
   hiddenLibraryItemForModel,
   isCheckpointOrLora,
   isVideoPreview,
@@ -106,7 +107,7 @@ const downloadedModels = computed<LibraryModelItem[]>(() => {
       librarySource: 'downloaded' as const,
       compatibility: compatibilityForDownload(item),
     }))
-    .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
+    .sort(compareLibraryItemsByDownloadedAt)
 })
 
 const completedDownloadKeys = computed(() =>
@@ -125,7 +126,7 @@ const watchedModels = computed<LibraryModelItem[]>(() => {
       previewUrl: watchedPreviewUrlFor(item),
       previewPaths: watchedPreviewPathsFor(item),
     }))
-    .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
+    .sort(compareLibraryItemsByDownloadedAt)
 })
 const hiddenLibraryModels = computed<LibraryModelItem[]>(() =>
   hiddenModels.value
@@ -134,7 +135,7 @@ const hiddenLibraryModels = computed<LibraryModelItem[]>(() =>
 )
 const libraryModels = computed(() =>
   [...downloadedModels.value, ...watchedModels.value, ...hiddenLibraryModels.value, ...controlNetModels.value]
-    .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0)),
+    .sort(compareLibraryItemsByDownloadedAt),
 )
 const backfilledLibraryModels = computed(() => libraryModels.value.map(withPreviewBackfill))
 const nonHiddenLibraryModels = computed(() =>
@@ -421,6 +422,9 @@ onMounted(() => {
       :range-label="visibleRangeLabel"
       :current-page="currentPage"
       :page-count="pageCount"
+      :loading="(loading || hiddenLoading) && !pagedModels.length"
+      :transition-key="currentPage"
+      loading-label="Loading library..."
       previous-label="Previous library page"
       next-label="Next library page"
       @go-to-page="goToPage"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Image as ImageIcon } from 'lucide-vue-next'
+import { Image as ImageIcon, LoaderCircle } from 'lucide-vue-next'
 import UiPreloadedMedia from './UiPreloadedMedia.vue'
 
 withDefaults(
@@ -15,6 +15,8 @@ withDefaults(
     mediaClass?: string
     mediaContentClass?: string
     bodyClass?: string
+    loading?: boolean
+    loadingLabel?: string
   }>(),
   {
     tag: 'article',
@@ -28,6 +30,8 @@ withDefaults(
     mediaClass: 'h-44',
     mediaContentClass: '',
     bodyClass: 'p-3',
+    loading: false,
+    loadingLabel: 'Loading preview image...',
   },
 )
 
@@ -71,6 +75,17 @@ const emit = defineEmits<{
           :aria-label="isVideoPreview ? previewLabel : undefined"
           :loading="isVideoPreview ? undefined : 'lazy'"
         />
+        <div
+          v-else-if="loading"
+          class="flex h-full w-full flex-col items-center justify-center gap-2 bg-muted px-4 text-center text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          <LoaderCircle class="h-7 w-7 animate-spin text-secondary" />
+          <span class="text-xs font-semibold uppercase tracking-[0.16em]">
+            {{ loadingLabel }}
+          </span>
+        </div>
         <div
           v-else
           class="flex h-full w-full flex-col items-center justify-center gap-2 bg-primary/70 px-4 text-center text-primary-foreground/58"
