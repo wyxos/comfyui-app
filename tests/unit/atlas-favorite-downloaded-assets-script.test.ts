@@ -160,4 +160,68 @@ describe('Atlas favorite downloaded assets script', () => {
       nsfw: true,
     })
   })
+
+  it('skips downloaded previews that already have an Atlas reaction', async () => {
+    const server = await setupHarness({
+      upstream: {
+        atlasStatus: {
+          ok: true,
+          items: [
+            {
+              request_id: 'civitai:601',
+              exists: true,
+              reaction: 'love',
+              reacted_at: '2026-06-18T08:00:00Z',
+            },
+            {
+              request_id: 'civitai:602',
+              exists: true,
+              reaction: null,
+            },
+          ],
+        },
+      },
+    })
+    await writeSettings(server.configDir)
+    const download = await writeDownloadedVersion(server, {
+      id: 'detail-v1',
+      versionId: 201,
+      previews: [
+        { id: 601, url: 'https://image.test/601.png' },
+        { id: 602, url: 'https://image.test/602.png' },
+      ],
+    })
+    await server.writeDownloads([download])
+
+    const output = logger()
+    const summary = await runAtlasFavoriteDownloadedAssets({
+      delayMs: 0,
+      dryRun: false,
+      logger: output,
+    })
+
+    expect(summary).toMatchObject({
+      dryRun: false,
+      previewCount: 2,
+      reaction: { planned: 1, completed: 1, failed: 0, skippedAlreadyReacted: 1 },
+      tab: { planned: 1, completed: 1, failed: 0 },
+    })
+
+    const statusCalls = server.calls.filter((call) => call.url.pathname === '/api/extension/civitai/status')
+    expect(statusCalls).toHaveLength(1)
+    expect(statusCalls[0]?.body).toMatchObject({
+      items: [
+        expect.objectContaining({ id: 601, request_id: 'civitai:601' }),
+        expect.objectContaining({ id: 602, request_id: 'civitai:602' }),
+      ],
+    })
+
+    const reactionCalls = server.calls.filter((call) => call.url.pathname === '/api/extension/civitai/reactions')
+    expect(reactionCalls).toHaveLength(1)
+    expect(reactionCalls[0]?.body).toMatchObject({
+      type: 'love',
+      item: expect.objectContaining({ id: 602, modelId: 101, modelVersionId: 201 }),
+    })
+    expect(output.lines.some((line) => line.includes('[skip reaction 1/2] already-reacted image=601 reaction=love'))).toBe(true)
+  })
 })

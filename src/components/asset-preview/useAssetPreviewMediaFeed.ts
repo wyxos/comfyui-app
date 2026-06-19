@@ -8,7 +8,7 @@ import type {
   CivitaiModelVersion,
   PreviewSlide,
 } from './assetPreviewTypes'
-import { atlasRequestId, type AtlasReactionType } from './assetPreviewAtlasMedia'
+import { atlasRequestId, type AtlasReactionDownloadBehavior, type AtlasReactionType } from './assetPreviewAtlasMedia'
 import {
   feedRequestErrorMessage,
   MEDIA_FEED_LIMIT,
@@ -330,26 +330,33 @@ export function useAssetPreviewMediaFeed(options: UseAssetPreviewMediaFeedOption
     void fetchFeed(modelId, versionId, feedRetryCursor)
   }
 
-  async function reactToFeedImage(index: number, type: AtlasReactionType = 'love') {
+  async function reactToFeedImage(
+    index: number,
+    type: AtlasReactionType = 'love',
+    downloadBehavior: AtlasReactionDownloadBehavior = 'queue',
+  ) {
     const image = feedSlides.value[index]?.image
     if (!image) {
       return
     }
 
-    const result = await reactToAtlasImage(image, type)
+    const result = await reactToAtlasImage(image, type, downloadBehavior)
     if (result) {
       updateSharedImageStatus(image, result.status)
       watchAtlasDownloadProgress(image, result.reverb)
     }
   }
 
-  async function reactToActiveImage(type: AtlasReactionType = 'love') {
+  async function reactToActiveImage(
+    type: AtlasReactionType = 'love',
+    downloadBehavior: AtlasReactionDownloadBehavior = 'queue',
+  ) {
     const image = activeSlide.value?.image
     if (!image) {
       return
     }
 
-    const result = await reactToAtlasImage(image, type)
+    const result = await reactToAtlasImage(image, type, downloadBehavior)
     if (!result) {
       return
     }

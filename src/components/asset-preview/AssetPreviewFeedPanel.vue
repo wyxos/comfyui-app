@@ -7,7 +7,12 @@ import {
   modelVersionLabel,
 } from './assetPreviewHelpers'
 import AssetPreviewAtlasReactionWidget from './AssetPreviewAtlasReactionWidget.vue'
-import { atlasFileUrlForStatus, atlasMediaKey, type AtlasReactionType } from './assetPreviewAtlasMedia'
+import {
+  atlasFileUrlForStatus,
+  atlasMediaKey,
+  type AtlasReactionDownloadBehavior,
+  type AtlasReactionType,
+} from './assetPreviewAtlasMedia'
 import type { CivitaiModelVersion, PreviewSlide } from './assetPreviewTypes'
 import UiPreloadedMedia from '../ui/UiPreloadedMedia.vue'
 import UiSelect from '../ui/UiSelect.vue'
@@ -35,7 +40,7 @@ const emit = defineEmits<{
   'select-feed-preview': [index: number]
   'load-more': []
   retry: []
-  'atlas-react': [index: number, type: AtlasReactionType]
+  'atlas-react': [index: number, type: AtlasReactionType, downloadBehavior?: AtlasReactionDownloadBehavior]
   'atlas-delete': [index: number]
 }>()
 
@@ -119,10 +124,14 @@ function selectVersion(versionId: string) {
   }
 }
 
-function reactToSlide(index: number, type: AtlasReactionType) {
+function reactToSlide(
+  index: number,
+  type: AtlasReactionType,
+  downloadBehavior: AtlasReactionDownloadBehavior = 'queue',
+) {
   const slide = props.feedSlides[index]
   if (slide && canReactInAtlas(slide)) {
-    emit('atlas-react', index, type)
+    emit('atlas-react', index, type, downloadBehavior)
   }
 }
 
@@ -292,7 +301,7 @@ function handleFeedAuxClick(event: MouseEvent, slide: PreviewSlide) {
             :deleting="isAtlasDeletePending(slide)"
             :atlas-file-url="atlasFileUrl(slide)"
             compact
-            @react="(type) => reactToSlide(index, type)"
+            @react="(type, downloadBehavior) => reactToSlide(index, type, downloadBehavior)"
             @delete="deleteSlide(index)"
           />
         </div>

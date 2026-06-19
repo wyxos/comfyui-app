@@ -8,7 +8,12 @@ import AssetPreviewImageMetadataSidebar from './AssetPreviewImageMetadataSidebar
 import AssetPreviewMediaStrip from './AssetPreviewMediaStrip.vue'
 import AssetPreviewSidebar from './AssetPreviewSidebar.vue'
 import type { AssetPreviewModalProps } from './assetPreviewTypes'
-import { atlasFileUrlForStatus, atlasMediaKey, type AtlasReactionType } from './assetPreviewAtlasMedia'
+import {
+  atlasFileUrlForStatus,
+  atlasMediaKey,
+  type AtlasReactionDownloadBehavior,
+  type AtlasReactionType,
+} from './assetPreviewAtlasMedia'
 import { imageMatchesNsfwBlurLevel } from './assetPreviewHelpers'
 import { useAssetPreviewModal } from './useAssetPreviewModal'
 import UiPreloadedMedia from '../ui/UiPreloadedMedia.vue'
@@ -204,9 +209,12 @@ function activeAtlasFileUrl() {
   return atlasFileUrlForStatus(activeAtlasStatus(), atlasBaseUrl.value)
 }
 
-function handleActiveAtlasReaction(type: AtlasReactionType) {
+function handleActiveAtlasReaction(
+  type: AtlasReactionType,
+  downloadBehavior: AtlasReactionDownloadBehavior = 'queue',
+) {
   if (canReactToActiveAtlasImage()) {
-    void reactToActiveImage(type)
+    void reactToActiveImage(type, downloadBehavior)
   }
 }
 

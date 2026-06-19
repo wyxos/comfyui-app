@@ -11,7 +11,7 @@ import AssetPreviewFileDetails from './AssetPreviewFileDetails.vue'
 import AssetPreviewPreviewRepairAction from './AssetPreviewPreviewRepairAction.vue'
 import AssetPreviewSafetyEditor from './AssetPreviewSafetyEditor.vue'
 import AssetPreviewVersionList from './AssetPreviewVersionList.vue'
-import type { AtlasReactionType } from './assetPreviewAtlasMedia'
+import type { AtlasReactionDownloadBehavior, AtlasReactionType } from './assetPreviewAtlasMedia'
 import type {
   AssetPreviewDownload,
   CivitaiModel,
@@ -89,7 +89,11 @@ const emit = defineEmits<{
   'select-feed-preview': [index: number]
   'load-more-feed': []
   'retry-feed': []
-  'atlas-react-feed-preview': [index: number, type?: AtlasReactionType]
+  'atlas-react-feed-preview': [
+    index: number,
+    type?: AtlasReactionType,
+    downloadBehavior?: AtlasReactionDownloadBehavior,
+  ]
   'atlas-delete-feed-preview': [index: number]
   'open-atlas-model': []
 }>()
@@ -358,7 +362,7 @@ function tabClasses(tab: SidebarTab) {
         @select-feed-preview="emit('select-feed-preview', $event)"
         @load-more="emit('load-more-feed')"
         @retry="emit('retry-feed')"
-        @atlas-react="(index, type) => emit('atlas-react-feed-preview', index, type)"
+        @atlas-react="(index, type, downloadBehavior) => emit('atlas-react-feed-preview', index, type, downloadBehavior)"
         @atlas-delete="(index) => emit('atlas-delete-feed-preview', index)"
       />
     </div>

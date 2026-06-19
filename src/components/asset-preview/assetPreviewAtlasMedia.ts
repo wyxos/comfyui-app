@@ -7,6 +7,7 @@ import type {
 } from './assetPreviewTypes'
 
 export type AtlasReactionType = 'love' | 'like' | 'blacklist' | 'funny'
+export type AtlasReactionDownloadBehavior = 'queue' | 'skip' | 'force'
 
 export type AtlasReverbConfig = {
   enabled?: boolean

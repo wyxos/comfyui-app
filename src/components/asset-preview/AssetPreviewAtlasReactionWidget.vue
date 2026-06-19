@@ -2,8 +2,12 @@
 import { Ban, ExternalLink, Heart, LoaderCircle, Smile, ThumbsUp, Trash2 } from 'lucide-vue-next'
 import { computed } from 'vue'
 
+import AssetPreviewAtlasReactionPrompt from './AssetPreviewAtlasReactionPrompt.vue'
 import type { AtlasMediaStatus } from './assetPreviewTypes'
-import type { AtlasReactionType } from './assetPreviewAtlasMedia'
+import type { AtlasReactionDownloadBehavior, AtlasReactionType } from './assetPreviewAtlasMedia'
+import { useAtlasExistingReactionPrompt } from './useAtlasExistingReactionPrompt'
+
+defineOptions({ inheritAttrs: false })
 
 const props = withDefaults(defineProps<{
   status?: AtlasMediaStatus | null
@@ -24,9 +28,11 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  react: [type: AtlasReactionType]
+  react: [type: AtlasReactionType, downloadBehavior?: AtlasReactionDownloadBehavior]
   delete: []
 }>()
+
+const existingReactionPrompt = useAtlasExistingReactionPrompt()
 
 const reactions: Array<{
   type: AtlasReactionType
@@ -105,10 +111,31 @@ const downloadProgress = computed(() => {
   }
 })
 
-function handleClick(type: AtlasReactionType, event: MouseEvent) {
-  emit('react', type)
+function hasExistingPositiveReaction() {
+  return typeof props.status?.reaction === 'string' && props.status.reaction.trim() !== ''
+}
+
+async function downloadBehaviorForClick(type: AtlasReactionType) {
+  if (type === 'blacklist' || !hasExistingPositiveReaction()) {
+    return 'queue'
+  }
+
+  const choice = await existingReactionPrompt.prompt()
+  if (choice === 'cancel') {
+    return null
+  }
+
+  return choice === 'redownload' ? 'force' : 'skip'
+}
+
+async function handleClick(type: AtlasReactionType, event: MouseEvent) {
   if (event.detail > 0) {
     ;(event.currentTarget as HTMLButtonElement | null)?.blur()
+  }
+
+  const downloadBehavior = await downloadBehaviorForClick(type)
+  if (downloadBehavior !== null) {
+    emit('react', type, downloadBehavior)
   }
 }
 
@@ -126,6 +153,7 @@ function handleDeleteClick(event: MouseEvent) {
 
 <template>
   <div
+    v-bind="$attrs"
     class="inline-flex items-center justify-center rounded-md border border-border bg-card/95 shadow-sm"
     :class="compact ? 'flex-col gap-1 px-0.5 py-1' : 'flex-col gap-1.5 p-1.5'"
     @click.stop
@@ -231,4 +259,12 @@ function handleDeleteClick(event: MouseEvent) {
       </span>
     </div>
   </div>
+
+  <AssetPreviewAtlasReactionPrompt
+    :open="existingReactionPrompt.data.open.value"
+    :update-open="existingReactionPrompt.setOpen"
+    :choose-react="existingReactionPrompt.chooseReact"
+    :choose-redownload="existingReactionPrompt.chooseRedownload"
+    :close-dialog="existingReactionPrompt.close"
+  />
 </template>

@@ -8,6 +8,7 @@ import {
   statusFromFileDeletePayload,
   statusFromReactionPayload,
   type AtlasReactionResponse,
+  type AtlasReactionDownloadBehavior,
   type AtlasReactionType,
 } from './assetPreviewAtlasMedia'
 import type {
@@ -92,7 +93,11 @@ export function useAssetPreviewAtlasMediaActions(options: UseAssetPreviewAtlasMe
     }
   }
 
-  async function reactToAtlasImage(image: CivitaiImage, type: AtlasReactionType) {
+  async function reactToAtlasImage(
+    image: CivitaiImage,
+    type: AtlasReactionType,
+    downloadBehavior: AtlasReactionDownloadBehavior = 'queue',
+  ) {
     const model = options.model.value
     const version = options.selectedVersion.value
     if (!model || !version || !canSendToAtlas(image)) {
@@ -113,7 +118,7 @@ export function useAssetPreviewAtlasMediaActions(options: UseAssetPreviewAtlasMe
         },
         body: JSON.stringify({
           type,
-          download_behavior: 'queue',
+          download_behavior: downloadBehavior,
           item: atlasItemFor(image, model, version),
         }),
       })

@@ -130,6 +130,41 @@ async function postAtlas(pathname, body, { atlasSettings, fetchImpl }) {
   return payload && typeof payload === 'object' ? payload : { ok: true }
 }
 
+function statusItems(payload) {
+  return Array.isArray(payload?.items) ? payload.items : []
+}
+
+function statusRequestId(status) {
+  const requestId = safeTrim(status?.request_id ?? status?.requestId)
+  return requestId || null
+}
+
+function reactionFromStatus(status) {
+  const directReaction = safeTrim(status?.reaction)
+  if (directReaction) return directReaction
+
+  const nestedReaction = safeTrim(status?.reaction?.type)
+  if (nestedReaction) return nestedReaction
+
+  if (status?.blacklisted === true || safeTrim(status?.blacklisted_at ?? status?.blacklistedAt)) {
+    return 'blacklisted'
+  }
+
+  return null
+}
+
+async function fetchAtlasStatusesForVersion(asset, version, { atlasSettings, fetchImpl }) {
+  const payload = await postAtlas('/api/extension/civitai/status', {
+    items: version.previews.map((preview) => atlasItemFor(preview, asset, version)),
+  }, { atlasSettings, fetchImpl })
+
+  return new Map(
+    statusItems(payload)
+      .map((status) => [statusRequestId(status), status])
+      .filter(([requestId]) => requestId),
+  )
+}
+
 function logError(logger, message) {
   if (typeof logger.error === 'function') {
     logger.error(message)
@@ -154,6 +189,7 @@ function createRunSummary(targetSummary, dryRun) {
       planned: targetSummary.previewCount,
       completed: 0,
       failed: 0,
+      skippedAlreadyReacted: 0,
     },
     tab: {
       planned: targetSummary.versionCount,
@@ -196,12 +232,27 @@ export async function runAtlasFavoriteDownloadedAssets({
       versionIndex += 1
       logger.log(`[version ${versionIndex}/${summary.versionCount}] ${version.name} (${version.id}) previews=${version.previews.length}`)
 
+      let statusesByRequestId = new Map()
+      if (!dryRun && version.previews.length > 0) {
+        await waitForAtlasTurn(requestState, delayMs, logger)
+        statusesByRequestId = await fetchAtlasStatusesForVersion(asset, version, { atlasSettings, fetchImpl })
+      }
+
       for (const preview of version.previews) {
         reactionIndex += 1
+        const item = atlasItemFor(preview, asset, version)
+        const reaction = reactionFromStatus(statusesByRequestId.get(item.request_id))
+        if (reaction !== null) {
+          summary.reaction.planned -= 1
+          summary.reaction.skippedAlreadyReacted += 1
+          logger.log(`[skip reaction ${reactionIndex}/${summary.previewCount}] already-reacted image=${preview.id} reaction=${reaction}`)
+          continue
+        }
+
         const body = {
           type: favoriteReactionType,
           download_behavior: 'queue',
-          item: atlasItemFor(preview, asset, version),
+          item,
         }
 
         if (dryRun) {
@@ -245,7 +296,7 @@ export async function runAtlasFavoriteDownloadedAssets({
     }
   }
 
-  logger.log(`[done] reactions=${summary.reaction.completed}/${summary.reaction.planned} tabs=${summary.tab.completed}/${summary.tab.planned} skippedDownloads=${summary.skippedDownloads} skippedPreviews=${summary.skippedPreviews}`)
+  logger.log(`[done] reactions=${summary.reaction.completed}/${summary.reaction.planned} tabs=${summary.tab.completed}/${summary.tab.planned} skippedDownloads=${summary.skippedDownloads} skippedPreviews=${summary.skippedPreviews} skippedAlreadyReacted=${summary.reaction.skippedAlreadyReacted}`)
   return summary
 }
 
