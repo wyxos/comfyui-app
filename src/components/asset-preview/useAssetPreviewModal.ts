@@ -372,17 +372,25 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
   )
 
   watch(
-    () => activeImage.value?.id,
-    (imageId) => {
+    () => [
+      props.open,
+      props.model?.id ?? null,
+      normalizedModelId.value,
+      activeVersionId.value,
+      activeImage.value?.id,
+      activeSlide.value?.source,
+    ] as const,
+    ([isOpen, , , , imageId, source]) => {
       imageDetailsController?.abort()
       imageDetailsToken += 1
       imageMetaLoading.value = false
       imageMetaError.value = ''
 
       if (
+        !isOpen ||
         imageId === undefined ||
         imageId === null ||
-        activeSlide.value?.source === 'archive'
+        source === 'archive'
       ) {
         return
       }

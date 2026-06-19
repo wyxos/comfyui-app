@@ -36,7 +36,6 @@ const emit = defineEmits<{
 }>()
 
 const hasActiveImage = computed(() => Boolean(props.activeImage))
-const showInlineMetadataAction = computed(() => typeof props.applyGenerationMetadata !== 'function')
 
 function mediaKindLabel(slide: PreviewSlide | null) {
   if (!slide) {
@@ -61,12 +60,12 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
 
 <template>
   <aside
-    class="min-h-0 overflow-y-auto border-l border-border bg-card p-5"
+    class="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden border-l border-border bg-card p-5"
     data-test="asset-preview-image-metadata-sidebar"
   >
-    <div class="space-y-5">
-      <section class="space-y-3">
-        <div>
+    <div class="min-w-0 space-y-5">
+      <section class="min-w-0 space-y-3">
+        <div class="min-w-0">
           <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">
             Image metadata
           </p>
@@ -76,7 +75,7 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
         </div>
 
         <dl
-          class="overflow-hidden rounded-md border border-border bg-background text-sm divide-y divide-border/70"
+          class="min-w-0 overflow-hidden rounded-md border border-border bg-background text-sm divide-y divide-border/70"
           data-test="asset-preview-media-detail-group"
         >
           <div class="px-3 py-2.5">
@@ -133,7 +132,7 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
         :rows="normalizedImageMetaRows"
         :metadata-source="activeImageMetaSource"
         :show-empty="hasActiveImage"
-        :show-action="showInlineMetadataAction"
+        :show-action="false"
         :apply-generation-metadata="applyGenerationMetadata"
         @applied="emit('applied')"
       />

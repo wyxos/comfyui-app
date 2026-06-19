@@ -137,10 +137,10 @@ function tabClasses(tab: SidebarTab) {
 
 <template>
   <aside
-    class="min-h-0 overflow-y-auto bg-card p-5"
+    class="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-card p-5"
     data-test="asset-preview-model-sidebar"
   >
-    <div class="space-y-5">
+    <div class="min-w-0 space-y-5">
       <section class="space-y-3">
         <div class="min-w-0">
           <h2 class="min-w-0 text-lg font-semibold leading-6 text-card-foreground">

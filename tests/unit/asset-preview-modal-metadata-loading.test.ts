@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { flushPromises, mount } from '@vue/test-utils'
+import { defineComponent, h, nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 
 const { emblaApi } = vi.hoisted(() => ({
@@ -133,4 +134,94 @@ describe('AssetPreviewModal image metadata loading', () => {
     expect(wrapper.text()).toContain('blue hair, underwater')
     expect(wrapper.text()).not.toContain('No prompt metadata found for this image.')
   })
+
+  it('restarts first image metadata loading when the modal model changes but the image id stays the same', async () => {
+    let imageDetailRequests = 0
+    const firstImageRequest = { aborted: false }
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'http://127.0.0.1')
+      if (url.pathname === '/api/civitai/images' && url.searchParams.get('imageId') === '901') {
+        imageDetailRequests += 1
+        if (imageDetailRequests === 1) {
+          return new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              firstImageRequest.aborted = true
+              reject(new DOMException('Aborted', 'AbortError'))
+            }, { once: true })
+          })
+        }
+
+        return new Response(
+          JSON.stringify({
+            items: [{
+              id: 901,
+              url: 'https://example.test/same-image.jpg',
+              type: 'image',
+              nsfw: false,
+              meta: {
+                prompt: 'refetched first prompt',
+                seed: 901901,
+              },
+            }],
+            metadata: {},
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+
+      return new Response(JSON.stringify({ items: [], metadata: {} }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const activeModel = ref(modelWithFirstImage(101))
+    const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
+    const Host = defineComponent({
+      setup() {
+        return () => h(AssetPreviewModal, {
+          open: true,
+          model: activeModel.value,
+        })
+      },
+    })
+    const wrapper = mount(Host, {
+      attachTo: document.body,
+      global: {
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
+      },
+    })
+
+    await nextTick()
+    expect(imageDetailRequests).toBe(1)
+
+    activeModel.value = modelWithFirstImage(202)
+    await nextTick()
+    await flushPromises()
+
+    expect(firstImageRequest.aborted).toBe(true)
+    expect(imageDetailRequests).toBe(2)
+    expect(wrapper.text()).toContain('refetched first prompt')
+    expect(wrapper.find('[data-test="asset-preview-floating-copy-metadata"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('No prompt metadata found for this image.')
+  })
 })
+
+function modelWithFirstImage(modelId: number) {
+  return {
+    id: modelId,
+    name: 'Metadata refresh model',
+    type: 'Checkpoint',
+    modelVersions: [
+      {
+        id: 201,
+        name: 'v1',
+        images: [{ id: 901, url: 'https://example.test/same-image.jpg', type: 'image', nsfw: false }],
+      },
+    ],
+  }
+}

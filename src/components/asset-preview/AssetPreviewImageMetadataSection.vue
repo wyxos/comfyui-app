@@ -72,9 +72,9 @@ async function handleMetadataAction() {
 <template>
   <section
     v-if="loading || error || metadataText || rows.length || showEmpty"
-    class="space-y-3 border-t border-border pt-5"
+    class="min-w-0 space-y-3 border-t border-border pt-5"
   >
-    <div class="flex flex-wrap items-center justify-between gap-2">
+    <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
       <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">
         Metadata
       </p>
@@ -103,7 +103,10 @@ async function handleMetadataAction() {
     >
       {{ actionError || notice }}
     </p>
-    <div class="rounded-md border border-accent/35 bg-background p-3">
+    <div
+      class="min-w-0 overflow-hidden rounded-md border border-accent/35 bg-background p-3"
+      data-test="asset-preview-metadata-card"
+    >
       <p
         v-if="loading"
         class="inline-flex items-center text-xs font-semibold text-muted-foreground"
@@ -125,16 +128,18 @@ async function handleMetadataAction() {
       </p>
       <dl
         v-if="rows.length"
-        class="grid gap-3 text-xs"
+        class="grid min-w-0 gap-3 text-xs"
       >
         <div
           v-for="row in rows"
           :key="row.label"
+          class="min-w-0"
         >
           <dt class="font-semibold uppercase tracking-[0.12em] text-muted-foreground">{{ row.label }}</dt>
           <dd
-            class="mt-1 whitespace-pre-wrap break-words text-card-foreground"
+            class="mt-1 min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-card-foreground"
             :class="row.mono ? 'font-mono leading-5' : 'font-semibold'"
+            data-test="asset-preview-metadata-row-value"
           >
             {{ row.value }}
           </dd>
@@ -148,7 +153,7 @@ async function handleMetadataAction() {
         <summary class="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Raw meta
         </summary>
-        <pre class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-sm bg-primary p-3 text-xs leading-5 text-primary-foreground/85">{{ metadataText }}</pre>
+        <pre class="mt-2 max-h-96 max-w-full overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-sm bg-primary p-3 text-xs leading-5 text-primary-foreground/85">{{ metadataText }}</pre>
       </details>
     </div>
   </section>

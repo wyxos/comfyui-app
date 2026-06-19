@@ -273,7 +273,7 @@ function shouldBlurActiveMedia() {
 <template>
   <div
     v-if="shouldRenderModal"
-    class="fixed inset-0 z-50 grid grid-rows-[minmax(0,1fr)_minmax(0,45vh)] bg-background/96 text-foreground backdrop-blur-sm lg:grid-cols-[minmax(0,1fr)_minmax(38rem,44rem)] lg:grid-rows-none"
+    class="fixed inset-0 z-50 grid grid-rows-[minmax(0,1fr)_minmax(0,45vh)] bg-background/96 text-foreground backdrop-blur-sm lg:grid-cols-[minmax(0,1fr)_minmax(44rem,54rem)] lg:grid-rows-none"
     role="dialog"
     aria-modal="true"
     :aria-label="`${modalTitle} image preview`"
@@ -410,7 +410,7 @@ function shouldBlurActiveMedia() {
     </section>
 
     <div
-      class="min-h-0 grid overflow-hidden border-t border-border bg-card sm:grid-cols-2 lg:border-l lg:border-t-0"
+      class="min-h-0 min-w-0 grid overflow-hidden border-t border-border bg-card sm:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:border-l lg:border-t-0"
       data-test="asset-preview-side-sheets"
     >
       <AssetPreviewSidebar
