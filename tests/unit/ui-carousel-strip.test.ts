@@ -95,10 +95,33 @@ describe('UiCarousel strip layout', () => {
 
     expect(viewport.element.contains(nextButton.element)).toBe(false)
 
+    vi.clearAllMocks()
     await nextButton.trigger('click')
 
-    expect(emblaApi.scrollTo).toHaveBeenCalledWith(5)
+    expect(emblaApi.scrollTo).toHaveBeenCalledWith(5, true)
     expect(emblaApi.scrollNext).not.toHaveBeenCalled()
+  })
+
+  it('keeps strip paging controls inside compact viewports and outside wider viewports', async () => {
+    const { default: AssetPreviewMediaStrip } = await import('../../src/components/asset-preview/AssetPreviewMediaStrip.vue')
+    const wrapper = mount(AssetPreviewMediaStrip, {
+      props: {
+        activeIndex: 0,
+        slides: Array.from({ length: 8 }, (_, index) => ({
+          key: `preview-${index}`,
+          url: `https://example.test/preview-${index}.jpg`,
+          image: { url: `https://example.test/preview-${index}.jpg` },
+          isVideo: false,
+          source: 'civitai' as const,
+        })),
+      },
+    })
+
+    const controls = wrapper.get('[data-test="asset-preview-strip-next"]').element.parentElement
+    expect(controls?.className).toContain('left-0')
+    expect(controls?.className).toContain('right-0')
+    expect(controls?.className).toContain('sm:-left-12')
+    expect(controls?.className).toContain('sm:-right-12')
   })
 
   it('keeps the visible five thumbnails stable until the active item enters the next group', async () => {
@@ -123,5 +146,60 @@ describe('UiCarousel strip layout', () => {
 
     await wrapper.setProps({ activeIndex: 5 })
     expect(emblaApi.scrollTo).toHaveBeenCalledWith(5, true)
+  })
+
+  it('keeps the final thumbnail page selected when Embla reports its clamped snap index', async () => {
+    const { default: UiCarousel } = await import('../../src/components/ui/UiCarousel.vue')
+    const { default: AssetPreviewMediaStrip } = await import('../../src/components/asset-preview/AssetPreviewMediaStrip.vue')
+    const wrapper = mount(AssetPreviewMediaStrip, {
+      props: {
+        activeIndex: 5,
+        slides: Array.from({ length: 8 }, (_, index) => ({
+          key: `preview-${index}`,
+          url: `https://example.test/preview-${index}.jpg`,
+          image: { url: `https://example.test/preview-${index}.jpg` },
+          isVideo: false,
+          source: 'civitai' as const,
+        })),
+      },
+    })
+    const carousel = wrapper.getComponent(UiCarousel)
+
+    expect(carousel.props('modelValue')).toBe(5)
+
+    await carousel.vm.$emit('update:modelValue', 3)
+    await wrapper.vm.$nextTick()
+
+    expect(carousel.props('modelValue')).toBe(5)
+  })
+
+  it('uses logical thumbnail pages when paging after selecting an item in the first group', async () => {
+    const { default: UiCarousel } = await import('../../src/components/ui/UiCarousel.vue')
+    const { default: AssetPreviewMediaStrip } = await import('../../src/components/asset-preview/AssetPreviewMediaStrip.vue')
+    const wrapper = mount(AssetPreviewMediaStrip, {
+      props: {
+        activeIndex: 3,
+        slides: Array.from({ length: 8 }, (_, index) => ({
+          key: `preview-${index}`,
+          url: `https://example.test/preview-${index}.jpg`,
+          image: { url: `https://example.test/preview-${index}.jpg` },
+          isVideo: false,
+          source: 'civitai' as const,
+        })),
+      },
+    })
+    const carousel = wrapper.getComponent(UiCarousel)
+    const nextButton = wrapper.get('[data-test="asset-preview-strip-next"]')
+
+    await nextButton.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(carousel.props('modelValue')).toBe(5)
+
+    await carousel.vm.$emit('update:modelValue', 3)
+    await wrapper.setProps({ activeIndex: 7 })
+    await wrapper.vm.$nextTick()
+
+    expect(carousel.props('modelValue')).toBe(5)
   })
 })

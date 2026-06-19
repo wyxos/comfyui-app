@@ -20,9 +20,33 @@ const emit = defineEmits<{
 const thumbnailPageSize = 5
 const visibleStartIndex = ref(0)
 const scrollIndex = computed(() => visibleStartIndex.value)
+const lastPageStart = computed(() => pageStartForIndex(Math.max(props.slides.length - 1, 0)))
+const maxScrollableStart = computed(() => Math.max(props.slides.length - thumbnailPageSize, 0))
+const canScrollPrev = computed(() => visibleStartIndex.value > 0)
+const canScrollNext = computed(() => visibleStartIndex.value < lastPageStart.value)
 
 function pageStartForIndex(index: number) {
   return Math.max(0, Math.floor(index / thumbnailPageSize) * thumbnailPageSize)
+}
+
+function pageStartForCarouselIndex(index: number) {
+  if (props.slides.length > thumbnailPageSize && index >= maxScrollableStart.value) {
+    return lastPageStart.value
+  }
+
+  return pageStartForIndex(index)
+}
+
+function showPreviousThumbnailPage() {
+  visibleStartIndex.value = Math.max(0, visibleStartIndex.value - thumbnailPageSize)
+}
+
+function showNextThumbnailPage() {
+  visibleStartIndex.value = Math.min(lastPageStart.value, visibleStartIndex.value + thumbnailPageSize)
+}
+
+function handleCarouselModelUpdate(index: number) {
+  visibleStartIndex.value = pageStartForCarouselIndex(index)
 }
 
 watch(
@@ -37,10 +61,9 @@ watch(
 
 watch(
   () => props.slides.length,
-  (count) => {
-    const lastPageStart = pageStartForIndex(Math.max(count - 1, 0))
-    if (visibleStartIndex.value > lastPageStart) {
-      visibleStartIndex.value = lastPageStart
+  () => {
+    if (visibleStartIndex.value > lastPageStart.value) {
+      visibleStartIndex.value = lastPageStart.value
     }
   },
 )
@@ -66,7 +89,7 @@ function mediaClassFor(slide: PreviewSlide) {
         viewport-test-id="asset-preview-strip-viewport"
         aria-label="Preview media strip"
         item-class="basis-1/5 p-1 h-full"
-        @update:model-value="visibleStartIndex = pageStartForIndex($event)"
+        @update:model-value="handleCarouselModelUpdate"
       >
         <template #item="{ item, index }">
           <button
@@ -97,10 +120,10 @@ function mediaClassFor(slide: PreviewSlide) {
           </button>
         </template>
 
-        <template #footer="{ canScrollPrev, canScrollNext, scrollPrev, scrollNext }">
+        <template #footer>
           <div
-            v-if="slides.length > 5"
-            class="pointer-events-none absolute -left-12 -right-12 top-1/2 flex -translate-y-1/2 items-center justify-between"
+            v-if="slides.length > thumbnailPageSize"
+            class="pointer-events-none absolute left-0 right-0 top-1/2 flex -translate-y-1/2 items-center justify-between px-1 sm:-left-12 sm:-right-12 sm:px-0"
           >
             <button
               data-test="asset-preview-strip-prev"
@@ -108,7 +131,7 @@ function mediaClassFor(slide: PreviewSlide) {
               class="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary-foreground/12 bg-primary/82 text-primary-foreground shadow-sm transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
               :disabled="!canScrollPrev"
               aria-label="Previous preview thumbnails"
-              @click="scrollPrev"
+              @click="showPreviousThumbnailPage"
             >
               <ChevronLeft class="h-4 w-4" />
             </button>
@@ -119,7 +142,7 @@ function mediaClassFor(slide: PreviewSlide) {
               class="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary-foreground/12 bg-primary/82 text-primary-foreground shadow-sm transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
               :disabled="!canScrollNext"
               aria-label="Next preview thumbnails"
-              @click="scrollNext"
+              @click="showNextThumbnailPage"
             >
               <ChevronRight class="h-4 w-4" />
             </button>
