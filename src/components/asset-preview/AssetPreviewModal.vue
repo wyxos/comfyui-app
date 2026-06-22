@@ -77,7 +77,6 @@ const emit = defineEmits<{
     imageNsfwOverride: boolean | null
   }]
 }>()
-
 const {
   civitaiModel,
   civitaiLoading,
@@ -148,8 +147,8 @@ const {
   queueVersionDownload,
   deleteVersionDownload,
   imageDimensions,
+  retryImageMetadata,
 } = useAssetPreviewModal(props, () => emit('close'))
-
 const activeMediaHasDimensions = computed(() => {
   const width = activeImage.value?.width
   const height = activeImage.value?.height
@@ -490,6 +489,7 @@ function shouldBlurActiveMedia() {
         :active-image-meta="activeImageMeta"
         :normalized-image-meta-rows="normalizedImageMetaRows"
         :active-image-meta-source="activeImageMetaSource"
+        :retry-image-metadata="retryImageMetadata"
         :apply-generation-metadata="props.applyGenerationMetadata"
         :image-dimensions="imageDimensions"
         @save-image-safety="emit('save-image-safety', $event)"

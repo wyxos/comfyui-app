@@ -26,6 +26,7 @@ const props = defineProps<{
   activeImageMeta: string
   normalizedImageMetaRows: NormalizedMetaRow[]
   activeImageMetaSource: Record<string, unknown> | null
+  retryImageMetadata: () => void
   applyGenerationMetadata?: (metadata: Record<string, unknown>) => void | Promise<void>
   imageDimensions: typeof formatImageDimensions
 }>()
@@ -131,9 +132,11 @@ function mediaSourceLabel(slide: PreviewSlide | null) {
         :metadata-text="activeImageMeta"
         :rows="normalizedImageMetaRows"
         :metadata-source="activeImageMetaSource"
+        :can-retry="hasActiveImage"
         :show-empty="hasActiveImage"
         :show-action="false"
         :apply-generation-metadata="applyGenerationMetadata"
+        @retry="retryImageMetadata"
         @applied="emit('applied')"
       />
     </div>

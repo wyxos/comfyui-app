@@ -1,4 +1,5 @@
 import { ref, type ComputedRef } from 'vue'
+import { toast } from 'vue-sonner'
 
 import {
   type AtlasFileDeleteResponse,
@@ -134,7 +135,9 @@ export function useAssetPreviewAtlasMediaActions(options: UseAssetPreviewAtlasMe
         reverb: payload?.reverb ?? null,
       }
     } catch (caughtError) {
-      atlasActionError.value = caughtError instanceof Error ? caughtError.message : 'Atlas reaction failed.'
+      const message = caughtError instanceof Error ? caughtError.message : 'Atlas reaction failed.'
+      atlasActionError.value = message
+      toast.error(message)
       return null
     } finally {
       if (atlasReactionPendingKey.value === key) {
@@ -177,7 +180,9 @@ export function useAssetPreviewAtlasMediaActions(options: UseAssetPreviewAtlasMe
         status: statusFromFileDeletePayload(image.atlasStatus),
       }
     } catch (caughtError) {
-      atlasActionError.value = caughtError instanceof Error ? caughtError.message : 'Atlas file delete failed.'
+      const message = caughtError instanceof Error ? caughtError.message : 'Atlas file delete failed.'
+      atlasActionError.value = message
+      toast.error(message)
       return null
     } finally {
       if (atlasDeletePendingKey.value === key) {

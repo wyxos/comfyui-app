@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Clipboard, ClipboardPaste, LoaderCircle } from 'lucide-vue-next'
+import { Clipboard, ClipboardPaste, LoaderCircle, RotateCw } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import type { NormalizedMetaRow } from './assetPreviewTypes'
 import { serializeGenerationMetadataClipboard } from '../../lib/generationMetadata'
@@ -14,6 +14,7 @@ const props = withDefaults(
     applyGenerationMetadata?: (metadata: Record<string, unknown>) => void | Promise<void>
     showAction?: boolean
     showEmpty?: boolean
+    canRetry?: boolean
     emptyMessage?: string
   }>(),
   {
@@ -25,18 +26,25 @@ const props = withDefaults(
     applyGenerationMetadata: undefined,
     showAction: true,
     showEmpty: false,
+    canRetry: false,
     emptyMessage: 'No prompt metadata found for this image.',
   },
 )
 
 const emit = defineEmits<{
   applied: []
+  retry: []
 }>()
 
 const notice = ref('')
 const actionError = ref('')
 const isHandlingAction = ref(false)
 const hasApplyAction = computed(() => typeof props.applyGenerationMetadata === 'function')
+const showRetryAction = computed(() =>
+  props.canRetry &&
+  !props.loading &&
+  Boolean(props.error || (!props.metadataText && !props.rows.length && props.showEmpty)),
+)
 
 async function handleMetadataAction() {
   if (isHandlingAction.value) {
@@ -78,23 +86,35 @@ async function handleMetadataAction() {
       <p class="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">
         Metadata
       </p>
-      <button
-        v-if="showAction && metadataSource"
-        type="button"
-        class="inline-flex h-8 items-center gap-1.5 rounded-sm border border-border bg-card px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-card-foreground transition hover:border-secondary hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25"
-        :disabled="isHandlingAction"
-        @click="handleMetadataAction"
-      >
-        <ClipboardPaste
-          v-if="hasApplyAction"
-          class="h-3.5 w-3.5"
-        />
-        <Clipboard
-          v-else
-          class="h-3.5 w-3.5"
-        />
-        {{ hasApplyAction ? 'Apply metadata' : 'Copy metadata' }}
-      </button>
+      <div class="flex min-w-0 flex-wrap items-center justify-end gap-2">
+        <button
+          v-if="showRetryAction"
+          type="button"
+          data-test="asset-preview-metadata-retry"
+          class="inline-flex h-8 items-center gap-1.5 rounded-sm border border-border bg-card px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-card-foreground transition hover:border-secondary hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25"
+          @click="emit('retry')"
+        >
+          <RotateCw class="h-3.5 w-3.5" />
+          Reload
+        </button>
+        <button
+          v-if="showAction && metadataSource"
+          type="button"
+          class="inline-flex h-8 items-center gap-1.5 rounded-sm border border-border bg-card px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-card-foreground transition hover:border-secondary hover:text-secondary focus:outline-none focus:ring-2 focus:ring-ring/25"
+          :disabled="isHandlingAction"
+          @click="handleMetadataAction"
+        >
+          <ClipboardPaste
+            v-if="hasApplyAction"
+            class="h-3.5 w-3.5"
+          />
+          <Clipboard
+            v-else
+            class="h-3.5 w-3.5"
+          />
+          {{ hasApplyAction ? 'Apply metadata' : 'Copy metadata' }}
+        </button>
+      </div>
     </div>
     <p
       v-if="actionError || notice"

@@ -4,6 +4,7 @@ import {
   imageMatchesNsfwBlurLevel,
   imageNsfwDetectedValue,
   imageNsfwLabel,
+  imagesForVersion,
   modelHasNsfwContent,
   versionDownloadUnavailableLabel,
 } from '../../src/components/asset-preview/assetPreviewHelpers'
@@ -127,6 +128,25 @@ describe('asset preview helpers', () => {
         },
       ],
     })).toBe('Early access locked')
+  })
+
+  it('infers missing Civitai image ids from numeric CDN filenames', () => {
+    const images = imagesForVersion({
+      id: 505,
+      images: [
+        {
+          url: 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/00bed0b0-f493-4e56-aa31-1079f3dae8b2/original=true/134254134.jpeg',
+          hash: 'UBAI_e}]%3%he?^R=|kDIUNHWYNFxIM{E1EN',
+        },
+        {
+          id: 42,
+          url: 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/with-id/original=true/ignored.jpeg',
+        },
+      ],
+    })
+
+    expect(images[0]?.id).toBe(134254134)
+    expect(images[1]?.id).toBe(42)
   })
 
   it('allows covered early-access versions to download', () => {

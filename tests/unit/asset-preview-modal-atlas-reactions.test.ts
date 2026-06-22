@@ -186,6 +186,69 @@ describe('AssetPreviewModal Atlas reactions', () => {
     expect(wrapper.get('button[aria-label="Like in Atlas"]').attributes('aria-pressed')).toBe('true')
   })
 
+  it('infers Civitai image ids from version image URLs before rendering Atlas reactions', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), 'http://127.0.0.1')
+      if (url.pathname === '/api/settings/app') {
+        return atlasSettingsResponse()
+      }
+
+      if (url.pathname === '/api/atlas/civitai/status') {
+        return new Response(JSON.stringify({
+          ok: true,
+          configured: true,
+          items: [{ request_id: 'civitai:134254134', exists: false, filtered: false }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+
+      return new Response(JSON.stringify({ items: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { default: AssetPreviewModal } = await import('../../src/components/asset-preview/AssetPreviewModal.vue')
+    const wrapper = mount(AssetPreviewModal, {
+      attachTo: document.body,
+      global: {
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
+      },
+      props: {
+        open: true,
+        model: {
+          id: 2122378,
+          name: 'MYRHA-PS00',
+          type: 'LORA',
+          modelVersions: [
+            {
+              id: 3049876,
+              name: 'v2.0',
+              baseModel: 'Illustrious',
+              images: [{
+                url: 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/00bed0b0-f493-4e56-aa31-1079f3dae8b2/original=true/134254134.jpeg',
+                type: 'image',
+                nsfw: false,
+              }],
+            },
+          ],
+        },
+      },
+    })
+
+    await flushPromises()
+    await flushPromises()
+
+    const statusCall = fetchMock.mock.calls.find((call) => String(call[0]) === '/api/atlas/civitai/status')
+    expect(requestBody(statusCall)).toMatchObject({
+      items: [expect.objectContaining({ id: 134254134 })],
+    })
+    expect(wrapper.find('[data-test="asset-preview-main-atlas-reactions"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-test="asset-preview-atlas-reaction-button"]')).toHaveLength(4)
+  })
+
   it('renders an Atlas reaction widget under every feed preview and sends the clicked type', async () => {
     const feedImages = [
       { id: 900, url: 'https://example.test/feed-1.jpg', type: 'image', nsfw: false },

@@ -96,9 +96,10 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     activeImageIndex,
   })
   const activeImage = computed(() => activeSlide.value?.image ?? null)
+  const activeImageLookupId = computed(() => numberProp(activeImage.value?.id))
   const activeDetailedImage = computed(() => {
-    const id = activeImage.value?.id
-    return id === undefined || id === null ? null : imageDetails.value[String(id)] ?? null
+    const id = activeImageLookupId.value
+    return id === null ? null : imageDetails.value[String(id)] ?? null
   })
   const imageSafety = useAssetPreviewImageSafety({
     activeDetailedImage,
@@ -316,6 +317,15 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     }
   }
 
+  function retryImageMetadata() {
+    const imageId = activeImageLookupId.value
+    if (imageId === null || imageMetaLoading.value) {
+      return
+    }
+
+    void fetchImageDetails(imageId)
+  }
+
   watch(
     () => [props.open, props.model?.id ?? null, normalizedModelId.value, normalizedVersionId.value, props.initialImageIndex, props.modelType, props.fileName],
     () => {
@@ -377,7 +387,7 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
       props.model?.id ?? null,
       normalizedModelId.value,
       activeVersionId.value,
-      activeImage.value?.id,
+      activeImageLookupId.value,
       activeSlide.value?.source,
     ] as const,
     ([isOpen, , , , imageId, source]) => {
@@ -388,7 +398,6 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
 
       if (
         !isOpen ||
-        imageId === undefined ||
         imageId === null ||
         source === 'archive'
       ) {
@@ -480,5 +489,6 @@ export function useAssetPreviewModal(props: Readonly<AssetPreviewModalProps>, em
     queueVersionDownload,
     deleteVersionDownload,
     imageDimensions,
+    retryImageMetadata,
   }
 }

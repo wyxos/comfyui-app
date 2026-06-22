@@ -48,7 +48,40 @@ export function modelVersionLabel(version: CivitaiModelVersion) {
 }
 
 export function imagesForVersion(version: CivitaiModelVersion | null | undefined) {
-  return (version?.images ?? []).filter((image) => Boolean(image.url))
+  return (version?.images ?? [])
+    .filter((image) => Boolean(image.url))
+    .map((image) => withInferredCivitaiImageId(image))
+}
+
+function inferCivitaiImageIdFromUrl(url: string | null | undefined) {
+  if (!url) {
+    return null
+  }
+
+  let pathname
+  try {
+    pathname = new URL(url, 'http://local.test').pathname
+  } catch {
+    pathname = url.split('?')[0]?.split('#')[0] ?? ''
+  }
+
+  const filename = pathname.split('/').filter(Boolean).at(-1) ?? ''
+  const stem = filename.replace(/\.[a-z0-9]+$/i, '')
+  if (!/^\d+$/.test(stem)) {
+    return null
+  }
+
+  const parsed = Number(stem)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+function withInferredCivitaiImageId(image: CivitaiImage) {
+  if (image.id !== undefined && image.id !== null && String(image.id).trim() !== '') {
+    return image
+  }
+
+  const id = inferCivitaiImageIdFromUrl(image.url)
+  return id === null ? image : { ...image, id }
 }
 
 export function previewSizedImageUrl(url: string) {
