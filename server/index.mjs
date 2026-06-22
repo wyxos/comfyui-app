@@ -40,6 +40,7 @@ export {
 } from './model-trigger-words.mjs'
 export { mergeJobOutputs } from './job-state.mjs'
 export { ensureJobsLoaded, resetJobStoreRuntimeState } from './job-store.mjs'
+export { resetPromptAssistantStoreRuntimeState } from './prompt-assistant/store.mjs'
 export {
   installServerConsoleLogger,
   logApiError,

@@ -11,6 +11,7 @@ import { createHomePromptTagActions } from '../../src/views/home/homePromptTagAc
 import { createHomeSelectionComputed } from '../../src/views/home/homeSelectionComputed'
 import { createHomeState } from '../../src/views/home/homeState'
 import { provideHomeView } from '../../src/views/home/homeViewContext'
+import type { PromptSuggestion } from '../../src/views/home/prompt-assistant/promptSuggestionTypes'
 
 function mountPromptTab() {
   const state = createHomeState()
@@ -19,8 +20,16 @@ function mountPromptTab() {
     ...state,
     formTab: ref('prompt'),
     promptSectionDefinitions: PROMPT_SECTION_DEFINITIONS,
-    compiledPrompt: computed(() => ''),
-    compiledNegativePrompt: computed(() => ''),
+    compiledPrompt: computed(() =>
+      state.promptMode.value === 'text'
+        ? state.prompt.value.trim()
+        : promptActions.buildPromptFromSections(state.promptSections.value, state.promptSectionDrafts.value),
+    ),
+    compiledNegativePrompt: computed(() =>
+      state.promptMode.value === 'text'
+        ? state.negativePrompt.value.trim()
+        : promptActions.buildNegativePromptFromTags(true),
+    ),
     setPromptMode: vi.fn(),
     handlePromptWeightKeydown: vi.fn(),
     ...promptActions,
@@ -37,6 +46,75 @@ function mountPromptTab() {
 }
 
 describe('home prompt tags', () => {
+  it('applies character suggestions to subject and routes helper traits without overwriting existing weights', () => {
+    const state = createHomeState()
+    const actions = createHomePromptTagActions(state)
+    const suggestion: PromptSuggestion = {
+      id: 'character-hatsune-miku',
+      kind: 'character',
+      label: 'Hatsune Miku',
+      prompt: 'hatsune miku',
+      aliases: ['miku'],
+      category: 'Character',
+      targetSections: ['subject'],
+      helperTags: ['twintails', 'turquoise hair', 'code geass'],
+    }
+
+    state.promptSections.value.subject = [{ text: 'hatsune miku', strength: '1.4' }]
+    state.promptSections.value.details = [{ text: 'twintails', strength: '1.2' }]
+    state.promptSections.value.others = [{ text: 'code geass', strength: '1.3' }]
+    state.promptSectionDrafts.value.subject = 'mik'
+
+    expect(actions.applyPromptSuggestion('subject', suggestion)).toBe(true)
+
+    expect(state.promptSections.value.subject).toEqual([{ text: 'hatsune miku', strength: '1.4' }])
+    expect(state.promptSections.value.details).toEqual([
+      { text: 'twintails', strength: '1.2' },
+      { text: 'turquoise hair', strength: '1' },
+    ])
+    expect(state.promptSections.value.others).toEqual([{ text: 'code geass', strength: '1.3' }])
+    expect(state.promptSectionDrafts.value.subject).toBe('')
+  })
+
+  it('can append enriched character helper traits after the character tag has already been inserted', () => {
+    const state = createHomeState()
+    const actions = createHomePromptTagActions(state)
+
+    state.promptSections.value.subject = [{ text: 'hatsune miku', strength: '1.4' }]
+    state.promptSections.value.details = [{ text: 'twintails', strength: '1.2' }]
+
+    actions.applyCharacterHelperTags(['twintails', 'aqua hair', 'vocaloid'])
+
+    expect(state.promptSections.value.subject).toEqual([{ text: 'hatsune miku', strength: '1.4' }])
+    expect(state.promptSections.value.details).toEqual([
+      { text: 'twintails', strength: '1.2' },
+      { text: 'aqua hair', strength: '1' },
+    ])
+    expect(state.promptSections.value.others).toEqual([{ text: 'vocaloid', strength: '1' }])
+  })
+
+  it('applies negative prompt suggestions and skips duplicates', () => {
+    const state = createHomeState()
+    const actions = createHomePromptTagActions(state)
+    const suggestion: PromptSuggestion = {
+      id: 'tag-bad-hands',
+      kind: 'tag',
+      label: 'Bad hands',
+      prompt: 'bad hands',
+      aliases: ['hands'],
+      category: 'Negative',
+      targetSections: ['negative'],
+    }
+
+    state.negativePromptTags.value = [{ text: 'bad hands', strength: '1.3' }]
+    state.negativePromptDraft.value = 'hands'
+
+    expect(actions.applyNegativePromptSuggestion(suggestion)).toBe(true)
+
+    expect(state.negativePromptTags.value).toEqual([{ text: 'bad hands', strength: '1.3' }])
+    expect(state.negativePromptDraft.value).toBe('')
+  })
+
   it('splits prompt section drafts into tags as soon as a delimiter appears', () => {
     const state = createHomeState()
     const actions = createHomePromptTagActions(state)

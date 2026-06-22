@@ -7,7 +7,10 @@ import type {
   PromptTagDropTarget,
   PromptTagLocation,
 } from './homeTypes'
+import { resolveCharacterHelperSection } from './prompt-assistant/promptSuggestionRouting'
+import type { PromptSuggestion } from './prompt-assistant/promptSuggestionTypes'
 import {
+  buildPromptTag,
   formatPromptWeight,
   formatPromptWeightInput,
   getPromptTagKey,
@@ -160,6 +163,79 @@ function setPromptTagList(location: ReturnType<typeof getPromptTagListLocation>,
   }
 
   negativePromptTags.value = tags
+}
+
+function appendTagsToPromptSection(sectionId: PromptSectionId, rawTags: string[]) {
+  const existing = promptSections.value[sectionId] ?? []
+  const seen = new Set(existing.map(getPromptTagKey))
+  const nextTags = [...existing]
+
+  for (const rawTag of rawTags) {
+    const tag = buildPromptTag(rawTag)
+    if (!tag) {
+      continue
+    }
+
+    const key = getPromptTagKey(tag)
+    if (seen.has(key)) {
+      continue
+    }
+
+    seen.add(key)
+    nextTags.push(tag)
+  }
+
+  promptSections.value[sectionId] = nextTags
+}
+
+function appendTagsToNegativePrompt(rawTags: string[]) {
+  const seen = new Set(negativePromptTags.value.map(getPromptTagKey))
+  const nextTags = [...negativePromptTags.value]
+
+  for (const rawTag of rawTags) {
+    const tag = buildPromptTag(rawTag)
+    if (!tag) {
+      continue
+    }
+
+    const key = getPromptTagKey(tag)
+    if (seen.has(key)) {
+      continue
+    }
+
+    seen.add(key)
+    nextTags.push(tag)
+  }
+
+  negativePromptTags.value = nextTags
+}
+
+function applyCharacterHelperTags(rawTags: string[]) {
+  const tagsBySection = new Map<PromptSectionId, string[]>()
+
+  for (const rawTag of rawTags) {
+    const sectionId = resolveCharacterHelperSection(rawTag)
+    tagsBySection.set(sectionId, [...(tagsBySection.get(sectionId) ?? []), rawTag])
+  }
+
+  for (const [sectionId, sectionTags] of tagsBySection) {
+    appendTagsToPromptSection(sectionId, sectionTags)
+  }
+}
+
+function applyPromptSuggestion(sectionId: PromptSectionId, suggestion: PromptSuggestion) {
+  appendTagsToPromptSection(sectionId, [suggestion.prompt])
+  if (suggestion.kind === 'character' && suggestion.helperTags?.length) {
+    applyCharacterHelperTags(suggestion.helperTags)
+  }
+  promptSectionDrafts.value[sectionId] = ''
+  return true
+}
+
+function applyNegativePromptSuggestion(suggestion: PromptSuggestion) {
+  appendTagsToNegativePrompt([suggestion.prompt])
+  negativePromptDraft.value = ''
+  return true
 }
 
 function clampPromptTagTargetIndex(index: number, length: number) {
@@ -391,6 +467,9 @@ return {
   addPromptSectionTag,
   removePromptSectionTag,
   movePromptTag,
+  applyPromptSuggestion,
+  applyCharacterHelperTags,
+  applyNegativePromptSuggestion,
   updatePromptSectionTagText,
   togglePromptSectionTagEnabled,
   clearPromptSectionTags,

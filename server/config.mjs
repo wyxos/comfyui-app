@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 export let host = process.env.COMFY_COMPANION_HOST ?? '127.0.0.1'
 export let port = Number(process.env.COMFY_COMPANION_PORT ?? 3210)
 export let comfyUrl = new URL(process.env.COMFYUI_URL ?? 'http://127.0.0.1:8000')
-export let comfyClientId = process.env.COMFYUI_CLIENT_ID ?? 'comfyui-companion-app'
+export let comfyClientId = createRuntimeComfyClientId()
 export let preferredCheckpoint = process.env.COMFYUI_DEFAULT_CHECKPOINT ?? 'waiIllustriousSDXL_v160.safetensors'
 
 export const defaultRuntimeAdapters = {
@@ -20,6 +21,14 @@ export const defaultRuntimeAdapters = {
 }
 export const runtimeAdapters = { ...defaultRuntimeAdapters }
 
+function comfyClientIdPrefix() {
+  return process.env.COMFYUI_CLIENT_ID?.trim() || 'comfyui-companion-app'
+}
+
+function createRuntimeComfyClientId() {
+  return `${comfyClientIdPrefix()}-${process.pid}-${randomUUID()}`
+}
+
 export const serverDir = fileURLToPath(new URL('.', import.meta.url))
 export const appRoot = normalize(join(serverDir, '..'))
 export const distDir = join(appRoot, 'dist')
@@ -32,6 +41,7 @@ export let settingsPath = join(configDir, 'settings.json')
 export let downloadsPath = join(configDir, 'downloads.json')
 export let watchedDownloadsPath = join(configDir, 'watched-downloads.json')
 export let jobsDatabasePath = join(configDir, 'jobs.sqlite')
+export let promptAssistantDatabasePath = join(configDir, 'prompt-assistant.sqlite')
 export const downloadsPersistRenameAttempts = 8
 export const downloadsPersistRenameDelayMs = 50
 export let civitaiDownloadSegmentCount = Math.max(
@@ -179,7 +189,7 @@ export function refreshConfigFromEnv() {
   host = process.env.COMFY_COMPANION_HOST ?? '127.0.0.1'
   port = Number(process.env.COMFY_COMPANION_PORT ?? 3210)
   comfyUrl = new URL(process.env.COMFYUI_URL ?? 'http://127.0.0.1:8000')
-  comfyClientId = process.env.COMFYUI_CLIENT_ID ?? 'comfyui-companion-app'
+  comfyClientId = createRuntimeComfyClientId()
   preferredCheckpoint = process.env.COMFYUI_DEFAULT_CHECKPOINT ?? 'waiIllustriousSDXL_v160.safetensors'
   userConfigRoot = process.env.APPDATA || process.env.XDG_CONFIG_HOME || join(homedir(), '.config')
   configDir = normalize(resolve(process.env.COMFY_COMPANION_CONFIG_DIR || join(userConfigRoot, 'comfyui-companion-app')))
@@ -187,6 +197,7 @@ export function refreshConfigFromEnv() {
   downloadsPath = join(configDir, 'downloads.json')
   watchedDownloadsPath = join(configDir, 'watched-downloads.json')
   jobsDatabasePath = join(configDir, 'jobs.sqlite')
+  promptAssistantDatabasePath = join(configDir, 'prompt-assistant.sqlite')
   civitaiDownloadSegmentCount = Math.max(
     1,
     Math.min(8, Number.parseInt(process.env.CIVITAI_DOWNLOAD_SEGMENTS ?? '4', 10) || 4),

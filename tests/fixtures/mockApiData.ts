@@ -8,6 +8,16 @@ export type FetchCall = {
 export type MockJob = Record<string, unknown>
 export type MockDownload = Record<string, unknown>
 export type MockModel = Record<string, unknown>
+export type MockPromptSuggestion = {
+  id: string
+  kind: 'character' | 'tag'
+  label: string
+  prompt: string
+  aliases: string[]
+  category: string
+  targetSections: string[]
+  helperTags?: string[]
+}
 
 export type MockFailure = {
   status?: number
@@ -22,6 +32,8 @@ export type MockApiOptions = {
   jobs?: MockJob[]
   downloads?: MockDownload[]
   watchedDownloads?: MockDownload[]
+  promptSuggestions?: MockPromptSuggestion[]
+  promptSuggestionSourceNames?: string[]
   civitaiConfigured?: boolean
   includeNsfwDefault?: boolean
   blurNsfwModelsDefault?: boolean

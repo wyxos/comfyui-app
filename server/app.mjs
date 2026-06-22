@@ -42,6 +42,15 @@ import {
   handlePutCivitaiSettings,
 } from './handlers/settings.mjs'
 import {
+  handlePromptSuggestionsClear,
+  handlePromptSuggestionsDownloadSaa,
+  handlePromptSuggestionsEnrichCharacter,
+  handlePromptSuggestionsImport,
+  handlePromptSuggestionsSearch,
+  handlePromptSuggestionsStatus,
+  resetPromptAssistantHandlerRuntimeState,
+} from './handlers/prompt-assistant.mjs'
+import {
   handleAtlasBroadcastAuth,
   handleAtlasFileDelete,
   handleAtlasCivitaiFeed,
@@ -69,6 +78,7 @@ import { resetWatchedDownloadsRuntimeState, startWatchedDownloadPoller, stopWatc
 import { resetComfyModelDirsFromEnv } from './model-paths.mjs'
 import { resetModelMetadataRuntimeState } from './model-metadata.mjs'
 import { resetJobStoreRuntimeState } from './job-store.mjs'
+import { resetPromptAssistantStoreRuntimeState } from './prompt-assistant/store.mjs'
 import { installProcessErrorLogger, installServerConsoleLogger } from './server-log.mjs'
 
 const proxyHeaderBlocklist = new Set(['connection', 'content-encoding', 'content-length', 'transfer-encoding'])
@@ -182,6 +192,30 @@ export function createCompanionServer({
 
   if (url.pathname === '/api/settings/app' && request.method === 'PUT') {
     return handlePutAppSettings(request, response)
+  }
+
+  if (url.pathname === '/api/prompt-suggestions/status' && request.method === 'GET') {
+    return handlePromptSuggestionsStatus(response)
+  }
+
+  if (url.pathname === '/api/prompt-suggestions' && request.method === 'GET') {
+    return handlePromptSuggestionsSearch(url, response)
+  }
+
+  if (url.pathname === '/api/prompt-suggestions/import' && request.method === 'POST') {
+    return handlePromptSuggestionsImport(request, response)
+  }
+
+  if (url.pathname === '/api/prompt-suggestions/download-saa' && request.method === 'POST') {
+    return handlePromptSuggestionsDownloadSaa(response)
+  }
+
+  if (url.pathname === '/api/prompt-suggestions/enrich-character' && request.method === 'POST') {
+    return handlePromptSuggestionsEnrichCharacter(request, response)
+  }
+
+  if (url.pathname === '/api/prompt-suggestions' && request.method === 'DELETE') {
+    return handlePromptSuggestionsClear(response)
   }
 
   if (url.pathname === '/api/civitai/models' && request.method === 'GET') {
@@ -393,6 +427,8 @@ export function createCompanionServer({
 
 export function configureCompanionServerForTests(adapters = {}) {
   resetJobStoreRuntimeState()
+  resetPromptAssistantStoreRuntimeState()
+  resetPromptAssistantHandlerRuntimeState()
   refreshConfigFromEnv()
   resetComfyModelDirsFromEnv()
   resetDownloadsRuntimeState()
@@ -402,6 +438,8 @@ export function configureCompanionServerForTests(adapters = {}) {
   resetComfySocketRuntimeState()
   resetModelMetadataRuntimeState()
   resetCivitaiCacheRuntimeState()
+  resetPromptAssistantStoreRuntimeState()
+  resetPromptAssistantHandlerRuntimeState()
   Object.assign(runtimeAdapters, adapters)
 
   return () => {

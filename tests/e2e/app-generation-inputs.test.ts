@@ -242,6 +242,21 @@ describe('companion app input and prompt flows', () => {
       })
     })
 
+  it('applies prompt tag assistant suggestions into the compiled prompt', async () => {
+      const { screen } = await renderCompanionApp('/?tab=prompt')
+
+      const subjectInput = screen.getByRole('textbox', { name: 'Subject', exact: true })
+      await subjectInput.fill('mik')
+
+      await expect.element(screen.getByRole('option', { name: 'Add Hatsune Miku suggestion' })).toBeVisible()
+      await screen.getByRole('option', { name: 'Add Hatsune Miku suggestion' }).click()
+
+      await expect.element(screen.getByText(/hatsune miku, twintails, turquoise hair/)).toBeVisible()
+
+      await screen.getByRole('textbox', { name: 'Details' }).fill('blue eyes')
+      await expect.element(screen.getByRole('option', { name: 'Add blue_eyes suggestion' })).toBeVisible()
+    })
+
   it('edits prompt tags on double click and drags them between fields', async () => {
       const { screen } = await renderCompanionApp('/')
 

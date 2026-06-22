@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   buildQueueSummaryForPromptIds,
@@ -15,7 +15,9 @@ import {
   serializeDownload,
   startCompanionServer,
 } from '../../server/index.mjs'
-import { handleComfySocketMessage } from '../../server/comfy-socket.mjs'
+import { submitComfyPrompt } from '../../server/comfy-client.mjs'
+import { comfyClientId } from '../../server/config.mjs'
+import { connectComfySocket, handleComfySocketMessage } from '../../server/comfy-socket.mjs'
 import { ensureJob } from '../../server/job-state.mjs'
 import { deletePersistedJob } from '../../server/job-store.mjs'
 
@@ -208,6 +210,65 @@ describe('server runtime helpers', () => {
     })
 
     deletePersistedJob(promptId)
+  })
+
+  it('uses one unique runtime ComfyUI client id for websocket and prompt submission', async () => {
+    const originalWebSocket = globalThis.WebSocket
+    const originalFetch = globalThis.fetch
+    const originalComfyUrl = process.env.COMFYUI_URL
+    const originalClientId = process.env.COMFYUI_CLIENT_ID
+    let socketUrl = ''
+    let promptBody: unknown = null
+
+    class FakeWebSocket {
+      static CONNECTING = 0
+      static OPEN = 1
+      readyState = FakeWebSocket.CONNECTING
+
+      constructor(url: string | URL) {
+        socketUrl = String(url)
+      }
+
+      addEventListener() {}
+    }
+
+    try {
+      process.env.COMFYUI_URL = 'http://comfy.test'
+      delete process.env.COMFYUI_CLIENT_ID
+      const restoreAdapters = configureCompanionServerForTests()
+      globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket
+      globalThis.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        promptBody = JSON.parse(String(init?.body ?? '{}'))
+        return new Response(JSON.stringify({ prompt_id: 'prompt-runtime-client-id' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        })
+      }) as unknown as typeof fetch
+
+      connectComfySocket()
+      await submitComfyPrompt({})
+
+      const socketClientId = new URL(socketUrl).searchParams.get('clientId')
+      expect(comfyClientId).not.toBe('comfyui-companion-app')
+      expect(socketClientId).toBe(comfyClientId)
+      expect(promptBody).toMatchObject({ client_id: comfyClientId })
+
+      restoreAdapters()
+    } finally {
+      if (originalComfyUrl === undefined) {
+        delete process.env.COMFYUI_URL
+      } else {
+        process.env.COMFYUI_URL = originalComfyUrl
+      }
+      if (originalClientId === undefined) {
+        delete process.env.COMFYUI_CLIENT_ID
+      } else {
+        process.env.COMFYUI_CLIENT_ID = originalClientId
+      }
+      globalThis.WebSocket = originalWebSocket
+      globalThis.fetch = originalFetch
+      configureCompanionServerForTests()
+    }
   })
 
   it('creates an importable HTTP server without connecting to ComfyUI', async () => {

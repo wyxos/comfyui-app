@@ -14,35 +14,13 @@ import {
 } from './mockApiData'
 import type { FetchCall, MockApiOptions, MockDownload, MockJob, MockModel } from './mockApiData'
 import { mockCivitaiModelPreviews } from './mockCivitaiModelPreviews'
+import { mockImageResponse, modelImages } from './mockMedia'
+import { createMockPromptSuggestionState, handleMockPromptSuggestions } from './mockPromptSuggestions'
 import { createMockSettingsApiState, handleMockSettingsApi, isMockAtlasConfigured } from './mockSettingsApi'
 import { handleMockWatchedDownloads } from './mockWatchedDownloads'
 import { installMockDownloadEventsSocket } from './mockDownloadEventsSocket'
 
 export { createMockDownload, createMockJob, createMockModel } from './mockApiData'
-
-const onePixelPng =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lp2wngAAAABJRU5ErkJggg=='
-
-function mockImageResponse() {
-  const bytes = Uint8Array.from(atob(onePixelPng), (char) => char.charCodeAt(0))
-  return new Response(bytes, {
-    status: 200,
-    headers: { 'Content-Type': 'image/png' },
-  })
-}
-
-function modelImages(models: MockModel[]) {
-  return models.flatMap((model) => {
-    const versions = Array.isArray(model.modelVersions) ? model.modelVersions : []
-    return versions.flatMap((version) => {
-      if (!version || typeof version !== 'object' || !('images' in version)) {
-        return []
-      }
-
-      return Array.isArray(version.images) ? version.images : []
-    })
-  })
-}
 
 export function installMockApi(options: MockApiOptions = {}) {
   const settingsState = createMockSettingsApiState(options)
@@ -50,6 +28,7 @@ export function installMockApi(options: MockApiOptions = {}) {
   let downloads: MockDownload[] = [...(options.downloads ?? [])]
   let watchedDownloads: MockDownload[] = [...(options.watchedDownloads ?? [])]
   let models = [...(options.models ?? [createMockModel()])]
+  const promptSuggestionState = createMockPromptSuggestionState(options)
   let inputImageUploadCount = 0
   const failures = options.failures ?? {}
   const waits = options.waits ?? {}
@@ -167,6 +146,17 @@ export function installMockApi(options: MockApiOptions = {}) {
           },
         },
       })
+    }
+
+    const promptSuggestionResponse = handleMockPromptSuggestions(
+      promptSuggestionState,
+      url.pathname,
+      method,
+      url.searchParams,
+      body,
+    )
+    if (promptSuggestionResponse) {
+      return promptSuggestionResponse
     }
 
     if (url.pathname === '/api/controlnet-preview' && method === 'POST') {

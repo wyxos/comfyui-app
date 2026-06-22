@@ -8,6 +8,9 @@ import {
 import type { PromptSectionId } from './homeTypes'
 import { useHomePromptTagInteractions } from './useHomePromptTagInteractions'
 import { useProvidedHomeView } from './homeViewContext'
+import PromptSuggestionPopover from './prompt-assistant/PromptSuggestionPopover.vue'
+import { usePromptSuggestionAutocomplete } from './prompt-assistant/usePromptSuggestionAutocomplete'
+import { usePromptSuggestionLibrary } from './prompt-assistant/usePromptSuggestionLibrary'
 
 const {
   prompt,
@@ -30,6 +33,9 @@ const {
   togglePromptSectionTagEnabled,
   clearPromptSectionTags,
   clearNegativePromptTags,
+  applyPromptSuggestion,
+  applyCharacterHelperTags,
+  applyNegativePromptSuggestion,
   setPromptSectionTagStrength,
   stepPromptSectionTagStrength,
   handlePromptSectionTagKeydown,
@@ -43,6 +49,39 @@ const {
   handleNegativePromptTagKeydown,
   handleNegativePromptTagInput,
 } = useProvidedHomeView()
+
+const {
+  searchPromptSuggestions,
+  enrichCharacterSuggestion,
+} = usePromptSuggestionLibrary()
+
+const {
+  activePromptSuggestionIndex,
+  getPromptSuggestions,
+  isPromptSuggestionLoading,
+  syncPromptSuggestions,
+  applyPromptSuggestionTarget,
+  handlePromptSectionSuggestionInput,
+  handlePromptSectionSuggestionKeydown,
+  handlePromptSectionSuggestionBlur,
+  handleNegativePromptSuggestionInput,
+  handleNegativePromptSuggestionKeydown,
+  handleNegativePromptSuggestionBlur,
+} = usePromptSuggestionAutocomplete({
+  promptSectionDrafts,
+  negativePromptDraft,
+  searchPromptSuggestions,
+  applyPromptSuggestion,
+  applyCharacterHelperTags,
+  applyNegativePromptSuggestion,
+  enrichCharacterSuggestion,
+  addPromptSectionTag,
+  handlePromptSectionTagInput,
+  handlePromptSectionTagKeydown,
+  addNegativePromptTag,
+  handleNegativePromptTagInput,
+  handleNegativePromptTagKeydown,
+})
 
 const hasPromptSectionTags = computed(() =>
   promptSectionDefinitions.some((section) =>
@@ -244,15 +283,25 @@ const {
                       </span>
                     </div>
 
-                    <input
-                      v-model="promptSectionDrafts[section.id]"
-                      :aria-label="section.label"
-                      class="min-h-7 min-w-[9rem] flex-1 bg-transparent text-sm text-card-foreground outline-none placeholder:text-muted-foreground/75"
-                      :placeholder="section.placeholder"
-                      @input="handlePromptSectionTagInput(section.id)"
-                      @keydown="handlePromptSectionTagKeydown($event, section.id)"
-                      @blur="addPromptSectionTag(section.id)"
-                    />
+                    <div class="relative min-w-[9rem] flex-1">
+                      <input
+                        v-model="promptSectionDrafts[section.id]"
+                        :aria-label="section.label"
+                        class="min-h-7 w-full bg-transparent text-sm text-card-foreground outline-none placeholder:text-muted-foreground/75"
+                        :placeholder="section.placeholder"
+                        autocomplete="off"
+                        @focus="syncPromptSuggestions({ field: 'section', sectionId: section.id })"
+                        @input="handlePromptSectionSuggestionInput(section.id)"
+                        @keydown="handlePromptSectionSuggestionKeydown($event, section.id)"
+                        @blur="handlePromptSectionSuggestionBlur(section.id)"
+                      />
+                      <PromptSuggestionPopover
+                        :suggestions="getPromptSuggestions({ field: 'section', sectionId: section.id })"
+                        :active-index="activePromptSuggestionIndex"
+                        :is-loading="isPromptSuggestionLoading({ field: 'section', sectionId: section.id })"
+                        @select="applyPromptSuggestionTarget({ field: 'section', sectionId: section.id }, $event)"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -362,15 +411,25 @@ const {
                   </span>
                 </div>
 
-                <input
-                  v-model="negativePromptDraft"
-                  aria-label="Negative prompt"
-                  class="min-h-7 min-w-[9rem] flex-1 bg-transparent text-sm text-card-foreground outline-none placeholder:text-muted-foreground/75"
-                  placeholder="blur, bad hands, text"
-                  @input="handleNegativePromptTagInput"
-                  @keydown="handleNegativePromptTagKeydown"
-                  @blur="addNegativePromptTag"
-                />
+                <div class="relative min-w-[9rem] flex-1">
+                  <input
+                    v-model="negativePromptDraft"
+                    aria-label="Negative prompt"
+                    class="min-h-7 w-full bg-transparent text-sm text-card-foreground outline-none placeholder:text-muted-foreground/75"
+                    placeholder="blur, bad hands, text"
+                    autocomplete="off"
+                    @focus="syncPromptSuggestions({ field: 'negative' })"
+                    @input="handleNegativePromptSuggestionInput"
+                    @keydown="handleNegativePromptSuggestionKeydown"
+                    @blur="handleNegativePromptSuggestionBlur"
+                  />
+                  <PromptSuggestionPopover
+                    :suggestions="getPromptSuggestions({ field: 'negative' })"
+                    :active-index="activePromptSuggestionIndex"
+                    :is-loading="isPromptSuggestionLoading({ field: 'negative' })"
+                    @select="applyPromptSuggestionTarget({ field: 'negative' }, $event)"
+                  />
+                </div>
               </div>
               <p class="break-words text-xs leading-5 text-primary-foreground/56">
                 {{ compiledNegativePrompt || 'No negative prompt tags yet.' }}

@@ -214,8 +214,12 @@ export function statusFromReactionPayload(
   payload: AtlasReactionResponse | null,
   type: AtlasReactionType,
 ): AtlasMediaStatus {
-  const blacklistedAt = payload?.blacklisted_at ?? currentStatus?.blacklisted_at ?? null
   const isBlacklist = type === 'blacklist'
+  const reaction = isBlacklist ? null : payload?.reaction?.type ?? type
+  const blacklistedAt = isBlacklist
+    ? payload?.blacklisted_at ?? currentStatus?.blacklisted_at ?? new Date().toISOString()
+    : null
+  const reactedAt = isBlacklist ? null : payload?.reacted_at ?? currentStatus?.reacted_at ?? null
 
   return {
     ...(currentStatus ?? {}),
@@ -223,12 +227,12 @@ export function statusFromReactionPayload(
     file_id: payload?.file?.id ?? currentStatus?.file_id ?? null,
     source_url: payload?.file?.url ?? currentStatus?.source_url ?? null,
     referrer_url: payload?.file?.referrer_url ?? currentStatus?.referrer_url ?? null,
-    reaction: isBlacklist ? currentStatus?.reaction ?? null : payload?.reaction?.type ?? type,
+    reaction,
     downloaded: currentStatus?.downloaded === true || Boolean(payload?.download?.downloaded_at),
     downloaded_at: payload?.download?.downloaded_at ?? currentStatus?.downloaded_at ?? null,
-    blacklisted: isBlacklist || currentStatus?.blacklisted === true,
-    blacklisted_at: isBlacklist ? blacklistedAt ?? new Date().toISOString() : blacklistedAt,
-    reacted_at: payload?.reacted_at ?? currentStatus?.reacted_at ?? null,
+    blacklisted: isBlacklist,
+    blacklisted_at: blacklistedAt,
+    reacted_at: reactedAt,
     download: payload?.download ?? currentStatus?.download ?? null,
     filtered: false,
     ignored: false,

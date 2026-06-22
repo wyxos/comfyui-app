@@ -368,6 +368,7 @@ export async function createServerHarness(options: HarnessOptions = {}) {
       server.close((error) => (error ? rejectClose(error) : resolveClose()))
     })
     serverModule.resetJobStoreRuntimeState()
+    serverModule.resetPromptAssistantStoreRuntimeState()
 
     for (const [key, value] of Object.entries(previousEnv)) {
       if (value === undefined) {
