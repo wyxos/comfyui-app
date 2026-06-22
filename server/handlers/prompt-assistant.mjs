@@ -15,9 +15,24 @@ import {
   replacePromptAssistantPack,
   searchPromptAssistantSuggestions,
 } from '../prompt-assistant/store.mjs'
+import {
+  clearPromptProviderCache,
+  readCachedPromptProviderSuggestionRecords,
+  readPromptProviderCacheState,
+  replacePromptProviderQueryCache,
+} from '../prompt-assistant/provider-cache.mjs'
+import {
+  fetchPromptTagProviderSuggestions,
+  promptTagProviders,
+} from '../prompt-assistant/providers.mjs'
+import {
+  coercePromptSuggestionLimit,
+  mergePromptSuggestionResults,
+} from '../prompt-assistant/search-results.mjs'
 
 const SAA_REFRESH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000
 let promptAssistantSyncPromise = null
+const promptProviderSyncPromises = new Map()
 
 function normalizeDocument(value) {
   if (!value || typeof value !== 'object') {
@@ -117,6 +132,55 @@ function startPromptAssistantSyncIfNeeded(status) {
   return true
 }
 
+function providerSyncKey(provider, query) {
+  return `${provider.id}:${query}`
+}
+
+function syncPromptTagProvider(provider, query) {
+  return fetchPromptTagProviderSuggestions(provider, query)
+    .then((records) => {
+      replacePromptProviderQueryCache({
+        provider: provider.id,
+        query,
+        records,
+      })
+    })
+    .catch((error) => {
+      replacePromptProviderQueryCache({
+        provider: provider.id,
+        query,
+        ok: false,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      })
+    })
+}
+
+function startPromptProviderSyncsIfNeeded(query, target) {
+  if (normalizePrompt(target).toLowerCase() === 'negative') {
+    return false
+  }
+
+  const cacheState = readPromptProviderCacheState(query, promptTagProviders)
+  if (!cacheState.query || !cacheState.staleProviders.length) {
+    return false
+  }
+
+  for (const provider of cacheState.staleProviders) {
+    const key = providerSyncKey(provider, cacheState.query)
+    if (promptProviderSyncPromises.has(key)) {
+      continue
+    }
+
+    const syncPromise = syncPromptTagProvider(provider, cacheState.query)
+      .finally(() => {
+        promptProviderSyncPromises.delete(key)
+      })
+    promptProviderSyncPromises.set(key, syncPromise)
+  }
+
+  return true
+}
+
 export function handlePromptSuggestionsStatus(response) {
   try {
     const status = readPromptAssistantStatus()
@@ -135,21 +199,37 @@ export function handlePromptSuggestionsStatus(response) {
 
 export async function handlePromptSuggestionsSearch(url, response) {
   try {
+    const query = url.searchParams.get('q') ?? ''
+    const target = url.searchParams.get('target') ?? ''
+    const limit = coercePromptSuggestionLimit(url.searchParams.get('limit') ?? undefined)
     let syncing = Boolean(promptAssistantSyncPromise)
-    if (normalizePrompt(url.searchParams.get('q') ?? '')) {
+    if (normalizePrompt(query)) {
       syncing = startPromptAssistantSyncIfNeeded(readPromptAssistantStatus()) || syncing
     }
 
-    const suggestions = searchPromptAssistantSuggestions({
-      query: url.searchParams.get('q') ?? '',
-      target: url.searchParams.get('target') ?? '',
-      limit: url.searchParams.get('limit') ?? undefined,
+    const providerSyncing = startPromptProviderSyncsIfNeeded(query, target)
+    const localSuggestions = searchPromptAssistantSuggestions({
+      query,
+      target,
+      limit,
+    })
+    const providerRecords = readCachedPromptProviderSuggestionRecords({
+      query,
+      target,
+      limit: 20,
+    })
+    const suggestions = mergePromptSuggestionResults({
+      localSuggestions,
+      providerRecords,
+      query,
+      limit,
     })
 
     return sendJson(response, 200, {
       ok: true,
       suggestions,
       syncing,
+      providerSyncing,
     })
   } catch (error) {
     return sendError(
@@ -207,6 +287,7 @@ export async function handlePromptSuggestionsDownloadSaa(response) {
 
 export function handlePromptSuggestionsClear(response) {
   try {
+    clearPromptProviderCache()
     return sendJson(response, 200, statusPayload(clearPromptAssistantPack()))
   } catch (error) {
     return sendError(
@@ -277,4 +358,5 @@ export async function handlePromptSuggestionsEnrichCharacter(request, response) 
 
 export function resetPromptAssistantHandlerRuntimeState() {
   promptAssistantSyncPromise = null
+  promptProviderSyncPromises.clear()
 }

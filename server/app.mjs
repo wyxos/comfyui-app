@@ -79,6 +79,7 @@ import { resetComfyModelDirsFromEnv } from './model-paths.mjs'
 import { resetModelMetadataRuntimeState } from './model-metadata.mjs'
 import { resetJobStoreRuntimeState } from './job-store.mjs'
 import { resetPromptAssistantStoreRuntimeState } from './prompt-assistant/store.mjs'
+import { resetPromptProviderCacheRuntimeState } from './prompt-assistant/provider-cache.mjs'
 import { installProcessErrorLogger, installServerConsoleLogger } from './server-log.mjs'
 
 const proxyHeaderBlocklist = new Set(['connection', 'content-encoding', 'content-length', 'transfer-encoding'])
@@ -428,6 +429,7 @@ export function createCompanionServer({
 export function configureCompanionServerForTests(adapters = {}) {
   resetJobStoreRuntimeState()
   resetPromptAssistantStoreRuntimeState()
+  resetPromptProviderCacheRuntimeState()
   resetPromptAssistantHandlerRuntimeState()
   refreshConfigFromEnv()
   resetComfyModelDirsFromEnv()
@@ -439,6 +441,7 @@ export function configureCompanionServerForTests(adapters = {}) {
   resetModelMetadataRuntimeState()
   resetCivitaiCacheRuntimeState()
   resetPromptAssistantStoreRuntimeState()
+  resetPromptProviderCacheRuntimeState()
   resetPromptAssistantHandlerRuntimeState()
   Object.assign(runtimeAdapters, adapters)
 

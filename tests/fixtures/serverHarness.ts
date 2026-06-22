@@ -369,6 +369,7 @@ export async function createServerHarness(options: HarnessOptions = {}) {
     })
     serverModule.resetJobStoreRuntimeState()
     serverModule.resetPromptAssistantStoreRuntimeState()
+    serverModule.resetPromptProviderCacheRuntimeState()
 
     for (const [key, value] of Object.entries(previousEnv)) {
       if (value === undefined) {

@@ -6,6 +6,12 @@ type PromptSuggestionInputTarget =
   | { field: 'section'; sectionId: PromptSectionId }
   | { field: 'negative' }
 
+type PromptSuggestionSearchResult = {
+  suggestions: PromptSuggestion[]
+  syncing?: boolean
+  providerSyncing?: boolean
+}
+
 type PromptSuggestionAutocompleteDeps = {
   promptSectionDrafts: { value: Record<PromptSectionId, string> }
   negativePromptDraft: { value: string }
@@ -13,7 +19,7 @@ type PromptSuggestionAutocompleteDeps = {
     query: string,
     target: PromptSuggestionTarget,
     signal?: AbortSignal,
-  ) => Promise<PromptSuggestion[]>
+  ) => Promise<PromptSuggestionSearchResult>
   applyPromptSuggestion: (sectionId: PromptSectionId, suggestion: PromptSuggestion) => boolean
   applyCharacterHelperTags: (rawTags: string[]) => void
   applyNegativePromptSuggestion: (suggestion: PromptSuggestion) => boolean
@@ -25,6 +31,9 @@ type PromptSuggestionAutocompleteDeps = {
   handleNegativePromptTagInput: () => void
   handleNegativePromptTagKeydown: (event: KeyboardEvent) => void
 }
+
+const PROVIDER_RETRY_DELAY_MS = 350
+const PROVIDER_RETRY_LIMIT = 4
 
 function promptSuggestionTargetKey(target: PromptSuggestionInputTarget) {
   return target.field === 'section' ? `section:${target.sectionId}` : 'negative'
@@ -42,6 +51,7 @@ export function usePromptSuggestionAutocomplete(deps: PromptSuggestionAutocomple
   let searchRequestId = 0
   let searchAbortController: AbortController | null = null
   let activeSearchTargetKey: string | null = null
+  let providerRetryTimer: ReturnType<typeof setTimeout> | null = null
 
   function isActivePromptSuggestionTarget(target: PromptSuggestionInputTarget) {
     return activePromptSuggestionTarget.value
@@ -82,17 +92,47 @@ export function usePromptSuggestionAutocomplete(deps: PromptSuggestionAutocomple
     }
   }
 
+  function clearProviderRetryTimer() {
+    if (providerRetryTimer) {
+      clearTimeout(providerRetryTimer)
+      providerRetryTimer = null
+    }
+  }
+
   function closePromptSuggestions(target?: PromptSuggestionInputTarget) {
     if (!target || isActivePromptSuggestionTarget(target)) {
+      clearProviderRetryTimer()
       activePromptSuggestionTarget.value = null
       activePromptSuggestionIndex.value = 0
     }
   }
 
-  async function syncPromptSuggestions(target: PromptSuggestionInputTarget) {
+  function scheduleProviderRetry(
+    target: PromptSuggestionInputTarget,
+    requestId: number,
+    query: string,
+    retryCount: number,
+  ) {
+    clearProviderRetryTimer()
+    providerRetryTimer = setTimeout(() => {
+      providerRetryTimer = null
+      if (
+        requestId !== searchRequestId ||
+        !isActivePromptSuggestionTarget(target) ||
+        getPromptSuggestionDraft(target).trim() !== query
+      ) {
+        return
+      }
+
+      void syncPromptSuggestions(target, retryCount + 1)
+    }, PROVIDER_RETRY_DELAY_MS)
+  }
+
+  async function syncPromptSuggestions(target: PromptSuggestionInputTarget, providerRetryCount = 0) {
     const query = getPromptSuggestionDraft(target).trim()
     const requestId = searchRequestId + 1
     searchRequestId = requestId
+    clearProviderRetryTimer()
     if (activeSearchTargetKey) {
       setPromptSuggestionLoading(activeSearchTargetKey, false)
       activeSearchTargetKey = null
@@ -112,11 +152,14 @@ export function usePromptSuggestionAutocomplete(deps: PromptSuggestionAutocomple
     activeSearchTargetKey = targetKey
     activePromptSuggestionTarget.value = target
     activePromptSuggestionIndex.value = 0
-    setPromptSuggestions(target, [])
+    if (providerRetryCount === 0) {
+      setPromptSuggestions(target, [])
+    }
     setPromptSuggestionLoading(targetKey, true)
+    let shouldRetryProvider = false
 
     try {
-      const suggestions = await deps.searchPromptSuggestions(
+      const result = await deps.searchPromptSuggestions(
         query,
         getPromptSuggestionSearchTarget(target),
         abortController.signal,
@@ -125,9 +168,14 @@ export function usePromptSuggestionAutocomplete(deps: PromptSuggestionAutocomple
         return
       }
 
+      const suggestions = result.suggestions
       setPromptSuggestions(target, suggestions)
-      if (!suggestions.length) {
+      shouldRetryProvider = Boolean(result.providerSyncing) && providerRetryCount < PROVIDER_RETRY_LIMIT
+      if (!suggestions.length && !shouldRetryProvider) {
         closePromptSuggestions(target)
+      }
+      if (shouldRetryProvider) {
+        scheduleProviderRetry(target, requestId, query, providerRetryCount)
       }
     } catch (error) {
       if ((error as { name?: string }).name === 'AbortError' || requestId !== searchRequestId) {
@@ -137,7 +185,7 @@ export function usePromptSuggestionAutocomplete(deps: PromptSuggestionAutocomple
       setPromptSuggestions(target, [])
       closePromptSuggestions(target)
     } finally {
-      if (requestId === searchRequestId) {
+      if (requestId === searchRequestId && !shouldRetryProvider) {
         setPromptSuggestionLoading(targetKey, false)
         if (activeSearchTargetKey === targetKey) {
           activeSearchTargetKey = null

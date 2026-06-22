@@ -6,6 +6,8 @@ import type {
 type PromptSuggestionSearchResponse = {
   ok: true
   suggestions: PromptSuggestion[]
+  syncing?: boolean
+  providerSyncing?: boolean
 }
 
 type PromptCharacterEnrichmentResponse = {
@@ -43,7 +45,11 @@ export async function searchPromptSuggestions(
     'Could not search prompt suggestions.',
   )
 
-  return payload.suggestions
+  return {
+    suggestions: payload.suggestions,
+    syncing: Boolean(payload.syncing),
+    providerSyncing: Boolean(payload.providerSyncing),
+  }
 }
 
 export async function enrichCharacterSuggestion(prompt: string) {

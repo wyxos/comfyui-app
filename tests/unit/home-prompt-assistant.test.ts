@@ -62,6 +62,10 @@ function createPromptAssistantFetchMock() {
   ]
   let suggestions: PromptSuggestion[] = [characterSuggestion, styleSuggestion]
   let nextSearchDelay: Promise<void> | null = null
+  const queuedSearchResponses: Array<{
+    suggestions: PromptSuggestion[]
+    providerSyncing?: boolean
+  }> = []
   const enrichmentByPrompt = new Map<string, string[]>()
   const calls: Array<{ path: string; method: string; body: unknown; search: URLSearchParams }> = []
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -85,6 +89,11 @@ function createPromptAssistantFetchMock() {
         const delay = nextSearchDelay
         nextSearchDelay = null
         await delay
+      }
+
+      const queuedSearchResponse = queuedSearchResponses.shift()
+      if (queuedSearchResponse) {
+        return jsonResponse({ ok: true, ...queuedSearchResponse })
       }
 
       const query = (url.searchParams.get('q') ?? '').toLowerCase()
@@ -129,6 +138,9 @@ function createPromptAssistantFetchMock() {
     },
     delayNextSearch(delay: Promise<void>) {
       nextSearchDelay = delay
+    },
+    queueSearchResponse(response: { suggestions: PromptSuggestion[]; providerSyncing?: boolean }) {
+      queuedSearchResponses.push(response)
     },
     setEnrichment(prompt: string, helperTags: string[]) {
       enrichmentByPrompt.set(prompt, helperTags)
@@ -199,6 +211,32 @@ describe('home prompt assistant', () => {
 
     expect(wrapper.find('[aria-label="Searching prompt suggestions"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Hatsune Miku')
+  })
+
+  it('keeps loading and retries while provider suggestions are still syncing', async () => {
+    vi.useFakeTimers()
+    try {
+      api.queueSearchResponse({ suggestions: [], providerSyncing: true })
+      api.queueSearchResponse({ suggestions: [characterSuggestion], providerSyncing: false })
+      const wrapper = mountPromptTab()
+      const subjectInput = wrapper.get('input[aria-label="Subject"]')
+
+      await flushPromises()
+      await subjectInput.setValue('mik')
+      await flushPromises()
+
+      expect(wrapper.find('[aria-label="Searching prompt suggestions"]').exists()).toBe(true)
+      expect(wrapper.find('[role="option"]').exists()).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(400)
+      await flushPromises()
+
+      expect(wrapper.find('[aria-label="Searching prompt suggestions"]').exists()).toBe(false)
+      expect(wrapper.text()).toContain('Hatsune Miku')
+      expect(api.calls.filter((call) => call.path === '/api/prompt-suggestions')).toHaveLength(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('applies a character suggestion and enriches missing helper tags on demand', async () => {

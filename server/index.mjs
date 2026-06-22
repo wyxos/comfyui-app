@@ -41,6 +41,7 @@ export {
 export { mergeJobOutputs } from './job-state.mjs'
 export { ensureJobsLoaded, resetJobStoreRuntimeState } from './job-store.mjs'
 export { resetPromptAssistantStoreRuntimeState } from './prompt-assistant/store.mjs'
+export { resetPromptProviderCacheRuntimeState } from './prompt-assistant/provider-cache.mjs'
 export {
   installServerConsoleLogger,
   logApiError,
